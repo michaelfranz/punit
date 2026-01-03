@@ -15,10 +15,11 @@ import java.util.stream.Stream;
  *
  * <p>This extension:
  * <ul>
- *   <li>Generates N sample invocations based on {@link ProbabilisticTest#samples()}</li>
+ *   <li>Generates N sample invocations based on resolved configuration</li>
  *   <li>Catches assertion failures and records them without failing the individual sample</li>
  *   <li>Aggregates results and determines final pass/fail based on observed pass rate</li>
  *   <li>Terminates early when success becomes mathematically impossible</li>
+ *   <li>Supports configuration overrides via system properties and environment variables</li>
  *   <li>Publishes structured statistics via {@link org.junit.jupiter.api.TestReporter}</li>
  * </ul>
  */
@@ -33,6 +34,22 @@ public class ProbabilisticTestExtension implements
     private static final String CONFIG_KEY = "config";
     private static final String EVALUATOR_KEY = "evaluator";
     private static final String TERMINATED_KEY = "terminated";
+
+    private final ConfigurationResolver configResolver;
+
+    /**
+     * Default constructor using standard configuration resolver.
+     */
+    public ProbabilisticTestExtension() {
+        this(new ConfigurationResolver());
+    }
+
+    /**
+     * Constructor for testing with custom configuration resolver.
+     */
+    ProbabilisticTestExtension(ConfigurationResolver configResolver) {
+        this.configResolver = configResolver;
+    }
 
     // ========== TestTemplateInvocationContextProvider ==========
 
@@ -50,15 +67,20 @@ public class ProbabilisticTestExtension implements
         Method testMethod = context.getRequiredTestMethod();
         ProbabilisticTest annotation = testMethod.getAnnotation(ProbabilisticTest.class);
         
-        int samples = annotation.samples();
-        double minPassRate = annotation.minPassRate();
+        // Resolve configuration with precedence: system prop > env var > annotation
+        ConfigurationResolver.ResolvedConfiguration resolved;
+        try {
+            resolved = configResolver.resolve(annotation, testMethod.getName());
+        } catch (IllegalArgumentException e) {
+            throw new ExtensionConfigurationException(e.getMessage(), e);
+        }
         
-        // Validate configuration
-        validateConfiguration(samples, minPassRate, testMethod);
+        int samples = resolved.samples();
+        double minPassRate = resolved.minPassRate();
         
         // Store configuration and create components
         ExtensionContext.Store store = context.getStore(NAMESPACE);
-        TestConfiguration config = new TestConfiguration(samples, minPassRate);
+        TestConfiguration config = new TestConfiguration(samples, minPassRate, resolved.appliedMultiplier());
         SampleResultAggregator aggregator = new SampleResultAggregator(samples);
         EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(samples, minPassRate);
         AtomicBoolean terminated = new AtomicBoolean(false);
@@ -81,19 +103,6 @@ public class ProbabilisticTestExtension implements
                 .limit(samples)
                 .takeWhile(i -> !terminated.get())
                 .map(sampleIndex -> new ProbabilisticTestInvocationContext(sampleIndex, samples));
-    }
-
-    private void validateConfiguration(int samples, double minPassRate, Method testMethod) {
-        if (samples <= 0) {
-            throw new ExtensionConfigurationException(
-                    "Invalid @ProbabilisticTest configuration on " + testMethod.getName() +
-                    ": samples must be >= 1, but was " + samples);
-        }
-        if (minPassRate < 0.0 || minPassRate > 1.0) {
-            throw new ExtensionConfigurationException(
-                    "Invalid @ProbabilisticTest configuration on " + testMethod.getName() +
-                    ": minPassRate must be in range [0.0, 1.0], but was " + minPassRate);
-        }
     }
 
     // ========== InvocationInterceptor ==========
@@ -121,7 +130,7 @@ public class ProbabilisticTestExtension implements
             // Record failure but don't rethrow - sample failed, but overall test continues
             aggregator.recordFailure(e);
         } catch (Throwable t) {
-            // For Phase 1/2, treat all exceptions as failures
+            // Treat all exceptions as failures
             aggregator.recordFailure(t);
         }
         
@@ -189,6 +198,11 @@ public class ProbabilisticTestExtension implements
         entries.put("punit.terminationReason", terminationReasonStr);
         entries.put("punit.elapsedMs", String.valueOf(aggregator.getElapsedMs()));
         
+        // Include multiplier info if one was applied
+        if (config.hasMultiplier()) {
+            entries.put("punit.samplesMultiplier", String.format("%.2f", config.appliedMultiplier()));
+        }
+        
         context.publishReportEntry(entries);
     }
 
@@ -227,9 +241,13 @@ public class ProbabilisticTestExtension implements
     // ========== Inner Classes ==========
 
     /**
-     * Holds the test configuration extracted from the annotation.
+     * Holds the resolved test configuration.
      */
-    private record TestConfiguration(int samples, double minPassRate) {}
+    private record TestConfiguration(int samples, double minPassRate, double appliedMultiplier) {
+        boolean hasMultiplier() {
+            return appliedMultiplier != 1.0;
+        }
+    }
 
     /**
      * Invocation context for a single sample execution.

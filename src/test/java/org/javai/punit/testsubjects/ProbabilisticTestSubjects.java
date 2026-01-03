@@ -99,6 +99,30 @@ public class ProbabilisticTestSubjects {
         }
     }
 
+    // ========== Phase 3: Configuration Override Test Subjects ==========
+
+    /**
+     * Test with small samples that can be scaled by multiplier.
+     * Used to verify system property overrides work.
+     */
+    public static class ConfigurableSamplesTest {
+        private static final AtomicInteger counter = new AtomicInteger(0);
+        
+        public static void resetCounter() {
+            counter.set(0);
+        }
+        
+        public static int getSamplesExecuted() {
+            return counter.get();
+        }
+        
+        @ProbabilisticTest(samples = 10, minPassRate = 0.5)
+        void configurableTest() {
+            counter.incrementAndGet();
+            assertThat(true).isTrue();
+        }
+    }
+
     // ========== Phase 2: Early Termination Test Subjects ==========
 
     /**

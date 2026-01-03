@@ -118,6 +118,77 @@ class ProbabilisticTestIntegrationTest {
                         .failed(0));
     }
 
+    // ========== Phase 3: Configuration Override Tests ==========
+
+    @Test
+    void systemPropertyOverridesSamples() {
+        ConfigurableSamplesTest.resetCounter();
+        
+        // Set system property to override samples from 10 to 5
+        System.setProperty("punit.samples", "5");
+        try {
+            EngineTestKit.engine("junit-jupiter")
+                    .selectors(DiscoverySelectors.selectClass(ConfigurableSamplesTest.class))
+                    .execute()
+                    .testEvents()
+                    .assertStatistics(stats -> stats
+                            .started(5)  // Overridden from 10 to 5
+                            .succeeded(5)
+                            .failed(0));
+            
+            org.assertj.core.api.Assertions.assertThat(
+                    ConfigurableSamplesTest.getSamplesExecuted())
+                    .isEqualTo(5);
+        } finally {
+            System.clearProperty("punit.samples");
+        }
+    }
+
+    @Test
+    void samplesMultiplierScalesSamples() {
+        ConfigurableSamplesTest.resetCounter();
+        
+        // Set multiplier to 0.5 (halves the samples from 10 to 5)
+        System.setProperty("punit.samplesMultiplier", "0.5");
+        try {
+            EngineTestKit.engine("junit-jupiter")
+                    .selectors(DiscoverySelectors.selectClass(ConfigurableSamplesTest.class))
+                    .execute()
+                    .testEvents()
+                    .assertStatistics(stats -> stats
+                            .started(5)  // 10 * 0.5 = 5
+                            .succeeded(5)
+                            .failed(0));
+            
+            org.assertj.core.api.Assertions.assertThat(
+                    ConfigurableSamplesTest.getSamplesExecuted())
+                    .isEqualTo(5);
+        } finally {
+            System.clearProperty("punit.samplesMultiplier");
+        }
+    }
+
+    @Test
+    void minPassRateOverrideWorks() {
+        BarelyFailingTest.resetCounter();
+        
+        // BarelyFailingTest passes 70% but requires 80%, so it fails
+        // Override minPassRate to 0.6 so it should pass
+        System.setProperty("punit.minPassRate", "0.6");
+        try {
+            EngineTestKit.engine("junit-jupiter")
+                    .selectors(DiscoverySelectors.selectClass(BarelyFailingTest.class))
+                    .execute()
+                    .testEvents()
+                    .assertStatistics(stats -> stats
+                            .started(10)
+                            .succeeded(10)  // Now passes because 70% >= 60%
+                            .failed(0));
+        } finally {
+            System.clearProperty("punit.minPassRate");
+        }
+    }
+
     // ========== Phase 2: Early Termination Tests ==========
 
     @Test
