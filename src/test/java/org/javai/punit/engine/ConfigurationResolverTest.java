@@ -1,5 +1,7 @@
 package org.javai.punit.engine;
 
+import org.javai.punit.api.BudgetExhaustedBehavior;
+import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ProbabilisticTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -218,6 +220,36 @@ class ConfigurationResolverTest {
             @Override
             public double minPassRate() {
                 return minPassRate;
+            }
+
+            @Override
+            public long timeBudgetMs() {
+                return 0;
+            }
+
+            @Override
+            public int tokenCharge() {
+                return 0;
+            }
+
+            @Override
+            public long tokenBudget() {
+                return 0;
+            }
+
+            @Override
+            public BudgetExhaustedBehavior onBudgetExhausted() {
+                return BudgetExhaustedBehavior.FAIL;
+            }
+
+            @Override
+            public ExceptionHandling onException() {
+                return ExceptionHandling.FAIL_SAMPLE;
+            }
+
+            @Override
+            public int maxExampleFailures() {
+                return 5;
             }
         };
     }

@@ -29,7 +29,21 @@ import java.lang.annotation.Target;
  * <p>The test above will execute 100 times and pass if at least 95% of
  * invocations succeed.
  *
+ * <h2>Budget Control</h2>
+ * <p>You can set time and token budgets to control resource consumption:
+ * <pre>{@code
+ * @ProbabilisticTest(samples = 100, minPassRate = 0.90,
+ *                    timeBudgetMs = 60000, // 1 minute max
+ *                    tokenBudget = 50000)  // 50k tokens max
+ * void llmRespondsWithValidJson(TokenChargeRecorder tokenRecorder) {
+ *     LlmResponse response = llmClient.complete("Generate JSON");
+ *     tokenRecorder.recordTokens(response.getUsage().getTotalTokens());
+ *     assertThat(response.getContent()).isValidJson();
+ * }
+ * }</pre>
+ *
  * @see ProbabilisticTestExtension
+ * @see TokenChargeRecorder
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
@@ -55,5 +69,73 @@ public @interface ProbabilisticTest {
      * @return the minimum required pass rate (0.0 to 1.0)
      */
     double minPassRate() default 0.95;
-}
 
+    /**
+     * Maximum wall-clock time budget in milliseconds for all samples.
+     * 0 = unlimited. Default: 0.
+     * 
+     * <p>If budget is exhausted before all samples complete, behavior is 
+     * controlled by {@link #onBudgetExhausted()}.
+     *
+     * @return the time budget in milliseconds, or 0 for unlimited
+     */
+    long timeBudgetMs() default 0;
+
+    /**
+     * Token charge per sample invocation (static mode).
+     * Must be ≥ 0. Default: 0 (no static token charging).
+     * 
+     * <p>This value is accumulated after each sample execution. Used in
+     * conjunction with {@link #tokenBudget()} to limit total token consumption.
+     * 
+     * <p><strong>Static vs Dynamic charging:</strong>
+     * <ul>
+     *   <li>If the test method has a {@link TokenChargeRecorder} parameter,
+     *       dynamic mode is used and this value is ignored.</li>
+     *   <li>Otherwise, this fixed charge is added after each sample.</li>
+     * </ul>
+     *
+     * @return the token charge per sample, or 0 to disable static charging
+     */
+    int tokenCharge() default 0;
+
+    /**
+     * Maximum total token budget for all samples combined.
+     * 0 = unlimited. Default: 0.
+     * 
+     * <p>In static mode: before each sample, if the next sample's tokenCharge
+     * would exceed the remaining budget, termination is triggered.
+     * 
+     * <p>In dynamic mode: after each sample, if total tokens consumed exceeds
+     * the budget, termination is triggered.
+     * 
+     * <p>Behavior when exhausted is controlled by {@link #onBudgetExhausted()}.
+     *
+     * @return the token budget, or 0 for unlimited
+     */
+    long tokenBudget() default 0;
+
+    /**
+     * Behavior when any budget (time or token) is exhausted before completing
+     * all samples. Default: FAIL (test fails if budget exhausted).
+     *
+     * @return the budget exhaustion behavior
+     */
+    BudgetExhaustedBehavior onBudgetExhausted() default BudgetExhaustedBehavior.FAIL;
+
+    /**
+     * How to treat non-{@link AssertionError} exceptions thrown by the test method.
+     * Default: FAIL_SAMPLE (count as a failed sample, continue execution).
+     *
+     * @return the exception handling behavior
+     */
+    ExceptionHandling onException() default ExceptionHandling.FAIL_SAMPLE;
+
+    /**
+     * Maximum number of example failures to capture for diagnostic reporting.
+     * Set to 0 to disable capture.
+     *
+     * @return the maximum number of failures to capture
+     */
+    int maxExampleFailures() default 5;
+}

@@ -32,6 +32,7 @@ public class SampleResultAggregator {
     private final List<Throwable> exampleFailures = new ArrayList<>();
     private TerminationReason terminationReason = null;
     private String terminationDetails = null;
+    private boolean forcedFailure = false;
 
     /**
      * Creates a new aggregator for the specified number of samples.
@@ -202,6 +203,25 @@ public class SampleResultAggregator {
      */
     public boolean isComplete() {
         return terminationReason != null || getSamplesExecuted() >= totalSamples;
+    }
+
+    /**
+     * Sets whether this test should be forced to fail regardless of pass rate.
+     * Used when budget exhaustion occurs with FAIL behavior.
+     *
+     * @param forced true to force failure
+     */
+    public void setForcedFailure(boolean forced) {
+        this.forcedFailure = forced;
+    }
+
+    /**
+     * Returns true if this test has been forced to fail.
+     *
+     * @return true if forced failure
+     */
+    public boolean isForcedFailure() {
+        return forcedFailure;
     }
 }
 

@@ -245,4 +245,60 @@ class ProbabilisticTestIntegrationTest {
                         .succeeded(10)
                         .failed(0));
     }
+
+    // ========== Phase 5: Budget Scope Tests ==========
+
+    @Test
+    void classTokenBudgetExhaustion() {
+        ClassTokenBudgetTest.reset();
+        
+        // Class has 100 token budget, each sample uses 30 tokens
+        // After 4 samples: 120 tokens > 100 budget
+        // With FAIL behavior, test should fail when budget exhausted
+        EngineTestKit.engine("junit-jupiter")
+                .selectors(DiscoverySelectors.selectClass(ClassTokenBudgetTest.class))
+                .execute()
+                .testEvents()
+                .assertStatistics(stats -> stats
+                        .failed(1));  // Test fails due to budget exhaustion
+        
+        // Verify only ~4 samples ran (budget exhausted after 4th sample)
+        int tokensRecorded = ClassTokenBudgetTest.getTotalTokensRecorded();
+        org.assertj.core.api.Assertions.assertThat(tokensRecorded)
+                .isGreaterThanOrEqualTo(90)  // At least 3 samples
+                .isLessThanOrEqualTo(150);   // At most 5 samples
+    }
+
+    @Test
+    void classTimeBudgetExhaustion() {
+        ClassTimeBudgetTest.reset();
+        
+        // Class has 50ms time budget, each sample takes 20ms
+        // Should run ~2-3 samples before budget exhausted
+        EngineTestKit.engine("junit-jupiter")
+                .selectors(DiscoverySelectors.selectClass(ClassTimeBudgetTest.class))
+                .execute()
+                .testEvents()
+                .assertStatistics(stats -> stats
+                        .failed(1));  // Test fails due to budget exhaustion
+        
+        // Verify fewer than 100 samples ran
+        int samplesExecuted = ClassTimeBudgetTest.getSamplesExecuted();
+        org.assertj.core.api.Assertions.assertThat(samplesExecuted)
+                .isLessThan(10);  // Much less than 100 samples
+    }
+
+    @Test
+    void evaluatePartialBehaviorPasses() {
+        // With EVALUATE_PARTIAL, test should pass if enough samples passed
+        // before budget exhaustion (50 token budget, 30 per sample = 2 samples run)
+        // 2/2 = 100% >= 50% required, so test passes
+        EngineTestKit.engine("junit-jupiter")
+                .selectors(DiscoverySelectors.selectClass(EvaluatePartialBudgetTest.class))
+                .execute()
+                .testEvents()
+                .assertStatistics(stats -> stats
+                        .succeeded(2)   // 2 samples succeeded before budget exhausted
+                        .failed(0));    // No samples failed
+    }
 }

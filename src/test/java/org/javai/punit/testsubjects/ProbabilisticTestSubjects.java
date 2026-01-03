@@ -1,6 +1,9 @@
 package org.javai.punit.testsubjects;
 
+import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.ProbabilisticTestBudget;
+import org.javai.punit.api.TokenChargeRecorder;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -95,6 +98,67 @@ public class ProbabilisticTestSubjects {
     public static class SingleSampleTest {
         @ProbabilisticTest(samples = 1, minPassRate = 1.0)
         void singleSamplePasses() {
+            assertThat(true).isTrue();
+        }
+    }
+
+    // ========== Phase 5: Budget Scope Test Subjects ==========
+
+    /**
+     * Test class with class-level token budget that will be exhausted.
+     */
+    @ProbabilisticTestBudget(tokenBudget = 100)
+    public static class ClassTokenBudgetTest {
+        private static final AtomicInteger tokensRecorded = new AtomicInteger(0);
+
+        public static void reset() {
+            tokensRecorded.set(0);
+        }
+
+        public static int getTotalTokensRecorded() {
+            return tokensRecorded.get();
+        }
+
+        @ProbabilisticTest(samples = 10, minPassRate = 0.5)
+        void consumesTokens(TokenChargeRecorder recorder) {
+            // Each sample consumes 30 tokens; after 4 samples we'll hit 120 > 100
+            recorder.recordTokens(30);
+            tokensRecorded.addAndGet(30);
+            assertThat(true).isTrue();
+        }
+    }
+
+    /**
+     * Test class with class-level time budget.
+     */
+    @ProbabilisticTestBudget(timeBudgetMs = 50)
+    public static class ClassTimeBudgetTest {
+        private static final AtomicInteger samplesExecuted = new AtomicInteger(0);
+
+        public static void reset() {
+            samplesExecuted.set(0);
+        }
+
+        public static int getSamplesExecuted() {
+            return samplesExecuted.get();
+        }
+
+        @ProbabilisticTest(samples = 100, minPassRate = 0.5)
+        void slowTest() throws InterruptedException {
+            samplesExecuted.incrementAndGet();
+            Thread.sleep(20); // Each sample takes 20ms
+            assertThat(true).isTrue();
+        }
+    }
+
+    /**
+     * Test class with EVALUATE_PARTIAL behavior.
+     */
+    @ProbabilisticTestBudget(tokenBudget = 50, onBudgetExhausted = BudgetExhaustedBehavior.EVALUATE_PARTIAL)
+    public static class EvaluatePartialBudgetTest {
+        @ProbabilisticTest(samples = 10, minPassRate = 0.5)
+        void consumesTokens(TokenChargeRecorder recorder) {
+            recorder.recordTokens(30);
             assertThat(true).isTrue();
         }
     }
