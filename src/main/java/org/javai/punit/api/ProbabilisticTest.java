@@ -61,14 +61,14 @@ public @interface ProbabilisticTest {
 
     /**
      * Minimum pass rate required for overall test success.
-     * Value must be in range [0.0, 1.0].
+     * Value must be in range [0.0, 1.0]. The default is 1.0 (100% pass rate).
      *
      * <p>The test passes if and only if:
      * {@code (successes / samplesExecuted) >= minPassRate}
      *
      * @return the minimum required pass rate (0.0 to 1.0)
      */
-    double minPassRate() default 0.95;
+    double minPassRate() default 1.0;
 
     /**
      * Maximum wall-clock time budget in milliseconds for all samples.

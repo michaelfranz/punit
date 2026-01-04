@@ -219,12 +219,16 @@ public class ProbabilisticTestExtension implements
             tokenRecorder.resetForNextSample();
         }
         
+        // Track sample failure for IDE display purposes
+        Throwable sampleFailure = null;
+        
         // Execute the sample
         try {
             invocation.proceed();
             aggregator.recordSuccess();
         } catch (AssertionError e) {
             aggregator.recordFailure(e);
+            sampleFailure = e;
         } catch (Throwable t) {
             if (config.onException() == ExceptionHandling.ABORT_TEST) {
                 // Immediate abort
@@ -237,6 +241,7 @@ public class ProbabilisticTestExtension implements
             }
             // FAIL_SAMPLE: record and continue
             aggregator.recordFailure(t);
+            sampleFailure = t;
         }
         
         // Post-sample processing: record tokens and propagate to all scopes
@@ -254,23 +259,35 @@ public class ProbabilisticTestExtension implements
             return;
         }
         
-        // Check for impossibility-based early termination
-        Optional<TerminationReason> impossibilityReason = evaluator.shouldTerminate(
+        // Check for early termination (impossibility or success guaranteed)
+        Optional<TerminationReason> earlyTerminationReason = evaluator.shouldTerminate(
                 aggregator.getSuccesses(), aggregator.getSamplesExecuted());
         
-        if (impossibilityReason.isPresent()) {
-            String details = evaluator.buildImpossibilityExplanation(
+        if (earlyTerminationReason.isPresent()) {
+            TerminationReason reason = earlyTerminationReason.get();
+            String details = evaluator.buildExplanation(reason,
                     aggregator.getSuccesses(), aggregator.getSamplesExecuted());
             
-            aggregator.setTerminated(impossibilityReason.get(), details);
+            aggregator.setTerminated(reason, details);
             terminated.set(true);
             finalizeProbabilisticTest(extensionContext, aggregator, config, budgetMonitor,
                     classBudgetMonitor, suiteBudgetMonitor);
+            // finalizeProbabilisticTest throws if test failed, so we won't reach here unless test passed
         } else if (aggregator.getSamplesExecuted() >= config.samples()) {
             // All samples completed normally
             aggregator.setCompleted();
             finalizeProbabilisticTest(extensionContext, aggregator, config, budgetMonitor,
                     classBudgetMonitor, suiteBudgetMonitor);
+            // finalizeProbabilisticTest throws if test failed, so we won't reach here unless test passed
+        }
+        
+        // If this sample failed but we're not terminating the test yet,
+        // re-throw the original error to show this sample as "failed" (❌) in the IDE
+        // rather than "passed" (✅). This provides accurate visual feedback that the
+        // sample failed, while subsequent samples will still execute (JUnit TestTemplate
+        // invocations are independent).
+        if (sampleFailure != null && !terminated.get()) {
+            throw sampleFailure;
         }
     }
 

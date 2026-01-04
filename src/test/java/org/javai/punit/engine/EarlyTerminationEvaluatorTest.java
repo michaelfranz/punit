@@ -51,11 +51,13 @@ class EarlyTerminationEvaluatorTest {
     }
 
     @Test
-    void shouldNeverTerminateWhenMinPassRateIsZero() {
+    void shouldNotTerminateForImpossibilityWhenMinPassRateIsZero() {
         // 0% required = 0 successes needed
+        // This test verifies that IMPOSSIBILITY is never triggered with minPassRate=0
+        // (Note: SUCCESS_GUARANTEED will trigger after the first sample - see separate test)
         EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(100, 0.0);
         
-        // All failures
+        // All failures, all samples complete - normal completion, no early termination
         Optional<TerminationReason> result = evaluator.shouldTerminate(0, 100);
         
         assertThat(result).isEmpty();
@@ -122,6 +124,96 @@ class EarlyTerminationEvaluatorTest {
         
         assertThat(evaluator.getTotalSamples()).isEqualTo(100);
         assertThat(evaluator.getRequiredSuccesses()).isEqualTo(95);
+    }
+
+    // ========== Success Guaranteed Tests ==========
+
+    @Test
+    void shouldTerminateWhenSuccessGuaranteed() {
+        // 80% of 10 = 8 required
+        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(10, 0.8);
+        
+        // 8 successes, 0 failures = 8 executed, 2 remaining
+        // Already have 8 >= 8 required, success guaranteed!
+        Optional<TerminationReason> result = evaluator.shouldTerminate(8, 8);
+        
+        assertThat(result).isPresent();
+        assertThat(result.get()).isEqualTo(TerminationReason.SUCCESS_GUARANTEED);
+    }
+
+    @Test
+    void shouldTerminateEarlyWhenSuccessGuaranteedWithExcessSuccesses() {
+        // 80% of 10 = 8 required
+        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(10, 0.8);
+        
+        // 9 successes, 0 failures = 9 executed, 1 remaining
+        // Have 9 > 8 required, success guaranteed!
+        Optional<TerminationReason> result = evaluator.shouldTerminate(9, 9);
+        
+        assertThat(result).isPresent();
+        assertThat(result.get()).isEqualTo(TerminationReason.SUCCESS_GUARANTEED);
+    }
+
+    @Test
+    void shouldNotTerminateSuccessGuaranteedIfAllSamplesComplete() {
+        // 80% of 10 = 8 required
+        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(10, 0.8);
+        
+        // 10 successes, 0 failures = 10 executed, 0 remaining
+        // All samples done - this is normal completion, not early termination
+        Optional<TerminationReason> result = evaluator.shouldTerminate(10, 10);
+        
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void shouldNotTerminateWhenNotYetGuaranteed() {
+        // 80% of 10 = 8 required
+        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(10, 0.8);
+        
+        // 7 successes, 0 failures = 7 executed, 3 remaining
+        // Only 7 successes, need 8, not yet guaranteed
+        Optional<TerminationReason> result = evaluator.shouldTerminate(7, 7);
+        
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void shouldTerminateSuccessGuaranteedWithMinPassRateZeroAfterFirstSample() {
+        // 0% required = 0 successes needed
+        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(100, 0.0);
+        
+        // After first sample (even if it fails), 0 >= 0 required, success guaranteed!
+        Optional<TerminationReason> result = evaluator.shouldTerminate(0, 1);
+        
+        assertThat(result).isPresent();
+        assertThat(result.get()).isEqualTo(TerminationReason.SUCCESS_GUARANTEED);
+    }
+
+    @Test
+    void buildSuccessGuaranteedExplanationIncludesDetails() {
+        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(10, 0.8);
+        
+        String explanation = evaluator.buildSuccessGuaranteedExplanation(8, 8);
+        
+        assertThat(explanation)
+                .contains("8 samples")
+                .contains("8 successes")
+                .contains("100.0%")  // pass rate
+                .contains("2 remaining"); // skipped samples
+    }
+
+    @Test
+    void buildExplanationDispatchesToCorrectMethod() {
+        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(10, 0.8);
+        
+        String impossibilityExplanation = evaluator.buildExplanation(
+                TerminationReason.IMPOSSIBILITY, 0, 3);
+        assertThat(impossibilityExplanation).contains("maximum possible successes");
+        
+        String successExplanation = evaluator.buildExplanation(
+                TerminationReason.SUCCESS_GUARANTEED, 8, 8);
+        assertThat(successExplanation).contains("already met");
     }
 }
 

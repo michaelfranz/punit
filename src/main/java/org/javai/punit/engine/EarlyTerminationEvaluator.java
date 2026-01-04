@@ -7,17 +7,28 @@ import java.util.Optional;
 /**
  * Evaluates whether a probabilistic test should terminate early.
  *
- * <p>Early termination occurs when it becomes mathematically impossible
- * to reach the required minimum pass rate. This is a deterministic,
- * lossless optimization that accelerates failure detection without
- * changing the outcome.
+ * <p>Early termination occurs in two cases:
+ * <ul>
+ *   <li><b>Impossibility</b>: It becomes mathematically impossible to reach the required pass rate</li>
+ *   <li><b>Success Guaranteed</b>: The required pass rate has already been achieved</li>
+ * </ul>
+ *
+ * <p>Both are deterministic, lossless optimizations that accelerate test execution
+ * without changing the outcome.
  *
  * <h2>Impossibility Detection</h2>
  * <p>After each sample k, we check:
  * <pre>
- *   successes_so_far + remaining_samples < required_successes
+ *   successes_so_far + remaining_samples &lt; required_successes
  * </pre>
  * If true, even if all remaining samples pass, we cannot reach the threshold.
+ *
+ * <h2>Success Guaranteed Detection</h2>
+ * <p>After each sample k, we check:
+ * <pre>
+ *   successes_so_far &gt;= required_successes
+ * </pre>
+ * If true, we've already achieved the required pass rate and can stop early.
  */
 public class EarlyTerminationEvaluator {
 
@@ -50,15 +61,27 @@ public class EarlyTerminationEvaluator {
     /**
      * Evaluates whether the test should terminate early after a sample has completed.
      *
+     * <p>Checks for two conditions:
+     * <ol>
+     *   <li><b>Success Guaranteed</b>: We've already achieved the required pass rate</li>
+     *   <li><b>Impossibility</b>: We can no longer achieve the required pass rate</li>
+     * </ol>
+     *
      * @param successesSoFar number of successful samples so far
      * @param samplesExecuted total samples executed so far
      * @return the termination reason if early termination should occur, empty otherwise
      */
     public Optional<TerminationReason> shouldTerminate(int successesSoFar, int samplesExecuted) {
-        // Check for impossibility: can we still reach the required successes?
         int remainingSamples = totalSamples - samplesExecuted;
+        
+        // Check for success guaranteed: have we already achieved the required successes?
+        // Only terminate early if there are remaining samples (otherwise it's normal completion)
+        if (successesSoFar >= requiredSuccesses && remainingSamples > 0) {
+            return Optional.of(TerminationReason.SUCCESS_GUARANTEED);
+        }
+        
+        // Check for impossibility: can we still reach the required successes?
         int maxPossibleSuccesses = successesSoFar + remainingSamples;
-
         if (maxPossibleSuccesses < requiredSuccesses) {
             return Optional.of(TerminationReason.IMPOSSIBILITY);
         }
@@ -115,6 +138,40 @@ public class EarlyTerminationEvaluator {
             samplesExecuted, successesSoFar,
             successesSoFar, remainingSamples, maxPossibleSuccesses,
             requiredSuccesses);
+    }
+
+    /**
+     * Builds a detailed explanation of why success was guaranteed.
+     *
+     * @param successesSoFar successes at time of termination
+     * @param samplesExecuted samples executed at time of termination
+     * @return explanation string
+     */
+    public String buildSuccessGuaranteedExplanation(int successesSoFar, int samplesExecuted) {
+        int remainingSamples = totalSamples - samplesExecuted;
+        double observedPassRate = (double) successesSoFar / samplesExecuted;
+        
+        return String.format(
+            "After %d samples with %d successes (%.1f%%), required threshold (%d successes) " +
+            "already met. Skipping %d remaining samples.",
+            samplesExecuted, successesSoFar, observedPassRate * 100,
+            requiredSuccesses, remainingSamples);
+    }
+
+    /**
+     * Builds an explanation for the given termination reason.
+     *
+     * @param reason the termination reason
+     * @param successesSoFar successes at time of termination
+     * @param samplesExecuted samples executed at time of termination
+     * @return explanation string
+     */
+    public String buildExplanation(TerminationReason reason, int successesSoFar, int samplesExecuted) {
+        return switch (reason) {
+            case IMPOSSIBILITY -> buildImpossibilityExplanation(successesSoFar, samplesExecuted);
+            case SUCCESS_GUARANTEED -> buildSuccessGuaranteedExplanation(successesSoFar, samplesExecuted);
+            default -> reason.getDescription();
+        };
     }
 }
 

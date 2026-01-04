@@ -41,7 +41,7 @@ public interface TokenChargeRecorder {
      * May be called multiple times per sample; values are accumulated.
      * 
      * @param tokens number of tokens to add to this sample's consumption (must be ≥ 0)
-     * @throws IllegalArgumentException if tokens < 0
+     * @throws IllegalArgumentException if tokens &lt; 0
      */
     void recordTokens(int tokens);
     
@@ -50,7 +50,7 @@ public interface TokenChargeRecorder {
      * Convenience overload for long values (e.g., from API responses).
      * 
      * @param tokens number of tokens to add to this sample's consumption (must be ≥ 0)
-     * @throws IllegalArgumentException if tokens < 0
+     * @throws IllegalArgumentException if tokens &lt; 0
      */
     void recordTokens(long tokens);
     

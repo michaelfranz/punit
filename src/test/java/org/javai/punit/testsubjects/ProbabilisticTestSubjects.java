@@ -258,5 +258,31 @@ public class ProbabilisticTestSubjects {
             assertThat(count > 3).isTrue();
         }
     }
+
+    /**
+     * Test that triggers SUCCESS_GUARANTEED early termination.
+     * With 50% pass rate required on 10 samples, after 5 consecutive successes,
+     * we've already guaranteed success and can skip the remaining 5 samples.
+     */
+    public static class SuccessGuaranteedEarlyTerminationTest {
+        private static final AtomicInteger counter = new AtomicInteger(0);
+        private static int samplesActuallyExecuted = 0;
+        
+        public static void resetCounter() {
+            counter.set(0);
+            samplesActuallyExecuted = 0;
+        }
+        
+        public static int getSamplesActuallyExecuted() {
+            return samplesActuallyExecuted;
+        }
+        
+        @ProbabilisticTest(samples = 10, minPassRate = 0.5)
+        void alwaysPasses() {
+            samplesActuallyExecuted = counter.incrementAndGet();
+            // All samples pass - after 5 successes, we've met the 50% threshold
+            assertThat(true).isTrue();
+        }
+    }
 }
 

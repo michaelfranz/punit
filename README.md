@@ -20,8 +20,38 @@ PUNIT is a JUnit 5 extension for testing non-deterministic systems. It runs test
 
 ### 1. Add Dependency
 
-```gradle
-testImplementation("org.javai:punit:1.0.0")
+**Gradle (Kotlin DSL):**
+```kotlin
+repositories {
+    mavenLocal()  // If using locally published version
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation("org.javai:punit:0.1.0")
+}
+```
+
+**Gradle (Groovy DSL):**
+```groovy
+repositories {
+    mavenLocal()  // If using locally published version
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.javai:punit:0.1.0'
+}
+```
+
+**Maven:**
+```xml
+<dependency>
+    <groupId>org.javai</groupId>
+    <artifactId>punit</artifactId>
+    <version>0.1.0</version>
+    <scope>test</scope>
+</dependency>
 ```
 
 ### 2. Write Your First Probabilistic Test

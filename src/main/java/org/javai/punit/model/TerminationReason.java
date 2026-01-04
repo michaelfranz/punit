@@ -24,6 +24,12 @@ public enum TerminationReason {
     IMPOSSIBILITY("Cannot reach required pass rate"),
 
     /**
+     * Test terminated early because the required pass rate has already been
+     * achieved and remaining samples cannot change the outcome.
+     */
+    SUCCESS_GUARANTEED("Required pass rate already achieved"),
+
+    /**
      * Method-level time budget was exhausted.
      */
     METHOD_TIME_BUDGET_EXHAUSTED("Method time budget exhausted"),
