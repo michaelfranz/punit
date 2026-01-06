@@ -1,3 +1,4 @@
+
 # PUNIT Experiment Extension — Design & Implementation Plan
 
 ## Executive Summary
@@ -32,13 +33,13 @@ The following principles are **non-negotiable** and must be preserved throughout
 
 ### 1.3 Clear Semantic Separation
 
-| Aspect | Experiment Mode | Probabilistic Test Mode |
-|--------|-----------------|-------------------------|
-| Intent | Exploratory, empirical | Conformance, gatekeeping |
-| Produces | Empirical data | Binary pass/fail verdict |
-| Gates CI? | **Never** | Yes |
-| Assertions | Observations, not failures | Failures gate outcomes |
-| Specification | None required | Spec-driven (preferred) or inline thresholds |
+| Aspect        | Experiment Mode            | Probabilistic Test Mode                      |
+|---------------|----------------------------|----------------------------------------------|
+| Intent        | Exploratory, empirical     | Conformance, gatekeeping                     |
+| Produces      | Empirical data             | Binary pass/fail verdict                     |
+| Gates CI?     | **Never**                  | Yes                                          |
+| Assertions    | Observations, not failures | Failures gate outcomes                       |
+| Specification | None required              | Spec-driven (preferred) or inline thresholds |
 
 ### 1.4 Discovery Precedes Specification Precedes Testing
 
@@ -60,14 +61,14 @@ The canonical flow is:
 
 This flow reflects the disciplined progression from **discovery** (experiments) through **codification** (specifications) to **enforcement** (tests). Each artifact builds on the previous:
 
-| Stage | Artifact | Purpose |
-|-------|----------|---------|
-| Define | Use Case | The behavior to observe/test |
-| Design | ExperimentDesign | What factors and levels to explore |
-| Execute | ExperimentConfig | Concrete configuration to run |
-| Record | Empirical Baselines | Observed behavior per config |
-| Approve | Execution Specification | Human-approved contract |
-| Enforce | Probabilistic Conformance Tests | CI-gated validation |
+| Stage   | Artifact                        | Purpose                            |
+|---------|---------------------------------|------------------------------------|
+| Define  | Use Case                        | The behavior to observe/test       |
+| Design  | ExperimentDesign                | What factors and levels to explore |
+| Execute | ExperimentConfig                | Concrete configuration to run      |
+| Record  | Empirical Baselines             | Observed behavior per config       |
+| Approve | Execution Specification         | Human-approved contract            |
+| Enforce | Probabilistic Conformance Tests | CI-gated validation                |
 
 Hard-coded thresholds in `@ProbabilisticTest` remain supported but are explicitly a **transitional pattern**. The framework will encourage spec-driven testing and discourage arbitrary thresholds.
 
@@ -81,6 +82,24 @@ Production application code must **never** depend on:
 - Specification references
 
 All these abstractions exist strictly in **test/experiment space**. Production code is the *subject* of testing, not a participant in the test framework.
+
+### 1.6 Statistical Foundations Must Be Isolated and Auditable
+
+The statistical calculations that underpin punit's operational integrity guarantees are **critical infrastructure**. They must be:
+
+- **Isolated**: Statistical modules have essentially no dependencies on other parts of the framework. A statistician reviewing the code should not need to understand experiments, use cases, or JUnit integration.
+
+- **Independently testable**: Each statistical concept resides in a dedicated artifact (module/package), sharing that artifact only with inextricably connected concepts. This enables focused, rigorous unit testing.
+
+- **Externally auditable**: The code must be readable by a professional statistician who may not be a Java expert. Variable names, method names, and comments should use standard statistical terminology.
+
+- **Rigorously tested**: Unit tests include worked examples with real-world variable names (e.g., `experimentPassRate`, `testSamples`, `confidenceLevel`), even when values are hard-coded. These tests serve as executable documentation of the statistical methods.
+
+This principle ensures that:
+1. Organizations can validate the statistical integrity of punit independently
+2. Professional statisticians can review the calculations without framework expertise
+3. Statistical bugs are caught early through comprehensive, focused testing
+4. The statistical foundation can evolve without destabilizing other framework components
 
 ---
 
@@ -166,13 +185,13 @@ All these abstractions exist strictly in **test/experiment space**. Production c
 
 ### 2.2 Ownership Boundaries
 
-| Layer | Responsibility | Package Location |
-|-------|---------------|------------------|
-| **punit-core** | Execution engine, aggregation, budgeting, reporting, base annotations | `org.javai.punit.api`, `org.javai.punit.engine`, `org.javai.punit.model` |
-| **punit-experiment** | Experiment annotation, baseline generation, spec resolution | `org.javai.punit.experiment.api`, `org.javai.punit.experiment.engine` |
-| **punit-spec** | Specification model, registry, versioning, conflict resolution | `org.javai.punit.spec.api`, `org.javai.punit.spec.model`, `org.javai.punit.spec.registry` |
-| **punit-backends-spi** | Backend SPI interface, generic backend, registry | `org.javai.punit.experiment.spi`, `org.javai.punit.experiment.backend` |
-| **llmx** (extension) | LLM-specific backend, context, presets | `org.javai.punit.llmx` |
+| Layer                  | Responsibility                                                        | Package Location                                                                          |
+|------------------------|-----------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| **punit-core**         | Execution engine, aggregation, budgeting, reporting, base annotations | `org.javai.punit.api`, `org.javai.punit.engine`, `org.javai.punit.model`                  |
+| **punit-experiment**   | Experiment annotation, baseline generation, spec resolution           | `org.javai.punit.experiment.api`, `org.javai.punit.experiment.engine`                     |
+| **punit-spec**         | Specification model, registry, versioning, conflict resolution        | `org.javai.punit.spec.api`, `org.javai.punit.spec.model`, `org.javai.punit.spec.registry` |
+| **punit-backends-spi** | Backend SPI interface, generic backend, registry                      | `org.javai.punit.experiment.spi`, `org.javai.punit.experiment.backend`                    |
+| **llmx** (extension)   | LLM-specific backend, context, presets                                | `org.javai.punit.llmx`                                                                    |
 
 #### Dependency Constraints
 
@@ -395,17 +414,17 @@ An experiment repeatedly executes a use case in **exploratory mode** to gather e
 
 #### Experiment Vocabulary
 
-| Term | Definition |
-|------|------------|
-| **ExperimentDesign** | Declarative description of what is explored. Composed of `ExperimentFactor`s, each with `ExperimentLevel`s. May include `AdaptiveFactor`s. |
-| **ExperimentFactor** | One independently varied dimension (e.g., `model`, `temperature`, `retryPolicy`). Domain-neutral. |
-| **ExperimentLevel** | One deliberately chosen setting of a factor. May be categorical (`gpt-4o`) or numeric (`0.2`). |
-| **StaticFactor** | An `ExperimentFactor` with levels enumerated up front. Cardinality is known and finite. |
-| **AdaptiveFactor** | An `ExperimentFactor` with levels generated dynamically through iterative refinement. Initial level is provided (statically or via `Supplier`); subsequent levels are discovered based on execution feedback. |
-| **Initial Level Supplier** | A `Supplier<T>` that provides the initial level for an adaptive factor. Enables sourcing initial levels from production code (e.g., prompt construction logic). |
-| **ExperimentConfig** | One concrete combination of `ExperimentLevel`s. Fully specified, executable. The unit of execution and observation. |
-| **ExperimentGoal** | Optional criteria for early termination. When any config achieves the goal, remaining configs/iterations are skipped. |
-| **RefinementStrategy** | SPI for generating refined levels in adaptive experiments. Backend-specific (e.g., llmx provides LLM-based strategies). |
+| Term                       | Definition                                                                                                                                                                                                    |
+|----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **ExperimentDesign**       | Declarative description of what is explored. Composed of `ExperimentFactor`s, each with `ExperimentLevel`s. May include `AdaptiveFactor`s.                                                                    |
+| **ExperimentFactor**       | One independently varied dimension (e.g., `model`, `temperature`, `retryPolicy`). Domain-neutral.                                                                                                             |
+| **ExperimentLevel**        | One deliberately chosen setting of a factor. May be categorical (`gpt-4o`) or numeric (`0.2`).                                                                                                                |
+| **StaticFactor**           | An `ExperimentFactor` with levels enumerated up front. Cardinality is known and finite.                                                                                                                       |
+| **AdaptiveFactor**         | An `ExperimentFactor` with levels generated dynamically through iterative refinement. Initial level is provided (statically or via `Supplier`); subsequent levels are discovered based on execution feedback. |
+| **Initial Level Supplier** | A `Supplier<T>` that provides the initial level for an adaptive factor. Enables sourcing initial levels from production code (e.g., prompt construction logic).                                               |
+| **ExperimentConfig**       | One concrete combination of `ExperimentLevel`s. Fully specified, executable. The unit of execution and observation.                                                                                           |
+| **ExperimentGoal**         | Optional criteria for early termination. When any config achieves the goal, remaining configs/iterations are skipped.                                                                                         |
+| **RefinementStrategy**     | SPI for generating refined levels in adaptive experiments. Backend-specific (e.g., llmx provides LLM-based strategies).                                                                                       |
 
 #### 3.3.0 Single-Config Experiment (Simple Case)
 
@@ -702,11 +721,11 @@ When an experiment defines an early termination goal (e.g., "stop when successRa
 
 **The framework does not impose any ordering strategy.** The developer controls the order and should consider their objective:
 
-| Objective | Recommended Ordering | Consequence if Goal Met Early |
-|-----------|---------------------|------------------------------|
-| Find *cheapest acceptable* option | Cheapest configs first | Expensive options never tested (intended) |
-| Find *highest quality* option | Highest quality first | Cheaper alternatives never tested |
-| Explore tradeoff space | Interleave quality/cost | Partial exploration before stopping |
+| Objective                         | Recommended Ordering    | Consequence if Goal Met Early             |
+|-----------------------------------|-------------------------|-------------------------------------------|
+| Find *cheapest acceptable* option | Cheapest configs first  | Expensive options never tested (intended) |
+| Find *highest quality* option     | Highest quality first   | Cheaper alternatives never tested         |
+| Explore tradeoff space            | Interleave quality/cost | Partial exploration before stopping       |
 
 **Example: Finding the cheapest model that achieves 90% success rate**
 
@@ -1002,12 +1021,12 @@ For these factors, the "right" level cannot be enumerated in advance—it must b
 
 ##### Key Concept: Static vs. Adaptive Factors
 
-| Aspect | Static Factor | Adaptive Factor |
-|--------|--------------|-----------------|
-| **Levels** | Enumerated up front | Generated iteratively |
-| **Source** | Developer-specified list | Initial value + refinement strategy |
-| **Cardinality** | Known, finite | Unknown, bounded by iteration limits |
-| **Example** | `model: [gpt-3.5, gpt-4]` | `systemPrompt: startingFrom(...).refinedBy(...)` |
+| Aspect          | Static Factor             | Adaptive Factor                                  |
+|-----------------|---------------------------|--------------------------------------------------|
+| **Levels**      | Enumerated up front       | Generated iteratively                            |
+| **Source**      | Developer-specified list  | Initial value + refinement strategy              |
+| **Cardinality** | Known, finite             | Unknown, bounded by iteration limits             |
+| **Example**     | `model: [gpt-3.5, gpt-4]` | `systemPrompt: startingFrom(...).refinedBy(...)` |
 
 Both factor types coexist in the same `ExperimentDesign`. Static factors provide the fixed dimensions; adaptive factors provide the discovery dimension.
 
@@ -1460,14 +1479,14 @@ generateAdaptiveBaseline(iterationHistory);
 
 Adaptive experiments reuse the existing punit machinery:
 
-| Component | Behavior |
-|-----------|----------|
-| **Use Case** | Unchanged—same function, same `UseCaseResult` |
+| Component            | Behavior                                        |
+|----------------------|-------------------------------------------------|
+| **Use Case**         | Unchanged—same function, same `UseCaseResult`   |
 | **Execution Engine** | Unchanged—same sample execution, same budgeting |
-| **Aggregation** | Unchanged—same `SampleResultAggregator` |
-| **Budgeting** | Unchanged—time and token budgets apply |
-| **Reporting** | Unchanged—JUnit TestReporter integration |
-| **Goal Evaluation** | Unchanged—same criteria, applied per iteration |
+| **Aggregation**      | Unchanged—same `SampleResultAggregator`         |
+| **Budgeting**        | Unchanged—time and token budgets apply          |
+| **Reporting**        | Unchanged—JUnit TestReporter integration        |
+| **Goal Evaluation**  | Unchanged—same criteria, applied per iteration  |
 
 An adaptive experiment is *not* a new execution model—it's a different way of **producing ExperimentConfigs**.
 
@@ -1615,13 +1634,13 @@ cost:
 
 Recording adaptive factor levels in baseline files presents practical challenges:
 
-| Challenge | Description |
-|-----------|-------------|
-| **Multi-line content** | System prompts often span dozens of lines, making baselines unwieldy |
-| **Special characters** | Prompts may contain characters that require YAML/JSON escaping (quotes, colons, brackets) |
-| **Structured objects** | Some adaptive factors may produce non-string values (nested structures, code templates) |
-| **Large iteration history** | Many iterations × large levels = bloated baseline files |
-| **Readability** | Escaped or inlined content is hard to review; diffs between iterations are obscured |
+| Challenge                   | Description                                                                               |
+|-----------------------------|-------------------------------------------------------------------------------------------|
+| **Multi-line content**      | System prompts often span dozens of lines, making baselines unwieldy                      |
+| **Special characters**      | Prompts may contain characters that require YAML/JSON escaping (quotes, colons, brackets) |
+| **Structured objects**      | Some adaptive factors may produce non-string values (nested structures, code templates)   |
+| **Large iteration history** | Many iterations × large levels = bloated baseline files                                   |
+| **Readability**             | Escaped or inlined content is hard to review; diffs between iterations are obscured       |
 
 **Mitigation Strategies**:
 
@@ -1751,13 +1770,13 @@ This ensures reproducibility and auditability even when content is externalized.
 
 **This is NOT prompt optimization or AutoML.**
 
-| This IS | This is NOT |
-|---------|-------------|
+| This IS                                           | This is NOT                                 |
+|---------------------------------------------------|---------------------------------------------|
 | Empirical refinement toward *acceptable* behavior | Search for globally *optimal* configuration |
-| Iteration stops when goal is met | Iteration continues to find "best" |
-| All iterations recorded for human review | Black-box optimization |
-| Produces a spec candidate for approval | Produces "tuned" production configuration |
-| Discovery phase before testing | Replacement for testing |
+| Iteration stops when goal is met                  | Iteration continues to find "best"          |
+| All iterations recorded for human review          | Black-box optimization                      |
+| Produces a spec candidate for approval            | Produces "tuned" production configuration   |
+| Discovery phase before testing                    | Replacement for testing                     |
 
 Adaptive experiments remain part of the **discovery → specification → testing** flow. The output is a baseline (with iteration history) that a human reviews to create a specification.
 
@@ -2529,14 +2548,14 @@ When running a probabilistic test, if the observed behavior significantly differ
 
 ### 6.5 Warnings vs Errors Summary
 
-| Condition | Severity | Behavior |
-|-----------|----------|----------|
-| Inline threshold without baseline | Warning | Test executes with warning |
-| Baseline with insufficient samples | Warning | Spec loads with warning |
-| Spec without approval metadata | Error | Test fails |
-| Spec references missing baseline | Error | Test fails |
-| Observed rate significantly below baseline | Warning | Test may still pass if threshold met |
-| Use case ID not found | Error | Test fails |
+| Condition                                  | Severity | Behavior                             |
+|--------------------------------------------|----------|--------------------------------------|
+| Inline threshold without baseline          | Warning  | Test executes with warning           |
+| Baseline with insufficient samples         | Warning  | Spec loads with warning              |
+| Spec without approval metadata             | Error    | Test fails                           |
+| Spec references missing baseline           | Error    | Test fails                           |
+| Observed rate significantly below baseline | Warning  | Test may still pass if threshold met |
+| Use case ID not found                      | Error    | Test fails                           |
 
 ---
 
@@ -2619,20 +2638,20 @@ Key aspects:
 
 New keys for experiment/spec-aware reporting:
 
-| Key | Description |
-|-----|-------------|
-| `punit.mode` | `EXPERIMENT` or `CONFORMANCE` |
-| `punit.useCaseId` | The use case identifier |
-| `punit.specId` | Specification ID (if spec-driven) |
-| `punit.specVersion` | Specification version |
-| `punit.baselineSource` | Source baseline file path |
-| `punit.successCriteria` | Success criteria expression |
-| `punit.context.backend` | Backend identifier |
-| `punit.context.*` | Backend-specific context parameters |
-| `punit.stats.successRate` | Observed success rate |
-| `punit.stats.confidenceInterval` | 95% confidence interval (experiments) |
-| `punit.stats.failureDistribution` | JSON map of failure modes (experiments) |
-| `punit.baseline.outputPath` | Path to generated baseline (experiments) |
+| Key                               | Description                              |
+|-----------------------------------|------------------------------------------|
+| `punit.mode`                      | `EXPERIMENT` or `CONFORMANCE`            |
+| `punit.useCaseId`                 | The use case identifier                  |
+| `punit.specId`                    | Specification ID (if spec-driven)        |
+| `punit.specVersion`               | Specification version                    |
+| `punit.baselineSource`            | Source baseline file path                |
+| `punit.successCriteria`           | Success criteria expression              |
+| `punit.context.backend`           | Backend identifier                       |
+| `punit.context.*`                 | Backend-specific context parameters      |
+| `punit.stats.successRate`         | Observed success rate                    |
+| `punit.stats.confidenceInterval`  | 95% confidence interval (experiments)    |
+| `punit.stats.failureDistribution` | JSON map of failure modes (experiments)  |
+| `punit.baseline.outputPath`       | Path to generated baseline (experiments) |
 
 ---
 
@@ -2736,6 +2755,8 @@ Examples:
 ---
 
 ## 9. Phased Implementation Plan
+
+> **Note (January 2026)**: This phased plan has been updated to incorporate enhancements from the January 2026 requirements analysis. New phases are marked with **(NEW)** or **(UPDATED)**.
 
 ### Phase 1: Core Use Case and Result Abstractions
 
@@ -3179,34 +3200,1339 @@ src/test/java/org/javai/punit/examples/
 
 ---
 
-### Phase Summary
+### Phase A: Core Statistical and Cost Enhancements (NEW)
 
-| Phase | Description | Dependencies | Est. Days |
-|-------|-------------|--------------|-----------|
-| 1 | Core use case and result abstractions | None | 2-3 |
-| 2 | Single-config experiment mode | Phase 1 | 4-5 |
-| 2b | Multi-config experiments (ExperimentDesign) | Phase 2 | 4-5 |
-| 2c | Adaptive experiments (AdaptiveFactor, RefinementStrategy) | Phase 2b | 5-6 |
-| 3 | Specification representation and registry | Phase 1 | 3-4 |
-| 4 | Spec-driven probabilistic tests | Phase 1, 2, 3 | 4-5 |
-| 5 | Pluggable backend infrastructure | Phase 2 | 2-3 |
-| 6 | LLM backend extension (llmx) | Phase 5, 2c | 4-5 |
-| 7 | Canonical flow examples | Phase 4, 6, 2c | 3-4 |
-| 8 | Documentation, migration, guardrails | Phase 1-7 | 3-4 |
+**Goals**:
+- Improve cost tracking granularity (input/output tokens)
+- Add token estimation fallback for providers that don't report usage
+- Provide statistical guidance for sample sizing
+- Enable stability-based early termination
 
-**Total Estimated Effort**: 34-44 days
+**Scope**:
+- `CostSummary` enhancement with input/output token split
+- `TokenEstimator` interface and built-in estimators (Cl100k, Claude, BasicCostEstimator)
+- Standardized cost metadata conventions for `UseCaseResult`
+- Sample size advisory in baseline output
+- `stabilityThreshold` parameter in `@Experiment`
+- API call count tracking
+
+**Deliverables**:
+1. Enhanced `CostSummary` record with input/output token fields
+2. `org.javai.punit.cost.TokenEstimator` interface
+3. `org.javai.punit.cost.BasicCostEstimator` fallback implementation
+4. `org.javai.punit.cost.Cl100kBaseEstimator` for GPT models
+5. `org.javai.punit.cost.ClaudeEstimator` for Anthropic models
+6. Sample size advisory calculation in `EmpiricalBaselineGenerator`
+7. Stability-based early termination in `ExperimentExtension`
+8. Documentation of cost metadata conventions
+9. Unit tests for all estimators and new functionality
+
+**Dependencies**: Phase 2 (single-config experiments)
+
+**Estimated Effort**: 3-4 days
 
 ---
 
-## 10. Out-of-Scope Clarifications
+### Phase B: Adaptive Prompt Refinement (NEW)
+
+**Goals**:
+- Enable automated prompt improvement through LLM-assisted refinement
+- Provide framework for extracting prompts from production code
+- Support failure categorization for targeted refinement
+
+**Scope**:
+- `PromptContributor` interface for production code integration
+- `FailureCategorizer` functional interface
+- `AdaptivePromptContext` for experiment configuration
+- `@AdaptivePromptExperiment` annotation
+- Template vs. instantiation separation
+- Refinement loop orchestration
+- Integration with llmx for LLM-based refinement
+
+**Package Structure**:
+```
+org.javai.punit.experiment.refinement/
+├── PromptContributor.java           # Interface to extract prompts from production
+├── FailureCategorizer.java          # Interface for failure categorization
+├── AdaptivePromptContext.java       # Context for prompt refinement experiments
+├── AdaptivePromptExperiment.java    # Annotation for prompt refinement
+├── RefinementResult.java            # Output from refinement loop
+└── engine/
+    ├── PromptRefinementExecutor.java     # Orchestrates refinement loop
+    └── RefinementIterationTracker.java   # Tracks iteration history (runtime)
+
+org.javai.punit.llmx.refinement/
+├── LlmPromptRefinementStrategy.java     # LLM-based refinement (existing, enhanced)
+├── RefinementPromptBuilder.java         # Builds prompts for refinement LLM
+└── RefinementResponseParser.java        # Parses refinement suggestions
+```
+
+**Deliverables**:
+1. `org.javai.punit.experiment.refinement.PromptContributor` interface
+2. `org.javai.punit.experiment.refinement.FailureCategorizer` functional interface
+3. `org.javai.punit.experiment.refinement.AdaptivePromptContext` class
+4. `org.javai.punit.experiment.refinement.AdaptivePromptExperiment` annotation
+5. `PromptRefinementExecutor` with refinement loop logic
+6. Template placeholder parsing (`{placeholder}` syntax)
+7. Enhanced `LlmPromptRefinementStrategy` in llmx
+8. System property support for refinement model (`-Dpunit.refinementModel`)
+9. Integration tests with mock refinement strategy
+10. Documentation for prompt refinement workflow
+
+**Dependencies**: Phase 2c (adaptive experiments), Phase 6 (llmx), Phase A (cost enhancements)
+
+**Estimated Effort**: 5-6 days
+
+---
+
+### Phase C: Pass Rate Threshold Derivation (NEW)
+
+**Goals**:
+- Enable statistically-derived pass rate thresholds for regression tests
+- Account for sample size differences between experiments and tests
+- Support three operational approaches: sample-size-first, confidence-first, threshold-first
+- Provide automated threshold calculation with auditability
+- Surface statistical confidence in all failure reports
+
+**Scope**:
+- `RegressionThreshold` record with experimental basis and derivation metadata
+- `RegressionThresholdCalculator` with normal approximation and Wilson score methods
+- Enhanced `@ProbabilisticTest` annotation supporting three operational approaches
+- `ThresholdDerivationPolicy` enum (DERIVE, RAW, REQUIRE_MATCHING_SAMPLES)
+- Pre-computed thresholds in baseline output for common test sample sizes
+- Enhanced specification model with regression threshold section
+- Qualified failure reporting with confidence context for all approaches
+- Statistical warnings for Approach 3 (threshold-first) when implied confidence is low
+- Validation for edge cases (small samples, extreme rates, conflicting parameters)
+
+**Package Structure**:
+```
+org.javai.punit.experiment.threshold/
+├── RegressionThreshold.java           # Record with basis, config, derivation
+├── RegressionThresholdCalculator.java # Calculator with Wilson/normal methods
+├── ThresholdDerivationPolicy.java     # Enum for derivation behavior
+├── ThresholdValidator.java            # Validation and warnings
+├── DerivedThreshold.java              # Pre-computed threshold for baseline output
+├── OperationalApproach.java           # Enum: SAMPLE_SIZE_FIRST, CONFIDENCE_FIRST, THRESHOLD_FIRST
+├── SampleSizeCalculator.java          # For confidence-first approach (effect size + power → samples)
+└── ImpliedConfidenceCalculator.java   # For threshold-first approach (samples + threshold → confidence)
+```
+
+**Deliverables**:
+
+*Module isolation (per Design Principle 1.6):*
+1. `punit-statistics` standalone module with no framework dependencies
+2. Core packages: `core/`, `intervals/`, `threshold/`, `power/`, `validation/`
+3. Comprehensive unit tests with worked examples using real-world variable names
+4. Code style suitable for statistician review (standard notation, academic references)
+
+*Statistical calculations:*
+5. `WilsonScore` and `NormalApproximation` interval implementations
+6. `RegressionThreshold` record with basis, config, derivation metadata
+7. `ThresholdCalculator` implementations (Wilson, Normal)
+8. `SampleSizeCalculator` for confidence-first approach
+9. `ImpliedConfidenceCalculator` for threshold-first approach (with warning generation)
+10. `MethodSelector` for automatic method selection based on conditions
+
+*Framework integration:*
+11. Enhanced `@ProbabilisticTest` annotation with:
+    - Approach 1: `samples` + `thresholdConfidence`
+    - Approach 2: `confidence` + `minDetectableEffect` + `power`
+    - Approach 3: `samples` + explicit `minPassRate`
+12. Approach detection and validation logic in `ConfigurationResolver`
+13. Pre-computed thresholds in `EmpiricalBaseline` for common test sizes (50, 100, 200, 500)
+14. Enhanced specification model with `regressionThreshold` section
+15. Qualified failure reporting with confidence context (all three approaches)
+16. Statistical warnings for low implied confidence (Approach 3)
+
+*Documentation:*
+17. Developer documentation: "Three ways to configure probabilistic tests"
+18. Statistical companion document (formal language for professional statistician review)
+
+**Dependencies**: Phase 2 (experiments), Phase 3 (specifications), Phase 4 (spec-driven tests)
+
+**Estimated Effort**: 6-8 days (increased to account for module isolation and comprehensive testing)
+
+---
+
+### Phase Summary
+
+| Phase | Description                                                                              | Dependencies   | Est. Days |
+|-------|------------------------------------------------------------------------------------------|----------------|-----------|
+| 1     | Core use case and result abstractions                                                    | None           | 2-3       |
+| 2     | Single-config experiment mode                                                            | Phase 1        | 4-5       |
+| 2b    | Multi-config experiments (ExperimentDesign)                                              | Phase 2        | 4-5       |
+| 2c    | Adaptive experiments (AdaptiveFactor, RefinementStrategy)                                | Phase 2b       | 5-6       |
+| 3     | Specification representation and registry                                                | Phase 1        | 3-4       |
+| 4     | Spec-driven probabilistic tests                                                          | Phase 1, 2, 3  | 4-5       |
+| 5     | Pluggable backend infrastructure                                                         | Phase 2        | 2-3       |
+| 6     | LLM backend extension (llmx)                                                             | Phase 5, 2c    | 4-5       |
+| 7     | Canonical flow examples                                                                  | Phase 4, 6, 2c | 3-4       |
+| 8     | Documentation, migration, guardrails                                                     | Phase 1-7      | 3-4       |
+| **A** | **Core statistical and cost enhancements (NEW)**                                         | Phase 2        | 3-4       |
+| **B** | **Adaptive prompt refinement (NEW)**                                                     | Phase 2c, 6, A | 5-6       |
+| **C** | **Pass rate threshold derivation + three approaches + isolated statistics module (NEW)** | Phase 2, 3, 4  | 6-8       |
+
+**Recommended Execution Order (January 2026)**:
+1. Complete Phases 1-8 as originally planned
+2. Then Phase C (isolated statistics module + threshold derivation + three operational approaches) — foundational for operational integrity
+3. Then Phase A (cost/statistical enhancements) — builds on Phase C's statistics module
+4. Then Phase B (prompt refinement)
+
+*Note*: Phase C should precede Phase A because the isolated `punit-statistics` module provides the foundation that Phase A's cost metrics can build upon.
+
+**Total Estimated Effort**: 49-68 days (including new phases)
+
+---
+
+## 10. Planned Enhancements (January 2026 Update)
+
+This section documents enhancements planned based on detailed requirements analysis. These enhancements are organized into three phases:
+
+- **Phase A**: Core statistical and cost enhancements
+- **Phase B**: Adaptive prompt refinement
+- **Phase C**: Experiment-to-specification pass rate derivation
+
+### 10.1 Phase A: Core Statistical and Cost Enhancements
+
+These enhancements improve the framework's ability to capture cost metrics and provide statistical guidance.
+
+#### 10.1.1 Input/Output Token Split
+
+**Priority**: P1
+
+**Rationale**: Most LLM providers price input and output tokens differently. Tracking them separately enables accurate cost estimation.
+
+**Changes to `CostSummary`**:
+
+```java
+public record CostSummary(
+    long totalTimeMs,
+    long avgTimePerSampleMs,
+    long totalTokens,              // Aggregate (for backward compatibility)
+    long avgTokensPerSample,       // Aggregate (for backward compatibility)
+    long totalInputTokens,         // NEW
+    long totalOutputTokens,        // NEW
+    long avgInputTokensPerSample,  // NEW
+    long avgOutputTokensPerSample, // NEW
+    long apiCallCount              // NEW
+) {}
+```
+
+**Baseline output**:
+
+```yaml
+cost:
+  totalTimeMs: 42000
+  avgTimePerSampleMs: 420
+  totalTokens: 45000
+  avgTokensPerSample: 450
+  totalInputTokens: 30000          # NEW
+  totalOutputTokens: 15000         # NEW
+  avgInputTokensPerSample: 300     # NEW
+  avgOutputTokensPerSample: 150    # NEW
+  apiCallCount: 100                # NEW
+```
+
+#### 10.1.2 Token Estimation
+
+**Priority**: P1
+
+**Rationale**: Not all LLM providers report token counts. The framework must provide fallback estimation.
+
+**Design**:
+
+```java
+/**
+ * Estimates token counts for text content.
+ * Used when LLM providers don't report token usage.
+ */
+public interface TokenEstimator {
+    
+    long estimateInputTokens(String text);
+    long estimateOutputTokens(String text);
+    
+    /**
+     * Returns the appropriate estimator for a model.
+     * Falls back to BasicCostEstimator for unknown models.
+     */
+    static TokenEstimator forModel(String modelName) {
+        return switch (modelName) {
+            case String s when s.startsWith("gpt-4") -> new Cl100kBaseEstimator();
+            case String s when s.startsWith("gpt-3.5") -> new Cl100kBaseEstimator();
+            case String s when s.startsWith("claude") -> new ClaudeEstimator();
+            // Additional models...
+            default -> new BasicCostEstimator();
+        };
+    }
+}
+
+/**
+ * Fallback estimator using word-count heuristics.
+ * ~1.3 tokens per word for English text (empirical average).
+ */
+public class BasicCostEstimator implements TokenEstimator {
+    
+    private static final double TOKENS_PER_WORD = 1.3;
+    
+    @Override
+    public long estimateInputTokens(String text) {
+        if (text == null || text.isBlank()) return 0;
+        return Math.round(text.split("\\s+").length * TOKENS_PER_WORD);
+    }
+    
+    @Override
+    public long estimateOutputTokens(String text) {
+        return estimateInputTokens(text);  // Same heuristic
+    }
+}
+```
+
+**Priority**: Prefer provider-reported counts; fallback to estimation when unavailable.
+
+**Auto-selection**: The framework automatically selects the appropriate estimator based on the model being invoked during experiment execution.
+
+#### 10.1.3 Standardized Cost Metadata Conventions
+
+**Priority**: P1
+
+**Rationale**: Consistent metadata keys enable aggregation across experiments.
+
+**Documented conventions for `UseCaseResult.meta()`**:
+
+| Key            | Type     | Description                             |
+|----------------|----------|-----------------------------------------|
+| `inputTokens`  | `long`   | Input tokens for this invocation        |
+| `outputTokens` | `long`   | Output tokens for this invocation       |
+| `totalTokens`  | `long`   | Total tokens (input + output)           |
+| `apiCallCount` | `int`    | Number of API calls made                |
+| `model`        | `String` | Model identifier used                   |
+| `provider`     | `String` | Provider name (openai, anthropic, etc.) |
+
+**Example usage**:
+
+```java
+return UseCaseResult.builder()
+    .value("success", isValid)
+    .value("response", responseText)
+    .meta("inputTokens", usage.getInputTokens())
+    .meta("outputTokens", usage.getOutputTokens())
+    .meta("model", "gpt-4")
+    .meta("apiCallCount", 1)
+    .build();
+```
+
+#### 10.1.4 Sample Size Advisory
+
+**Priority**: P1
+
+**Rationale**: Developers often don't know how many samples are needed for desired statistical precision.
+
+**Enhancement**: Include advisory information in baseline output.
+
+```yaml
+statistics:
+  samplesExecuted: 100
+  observedSuccessRate: 0.87
+  standardError: 0.034
+  confidenceInterval95:
+    lower: 0.80
+    upper: 0.94
+  sampleSizeAdvisory:                    # NEW
+    currentSamples: 100
+    currentPrecision: 0.068              # CI width / 2
+    forPrecision5Pct: 176                # Samples needed for ±5% CI
+    forPrecision3Pct: 489                # Samples needed for ±3% CI
+    forPrecision1Pct: 4394               # Samples needed for ±1% CI
+```
+
+**Calculation**: Uses the formula `n = (z² × p × (1-p)) / e²` where:
+- `z = 1.96` (95% confidence)
+- `p` = observed success rate
+- `e` = desired margin of error
+
+#### 10.1.5 Stability-Based Early Termination
+
+**Priority**: P1
+
+**Rationale**: Avoid running more samples than necessary once statistical precision is achieved.
+
+**Enhancement**: Add `stabilityThreshold` parameter to `@Experiment`.
+
+```java
+@Experiment(
+    useCase = "usecase.json.generation",
+    samples = 1000,                    // Maximum samples
+    stabilityThreshold = 0.02          // NEW: Stop when CI width < 2%
+)
+void measureReliability() {}
+```
+
+**Behavior**:
+- After each batch of samples, compute 95% confidence interval width
+- If width ≤ `stabilityThreshold`, terminate early
+- Report termination reason as `STABILITY_ACHIEVED`
+
+---
+
+### 10.2 Phase B: Adaptive Prompt Refinement
+
+These enhancements enable automated prompt improvement through LLM-assisted refinement.
+
+#### 10.2.1 PromptContributor Interface
+
+**Priority**: P1
+
+**Rationale**: Enable extraction of prompt components from production code for refinement.
+
+```java
+/**
+ * Adapter to extract prompt contributions from production code.
+ * 
+ * <p>The framework calls this at the start of each experiment iteration
+ * to obtain the application's prompt components.
+ * 
+ * <p>Note: The PromptContributor implementation itself is NOT part of
+ * application code—it simply invokes application code to extract components.
+ */
+public interface PromptContributor {
+    
+    /**
+     * Returns the system message from production code.
+     * 
+     * <p>This is REQUIRED if using the adapter pattern—the whole point
+     * is that your application defines the system message.
+     *
+     * @return the system message text
+     */
+    String getSystemMessage();
+    
+    /**
+     * Returns few-shot examples from production code, if any.
+     * 
+     * <p>Optional. Return empty list if the application doesn't use examples.
+     *
+     * @return list of examples, or empty list
+     */
+    default List<Example> getExamples() {
+        return List.of();
+    }
+    
+    /**
+     * Returns a user message template from production code, if any.
+     * 
+     * <p>Optional. In most cases, the experiment defines user message
+     * variations. But if your application has a fixed user message
+     * structure, you can provide it here.
+     *
+     * @return the user message template, or empty if experiment provides it
+     */
+    default Optional<String> getUserMessageTemplate() {
+        return Optional.empty();
+    }
+    
+    /**
+     * Example input/output pair for few-shot prompting.
+     * Uses explicit role labels for clarity.
+     */
+    record Example(String userMessage, String assistantResponse) {}
+}
+```
+
+**Example implementation**:
+
+```java
+public class ProductSearchPromptContributor implements PromptContributor {
+    
+    private final ProductPromptBuilder builder;  // Production class
+    
+    public ProductSearchPromptContributor() {
+        this.builder = new ProductPromptBuilder();
+    }
+    
+    @Override
+    public String getSystemMessage() {
+        return builder.getSystemMessage();  // Required
+    }
+    
+    @Override
+    public List<Example> getExamples() {
+        return builder.getFewShotExamples()
+            .stream()
+            .map(e -> new Example(e.getInput(), e.getOutput()))
+            .toList();
+    }
+    
+    // getUserMessageTemplate() not overridden—experiment provides it
+}
+```
+
+#### 10.2.2 Template vs. Instantiation Separation
+
+**Priority**: P1
+
+**Rationale**: Templates have placeholders; instantiations have actual values. Refinement operates on templates, but the refinement LLM sees instantiated values for context.
+
+**Template** (what is stored and refined):
+```
+Find {productType} matching: {query}
+```
+
+**Instantiation** (what is sent to the LLM):
+```
+Find electronics matching: wireless headphones
+```
+
+**Key decision**: The refinement LLM sees **instantiated values** (not templates with placeholders). This provides concrete context for understanding failure patterns.
+
+**Placeholder syntax**: `{placeholderName}` (curly braces)
+
+```java
+ctx.setUserMessageTemplate("Find {productType} matching: {query}");
+ctx.addTestInput("productType", "electronics");
+ctx.addTestInput("query", "wireless headphones");
+```
+
+#### 10.2.3 Refinement Loop Orchestration
+
+**Priority**: P1
+
+**Rationale**: Automate the tedious edit-run-analyze cycle for prompt improvement.
+
+**Flow**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    REFINEMENT LOOP ORCHESTRATION                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. INITIALIZATION                                                           │
+│     ├── Call PromptContributor to get initial components                    │
+│     └── Apply any experiment-level overrides                                 │
+│                                                                              │
+│  2. ITERATION                                                                │
+│     ├── Run N samples with current prompt configuration                      │
+│     ├── Collect UseCaseResults                                               │
+│     ├── Apply failure categorization (user-provided FailureCategorizer)     │
+│     └── Compute empirical summary (success rate, failure distribution)       │
+│                                                                              │
+│  3. GOAL CHECK                                                               │
+│     ├── Target success rate achieved? → EXIT with success                    │
+│     ├── Max iterations reached? → EXIT with best-so-far                      │
+│     └── Continue to refinement                                               │
+│                                                                              │
+│  4. REFINEMENT                                                               │
+│     ├── Build refinement request:                                            │
+│     │   - Current system message (instantiated)                              │
+│     │   - Current examples (instantiated)                                    │
+│     │   - Failure distribution and sample failures                           │
+│     ├── Call refinement LLM (configured via system property)                 │
+│     ├── Parse proposed changes                                               │
+│     └── Apply changes to refinable components                                │
+│                                                                              │
+│  5. LOOP → Back to step 2 with refined configuration                        │
+│                                                                              │
+│  6. OUTPUT                                                                   │
+│     ├── Best prompt configuration found                                      │
+│     ├── Iteration history (runtime output, NOT in baseline)                  │
+│     ├── Failure distribution per iteration                                   │
+│     └── Cost per iteration (refinement LLM tokens)                           │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Refinement scope**: System message + examples can be refined. User message template is fixed.
+
+**Experiment annotation**:
+
+```java
+@Experiment(useCase = "usecase.product.search")
+@AdaptivePromptExperiment(
+    promptContributor = ProductSearchPromptContributor.class,
+    samplesPerIteration = 50,
+    maxIterations = 10,
+    targetSuccessRate = 0.95
+)
+void refineProductSearchPrompt(AdaptivePromptContext ctx) {
+    
+    // Experiment can override/supplement with its own user message template
+    ctx.setUserMessageTemplate("Find products matching: {query}");
+    ctx.addTestInput("query", "wireless headphones under $50");
+}
+```
+
+#### 10.2.4 Failure Categorization SPI
+
+**Priority**: P1
+
+**Rationale**: Different use cases have different failure modes. User provides categorization logic.
+
+```java
+/**
+ * Categorizes failures for refinement analysis.
+ * User implements this interface to provide domain-specific categorization.
+ */
+@FunctionalInterface
+public interface FailureCategorizer {
+    
+    /**
+     * Categorizes a failed result.
+     *
+     * @param result the UseCaseResult from a failed sample
+     * @return the failure category (e.g., "json_syntax", "hallucination")
+     */
+    String categorize(UseCaseResult result);
+}
+```
+
+**Common failure categories** (documentation, not framework code):
+
+| Category             | Description                           |
+|----------------------|---------------------------------------|
+| `json_syntax`        | Invalid JSON structure                |
+| `missing_fields`     | Required fields not present           |
+| `hallucination`      | Invented/fabricated values            |
+| `schema_violation`   | Values don't match schema constraints |
+| `wrong_type`         | Incorrect data types                  |
+| `irrelevant_content` | Response not relevant to query        |
+| `unknown`            | Unclassified failure                  |
+
+**Example implementation**:
+
+```java
+FailureCategorizer categorizer = result -> {
+    if (!result.getBoolean("isValidJson", false)) {
+        return "json_syntax";
+    }
+    if (result.getBoolean("hasMissingFields", false)) {
+        return "missing_fields";
+    }
+    if (result.getBoolean("hasHallucinations", false)) {
+        return "hallucination";
+    }
+    return "unknown";
+};
+```
+
+**Note**: Built-in utility classes for common categorization patterns are deferred to a future release pending more use case experience.
+
+#### 10.2.5 LLM-Based Refinement Strategy (llmx)
+
+**Priority**: P1
+
+**Rationale**: Use an LLM to analyze failures and propose prompt improvements.
+
+**Location**: `org.javai.punit.llmx` package (extension, not core)
+
+**Refinement model configuration**:
+- **No hardcoded default**: The framework does not embed commercial model defaults
+- **Configurable via system property**: `-Dpunit.refinementModel=gpt-4`
+- **Override per experiment**: `@AdaptivePromptExperiment(refinementModel = "claude-3-sonnet")`
+
+**Refinement prompt** (framework-provided default):
+
+The refinement LLM receives:
+1. Current system message (instantiated)
+2. Current examples (instantiated)
+3. Failure summary (distribution by category)
+4. Sample of actual failures (instantiated inputs/outputs)
+
+It proposes:
+1. Revised system message text
+2. Revised examples (if applicable)
+
+**Token accounting**: Refinement LLM token usage is tracked separately and reported per iteration.
+
+#### 10.2.6 Refinement Output
+
+**Runtime output** (available during experiment):
+- Best prompt configuration found
+- Iteration-by-iteration history
+- Failure distribution per iteration
+- Cost per iteration (refinement LLM tokens)
+
+**Baseline output** (persisted):
+- Final best prompt configuration
+- Final success rate and statistics
+- Total refinement cost
+- **NOT included**: Full iteration history (too verbose for baseline files)
+
+**Deployment**: The framework stays out of deployment concerns. The refined prompt is output; how it gets into production is the developer's responsibility.
+
+---
+
+### 10.3 Phase C: Experiment-to-Specification Pass Rate Derivation
+
+This phase introduces **statistically rigorous threshold derivation** for regression tests. The core insight: reducing sample size increases sampling variance, so a test with fewer samples cannot use the same raw pass rate observed in a larger experiment.
+
+#### 10.3.1 Problem Statement
+
+**The Problem**: An experiment runs 1000 samples and observes 95.1% success rate. If the regression test runs only 100 samples with a 95.1% threshold, normal sampling variance will cause false failures—the test may legitimately see 93% or 91% due to chance alone, even though the underlying system hasn't degraded.
+
+**The Solution**: Derive a **one-sided lower confidence bound** on the observed success probability that accounts for the increased variance in smaller test samples. We use a one-sided bound because regression testing is concerned with detecting **degradation** (pass rate falling below acceptable levels), not with detecting improvements.
+
+**Economic Pressure**: Regression tests run frequently—on every commit, PR, or CI job. This creates strong pressure to minimize sample sizes for cost reasons. The statistical machinery here enables **economically viable sample sizes** while maintaining **statistical rigor**.
+
+#### 10.3.2 One-Sided Lower Confidence Bound
+
+Given:
+- Experiment observed p̂_exp from n_exp samples
+- Regression test will use n_test samples (typically n_test < n_exp)
+
+The **standard error for the test sample** is:
+```
+SE_test = √(p̂_exp × (1 - p̂_exp) / n_test)
+```
+
+The **one-sided lower confidence bound** at confidence level (1-α) is:
+```
+p_lower = p̂_exp - z_α × SE_test
+```
+
+Common z-scores for **one-sided** intervals:
+
+| Confidence Level | z_α   | Meaning                   |
+|------------------|-------|---------------------------|
+| 90%              | 1.282 | 10% chance of false alarm |
+| 95%              | 1.645 | 5% chance of false alarm  |
+| 99%              | 2.326 | 1% chance of false alarm  |
+
+**Worked Example**:
+- Experiment: n=1000, observed rate=95.1%
+- Test: n=100, confidence=95%
+- SE_test = √(0.951 × 0.049 / 100) ≈ 0.0216
+- p_lower = 0.951 - 1.645 × 0.0216 ≈ 0.916
+
+**Result**: Use `minPassRate = 0.916` for 100-sample tests to be statistically consistent with 95.1% observed in the experiment.
+
+#### 10.3.3 Wilson Score Lower Bound
+
+For small samples or extreme success rates (p̂ near 0 or 1), use the **Wilson score** bound:
+
+```
+p_lower = (p̂ + z²/2n - z√(p̂(1-p̂)/n + z²/4n²)) / (1 + z²/n)
+```
+
+**When to Use Which Method**:
+
+| Condition                         | Recommendation                  | Rationale                                   |
+|-----------------------------------|---------------------------------|---------------------------------------------|
+| n ≥ 40 **and** p̂ not near 0 or 1 | Normal approximation OK         | CLT provides good approximation             |
+| n ≥ 20 **but** p̂ near 0 or 1     | **Wilson preferred**            | Normal approx has poor coverage at extremes |
+| n < 20                            | **Wilson strongly recommended** | Normal approx increasingly unreliable       |
+| n < 10                            | **Wilson required**             | Normal approximation should NOT be used     |
+
+**Recommendation**: Default to Wilson score for all threshold calculations—it has no downside for larger samples and is essential for small samples and high success rates (common in punit usage: n=50–100 with p̂ > 0.85).
+
+#### 10.3.4 RegressionThreshold Model
+
+```java
+/**
+ * Represents a statistically-derived minimum pass rate threshold for regression testing.
+ */
+public record RegressionThreshold(
+    ExperimentalBasis basis,
+    TestConfiguration testConfig,
+    double minPassRate,
+    DerivationMetadata derivation
+) {
+    
+    public record ExperimentalBasis(
+        int experimentSamples,
+        int experimentSuccesses,
+        double observedRate,
+        double standardError,
+        String baselineReference
+    ) {}
+    
+    public record TestConfiguration(
+        int testSamples,
+        double confidenceLevel
+    ) {}
+    
+    public record DerivationMetadata(
+        DerivationMethod method,
+        double zScore,
+        double testStandardError,
+        Instant derivedAt
+    ) {}
+    
+    public enum DerivationMethod {
+        NORMAL_APPROXIMATION,
+        WILSON_SCORE,
+        EXACT_BINOMIAL
+    }
+}
+```
+
+#### 10.3.5 RegressionThresholdCalculator
+
+```java
+public class RegressionThresholdCalculator {
+    
+    private static final double DEFAULT_CONFIDENCE_LEVEL = 0.95;
+    
+    public RegressionThreshold calculate(
+            int experimentSamples,
+            int experimentSuccesses,
+            int testSamples,
+            double confidenceLevel) {
+        
+        double pHat = (double) experimentSuccesses / experimentSamples;
+        double zScore = getZScore(confidenceLevel);
+        DerivationMethod method = chooseMethod(pHat, testSamples);
+        
+        double minPassRate;
+        double testSE = Math.sqrt(pHat * (1 - pHat) / testSamples);
+        
+        if (method == DerivationMethod.WILSON_SCORE) {
+            minPassRate = wilsonLowerBound(pHat, testSamples, zScore);
+        } else {
+            minPassRate = pHat - zScore * testSE;
+        }
+        
+        // Clamp to valid probability range
+        minPassRate = Math.max(0.0, Math.min(1.0, minPassRate));
+        
+        return new RegressionThreshold(
+            new ExperimentalBasis(experimentSamples, experimentSuccesses, pHat,
+                Math.sqrt(pHat * (1 - pHat) / experimentSamples), null),
+            new TestConfiguration(testSamples, confidenceLevel),
+            minPassRate,
+            new DerivationMetadata(method, zScore, testSE, Instant.now())
+        );
+    }
+    
+    private DerivationMethod chooseMethod(double pHat, int n) {
+        boolean pNearExtreme = pHat < 0.1 || pHat > 0.9;
+        if (n < 10) return DerivationMethod.WILSON_SCORE;
+        if (n < 20) return DerivationMethod.WILSON_SCORE;
+        if (n < 40 && pNearExtreme) return DerivationMethod.WILSON_SCORE;
+        if (pNearExtreme) return DerivationMethod.WILSON_SCORE;
+        return DerivationMethod.NORMAL_APPROXIMATION;
+    }
+    
+    private double wilsonLowerBound(double pHat, int n, double z) {
+        double z2 = z * z;
+        double numerator = pHat + z2 / (2 * n) 
+            - z * Math.sqrt(pHat * (1 - pHat) / n + z2 / (4 * n * n));
+        double denominator = 1 + z2 / n;
+        return numerator / denominator;
+    }
+}
+```
+
+#### 10.3.6 Enhanced @ProbabilisticTest Annotation
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@TestTemplate
+@ExtendWith(ProbabilisticTestExtension.class)
+public @interface ProbabilisticTest {
+    
+    // Existing parameters...
+    int samples() default 100;
+    double minPassRate() default 0.95;
+    
+    /**
+     * Reference to an ExecutionSpecification that defines the threshold.
+     * When provided, minPassRate is derived from the specification based
+     * on the configured sample count.
+     */
+    String spec() default "";
+    
+    /**
+     * Confidence level for threshold derivation when using spec-based thresholds.
+     */
+    double thresholdConfidence() default 0.95;
+    
+    /**
+     * Behavior when spec references experimental data with different sample size.
+     */
+    ThresholdDerivationPolicy derivationPolicy() default ThresholdDerivationPolicy.DERIVE;
+}
+
+public enum ThresholdDerivationPolicy {
+    /** Derive threshold from spec's experimental basis, adjusted for test sample size. */
+    DERIVE,
+    /** Use the raw minPassRate from spec without adjustment. */
+    RAW,
+    /** Fail if test samples differ significantly from experiment. */
+    REQUIRE_MATCHING_SAMPLES
+}
+```
+
+**Usage Example**:
+
+```java
+@ProbabilisticTest(
+    spec = "usecase.json.generation:v1",
+    samples = 100,  // Different from experiment's 1000
+    thresholdConfidence = 0.95
+)
+void jsonGenerationMeetsSpec() {
+    // minPassRate is automatically derived as ~0.916
+    String result = llmClient.generateJson();
+    assertThat(result).satisfies(JsonValidator::isValidJson);
+}
+```
+
+#### 10.3.7 Enhanced Baseline and Specification Output
+
+**Baseline Enhancement** (pre-computed thresholds for common test sizes):
+
+```yaml
+# baselines/usecase-json-generation-experiment.yaml
+statistics:
+  successRate:
+    observed: 0.9510
+    standardError: 0.0068
+    confidenceInterval95: [0.9376, 0.9644]
+  successes: 951
+  failures: 49
+
+# Pre-computed one-sided lower bounds for common test sample sizes
+derivedThresholds:
+  - testSamples: 50
+    confidenceLevel: 0.95
+    minPassRate: 0.901
+    boundType: ONE_SIDED_LOWER
+    method: WILSON_SCORE
+    
+  - testSamples: 100
+    confidenceLevel: 0.95
+    minPassRate: 0.916
+    boundType: ONE_SIDED_LOWER
+    method: WILSON_SCORE
+    
+  - testSamples: 200
+    confidenceLevel: 0.95
+    minPassRate: 0.927
+    boundType: ONE_SIDED_LOWER
+    method: WILSON_SCORE
+```
+
+**Specification Enhancement**:
+
+```yaml
+# specs/usecase.json.generation/v1.yaml
+regressionThreshold:
+  experimentalBasis:
+    samples: 1000
+    successes: 951
+    observedRate: 0.951
+    standardError: 0.0068
+    
+  testConfiguration:
+    samples: 100
+    confidenceLevel: 0.95
+    
+  derivedMinPassRate: 0.916
+  
+  derivation:
+    method: WILSON_SCORE
+    zScore: 1.645
+    testStandardError: 0.0216
+    derivedAt: 2026-01-04T17:00:00Z
+    
+  explanation: |
+    The minimum pass rate of 91.6% is derived from the experimental 
+    observation of 95.1% (951/1000) adjusted for the smaller test 
+    sample size (100). This threshold provides 95% confidence that 
+    a passing test indicates no degradation from experimental levels.
+
+# Legacy field (for backward compatibility)
+requirements:
+  minPassRate: 0.916
+```
+
+#### 10.3.8 Enhanced Test Reports
+
+**Passing Test Report**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ TEST: JsonGenerationTest.jsonGenerationMeetsSpec                │
+├─────────────────────────────────────────────────────────────────┤
+│ Status: PASSED                                                  │
+│ Samples: 100/100 executed                                       │
+│ Successes: 94 | Failures: 6                                     │
+│ Observed Pass Rate: 94.00%                                      │
+│ Minimum Pass Rate: 91.55% (derived, one-sided lower bound)      │
+│                                                                 │
+│ THRESHOLD DERIVATION (ONE-SIDED LOWER BOUND):                   │
+│   Experimental basis: 95.1% (951/1000 samples)                  │
+│   Test sample size: 100                                         │
+│   Confidence level: 95% (one-sided)                             │
+│   Method: WILSON_SCORE                                          │
+│   One-sided lower bound: 91.55%                                 │
+│                                                                 │
+│ INTERPRETATION:                                                 │
+│   Observed 94.00% ≥ 91.55% threshold → No evidence of degradation│
+│                                                                 │
+│ Source: spec usecase.json.generation:v1                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Failing Test Report** (with statistical context):
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ TEST: JsonGenerationTest.jsonGenerationMeetsSpec                │
+├─────────────────────────────────────────────────────────────────┤
+│ Status: FAILED                                                  │
+│ Observed: 87.0% (87/100) | Threshold: 91.55%                    │
+│ Shortfall: 4.55% below threshold                                │
+│ Z-score: -3.75 | One-tailed p-value: < 0.001                    │
+│                                                                 │
+│ INTERPRETATION:                                                 │
+│   This result indicates statistically significant DEGRADATION.  │
+│   This is unlikely (p < 0.1%) to be random sampling variation.  │
+│                                                                 │
+│ RECOMMENDATIONS:                                                │
+│   1. Investigate recent changes that may have caused regression │
+│   2. Re-run experiment to establish new baseline if intentional │
+│   3. If false positive suspected, increase test sample size     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 10.3.9 Reference Table: One-Sided Lower Bound Examples
+
+| Exp. Rate | Exp. N | Test N | 95% One-Sided Lower Bound | Margin | Method    |
+|-----------|--------|--------|---------------------------|--------|-----------|
+| 95%       | 1000   | 100    | 91.4%                     | ~3.6%  | Wilson    |
+| 95%       | 1000   | 50     | 89.9%                     | ~5.1%  | Wilson    |
+| 95%       | 1000   | 20     | 86.9%                     | ~8.1%  | Wilson    |
+| 95%       | 500    | 100    | 90.6%                     | ~4.4%  | Wilson    |
+| 90%       | 1000   | 100    | 85.1%                     | ~4.9%  | Normal OK |
+| 99%       | 1000   | 100    | 97.4%                     | ~1.6%  | Wilson    |
+
+**Practical guidance for cost-conscious teams**:
+- **n=50**: ~10% margin, acceptable for early dev
+- **n=100**: ~7% margin, **good balance for most use cases**
+- **n=200**: ~5% margin, recommended for critical paths
+
+#### 10.3.10 Three Operational Approaches
+
+Organizations have different priorities when configuring probabilistic tests. The framework supports three operationally distinct approaches, each legitimate and first-class:
+
+##### Approach 1: Sample-Size-First (Cost-Driven)
+
+**Organizational stance**: *"We can afford to run N samples per test. Given that constraint, tell us what confidence level we achieve."*
+
+| Given                                              | Framework Computes      |
+|----------------------------------------------------|-------------------------|
+| Experimental basis (e.g., 95.1% from 1000 samples) | Threshold for N samples |
+| Desired confidence (e.g., 95%)                     |                         |
+| Sample size (e.g., 100)                            |                         |
+
+**Annotation**:
+```java
+@ProbabilisticTest(
+    spec = "usecase.json.generation:v1",
+    samples = 100,
+    thresholdConfidence = 0.95
+)
+```
+
+**Who uses this**: Organizations with fixed testing budgets, CI time constraints, or API rate limits. This is expected to be the most common approach.
+
+##### Approach 2: Confidence-First (Quality-Driven)
+
+**Organizational stance**: *"We require X% confidence in our test results. Tell us how many samples we need to achieve that."*
+
+| Given                                              | Framework Computes   |
+|----------------------------------------------------|----------------------|
+| Experimental basis (e.g., 95.1% from 1000 samples) | Required sample size |
+| Desired confidence (e.g., 99%)                     |                      |
+| Minimum detectable effect (e.g., 5% drop)          |                      |
+| Desired power (e.g., 80%)                          |                      |
+
+**Annotation**:
+```java
+@ProbabilisticTest(
+    spec = "usecase.json.generation:v1",
+    confidence = 0.99,
+    minDetectableEffect = 0.05,
+    power = 0.80
+    // samples computed by framework
+)
+```
+
+**Who uses this**: Organizations with strict quality requirements (healthcare, finance, safety-critical systems) where cost is secondary to confidence.
+
+**Note**: This approach requires additional inputs (effect size, power) because sample size cannot be determined from confidence alone.
+
+##### Approach 3: Threshold-First (Baseline-Anchored)
+
+**Organizational stance**: *"We want to use a specific threshold (possibly the experimental pass rate directly). Tell us what that implies statistically."*
+
+| Given                                              | Framework Computes                |
+|----------------------------------------------------|-----------------------------------|
+| Experimental basis (e.g., 95.1% from 1000 samples) | Implied false positive rate       |
+| Explicit threshold (e.g., 95.1%)                   | Expected false positive frequency |
+| Sample size (e.g., 100)                            |                                   |
+
+**Annotation**:
+```java
+@ProbabilisticTest(
+    spec = "usecase.json.generation:v1",
+    samples = 100,
+    minPassRate = 0.951  // Explicit threshold, not derived from spec
+)
+```
+
+**Who uses this**: Organizations that deliberately accept high false positive rates for stricter gatekeeping, or those learning why raw experimental rates don't work as thresholds.
+
+**Warning behavior**: When the implied false positive rate exceeds a reasonable level (e.g., >20%), the framework emits a warning explaining the statistical implications and suggesting Approach 1 as an alternative.
+
+##### Approach Validation Rules
+
+| Configuration                                  | Interpretation                          |
+|------------------------------------------------|-----------------------------------------|
+| `samples` + `thresholdConfidence`              | Approach 1: Compute threshold from spec |
+| `confidence` + `minDetectableEffect` + `power` | Approach 2: Compute required samples    |
+| `samples` + explicit `minPassRate`             | Approach 3: Compute implied confidence  |
+| Conflicting combinations                       | Abort with clear error message          |
+
+##### Failure Reporting by Approach
+
+All approaches produce qualified reports that include confidence context:
+
+**Approach 1 failure**:
+```
+FAILED: Observed 87.0% < threshold 91.6%
+Configuration: 100 samples, 95% confidence (sample-size-first)
+Statistical context: There is a 5% probability this failure is due to 
+sampling variance rather than actual system degradation.
+```
+
+**Approach 2 failure**:
+```
+FAILED: Observed 87.0% < threshold 96.2%
+Configuration: 250 samples, 99% confidence, detecting ≥5% degradation
+Statistical context: There is a 1% probability this failure is due to 
+sampling variance rather than actual system degradation.
+```
+
+**Approach 3 failure** (with warning when implied confidence is low):
+```
+FAILED: Observed 93.0% < threshold 95.1%
+Configuration: 100 samples, threshold set explicitly to 95.1%
+
+⚠️ STATISTICAL WARNING: Using threshold 95.1% for 100-sample tests implies 
+only ~50% confidence. Approximately half of all failures may be false positives.
+
+Recommendation: Consider using sample-size-first approach with 
+thresholdConfidence = 0.95, which would set threshold to 91.6% and 
+reduce false positives to 5%.
+```
+
+##### Documentation Requirements
+
+**Developer documentation** (accessible, light on math):
+- "Three ways to configure your probabilistic tests"
+- Decision guide: "Which approach is right for your organization?"
+- Worked examples for each approach
+- Common pitfalls (especially Approach 3 misconceptions)
+
+**Statistical companion document** (formal language for professional review):
+- Formal definitions: α (significance), β (Type II error), power (1-β), effect size (Δ)
+- Derivation of sample size formulas
+- One-sided vs. two-sided bounds and why punit uses one-sided
+- Wilson score interval derivation and justification
+- Assumptions and limitations
+- Written so a professional statistician can review and approve
+
+#### 10.3.11 Statistical Module Isolation (Architectural Requirement)
+
+Per Design Principle 1.6, the statistical calculations must be isolated in dedicated modules with minimal dependencies. This section specifies the implementation requirements.
+
+##### Module Structure
+
+```
+punit-statistics/                          # Standalone Maven/Gradle module
+├── pom.xml                                # No dependencies on punit-core or punit-experiment
+│
+├── src/main/java/org/javai/punit/statistics/
+│   │
+│   ├── core/                              # Foundational statistical concepts
+│   │   ├── BinomialProportion.java        # Point estimate, variance, standard error
+│   │   ├── ConfidenceInterval.java        # Two-sided interval (for baselines)
+│   │   └── OneSidedBound.java             # Lower/upper bound (for thresholds)
+│   │
+│   ├── intervals/                         # Confidence interval methods
+│   │   ├── NormalApproximation.java       # Wald interval, large-sample approximation
+│   │   ├── WilsonScore.java               # Wilson score interval
+│   │   └── ClopperPearson.java            # Exact binomial interval (optional)
+│   │
+│   ├── threshold/                         # Threshold derivation
+│   │   ├── RegressionThreshold.java       # Record: basis, config, derived threshold
+│   │   ├── ThresholdCalculator.java       # Interface for threshold computation
+│   │   ├── NormalThresholdCalculator.java # Normal approximation implementation
+│   │   └── WilsonThresholdCalculator.java # Wilson score implementation
+│   │
+│   ├── power/                             # Power analysis and sample size
+│   │   ├── PowerAnalysis.java             # Power calculation given effect size
+│   │   ├── SampleSizeCalculator.java      # Sample size for given power/confidence
+│   │   └── EffectSize.java                # Effect size representations
+│   │
+│   └── validation/                        # Statistical validation
+│       ├── MethodSelector.java            # Chooses appropriate method for conditions
+│       ├── AssumptionChecker.java         # Validates method assumptions
+│       └── StatisticalWarning.java        # Warnings for edge cases
+│
+└── src/test/java/org/javai/punit/statistics/
+    │
+    ├── intervals/
+    │   ├── WilsonScoreWorkedExamplesTest.java
+    │   └── NormalApproximationWorkedExamplesTest.java
+    │
+    ├── threshold/
+    │   ├── ThresholdDerivationWorkedExamplesTest.java
+    │   └── MethodSelectionTest.java
+    │
+    └── power/
+        ├── SampleSizeWorkedExamplesTest.java
+        └── PowerAnalysisWorkedExamplesTest.java
+```
+
+##### Dependency Rules
+
+| Module             | May Depend On                    | Must NOT Depend On                                      |
+|--------------------|----------------------------------|---------------------------------------------------------|
+| `punit-statistics` | Java standard library only       | punit-core, punit-experiment, JUnit, any test framework |
+| `punit-core`       | `punit-statistics`               | —                                                       |
+| `punit-experiment` | `punit-statistics`, `punit-core` | —                                                       |
+
+The `punit-statistics` module is a **pure library** with no framework dependencies. It can be:
+- Reviewed by statisticians without Java framework expertise
+- Used by other projects needing the same statistical calculations
+- Tested in complete isolation
+
+##### Unit Test Requirements
+
+**Worked example format**: Each test method represents a complete worked example with descriptive variable names:
+
+```java
+@Test
+void wilsonLowerBound_experimentWith951SuccessesIn1000Samples_100SampleTest_95PercentConfidence() {
+    // Given: Experiment results
+    int experimentSuccesses = 951;
+    int experimentSamples = 1000;
+    double experimentPassRate = (double) experimentSuccesses / experimentSamples;  // 0.951
+    
+    // Given: Test configuration
+    int testSamples = 100;
+    double confidenceLevel = 0.95;
+    double zScore = 1.645;  // One-sided 95%
+    
+    // When: Calculate Wilson lower bound for test threshold
+    double threshold = WilsonScore.lowerBound(experimentPassRate, testSamples, zScore);
+    
+    // Then: Threshold accounts for increased variance in smaller sample
+    assertThat(threshold).isCloseTo(0.916, within(0.001));
+    
+    // Interpretation: A 100-sample test should use 91.6% threshold,
+    // not the raw 95.1% observed in the experiment
+}
+
+@Test
+void normalApproximation_shouldNotBeUsedForSmallSamples() {
+    // Given: Small test sample size
+    int testSamples = 15;
+    double passRate = 0.95;
+    
+    // When: Check if normal approximation is appropriate
+    boolean isAppropriate = MethodSelector.isNormalApproximationAppropriate(
+        passRate, testSamples);
+    
+    // Then: Normal approximation should be rejected for n < 20
+    assertThat(isAppropriate).isFalse();
+    
+    // Recommendation: Use Wilson score for small samples
+    assertThat(MethodSelector.recommendedMethod(passRate, testSamples))
+        .isEqualTo(IntervalMethod.WILSON_SCORE);
+}
+```
+
+**Test coverage requirements**:
+
+| Category                | Required Tests                                            |
+|-------------------------|-----------------------------------------------------------|
+| **Core calculations**   | Every formula with multiple worked examples               |
+| **Boundary conditions** | n=1, n=10, p=0, p=1, p=0.5                                |
+| **Method selection**    | All decision boundaries (n<10, n<20, n<40, extreme rates) |
+| **Known values**        | Published statistical tables as validation                |
+| **Symmetry/invariants** | Mathematical properties that must hold                    |
+
+##### Code Style for Statistical Review
+
+To facilitate review by statisticians:
+
+```java
+/**
+ * Computes the Wilson score one-sided lower confidence bound.
+ * 
+ * <p>Formula: p_lower = (p̂ + z²/2n - z√(p̂(1-p̂)/n + z²/4n²)) / (1 + z²/n)
+ * 
+ * <p>Reference: Wilson, E. B. (1927). "Probable inference, the law of succession, 
+ * and statistical inference". Journal of the American Statistical Association.
+ * 
+ * @param pHat observed proportion (success rate), range [0, 1]
+ * @param n sample size, must be > 0
+ * @param z z-score for desired one-sided confidence (e.g., 1.645 for 95%)
+ * @return lower confidence bound, range [0, 1]
+ */
+public static double lowerBound(double pHat, int n, double z) {
+    double z2 = z * z;
+    double n_d = (double) n;
+    
+    double numerator = pHat + z2 / (2 * n_d) 
+                     - z * Math.sqrt(pHat * (1 - pHat) / n_d + z2 / (4 * n_d * n_d));
+    double denominator = 1 + z2 / n_d;
+    
+    return numerator / denominator;
+}
+```
+
+**Style guidelines**:
+- Use standard statistical notation in variable names (pHat, alpha, beta, z)
+- Include formula in Javadoc
+- Cite academic references where applicable
+- No abbreviations that obscure meaning
+- Comments explain statistical reasoning, not just code mechanics
+
+---
+
+### 10.4 Explicit Exclusions (Updated)
+
+Based on requirements analysis, the following are explicitly **excluded** from the framework:
+
+| Feature                                             | Reason                                                                 |
+|-----------------------------------------------------|------------------------------------------------------------------------|
+| Dollar cost calculations                            | Framework provides tokens and time only; dollar conversion is external |
+| Automated config optimization (Bayesian, etc.)      | Optimization decisions remain with humans                              |
+| Cross-experiment state management                   | Each experiment is independent                                         |
+| Visualization/dashboards                            | Results via JUnit mechanisms only                                      |
+| Response format/schema refinement                   | Structural constraints, not prose                                      |
+| Retry orchestration                                 | Framework models prompts; developers build retry logic                 |
+| `ExperimentPurpose` metadata enum                   | Not needed                                                             |
+| Baseline comparison utility                         | Not needed                                                             |
+| `PromptComponent` with mandatory categories         | Categories are guidance, not mandated                                  |
+| Iteration history in baseline files                 | Available as runtime output only                                       |
+| Spring AI / LangChain4j specific adapters (in core) | Core remains framework-neutral; adapters may exist as extensions       |
+
+---
+
+## 11. Out-of-Scope Clarifications
 
 The following are explicitly **not** part of this extension:
 
-### 10.1 Auto-Approval of Specifications
+### 11.1 Auto-Approval of Specifications
 
 Specifications require explicit human approval. There is no mechanism for automatically promoting baselines to specifications. This is intentional: the approval step forces deliberation about what behavior is acceptable.
 
-### 10.2 AutoML / Automatic Configuration Optimization
+### 11.2 AutoML / Automatic Configuration Optimization
 
 The framework does not:
 - Automatically search for optimal model parameters
@@ -3215,94 +4541,116 @@ The framework does not:
 
 These would undermine the purpose of empirical specification.
 
-### 10.3 Runtime Routing via Use Case IDs
+### 11.3 Runtime Routing via Use Case IDs
 
 Production code does **not** use use case IDs for routing, feature flags, or configuration. Use case IDs are test/experiment metadata only.
 
-### 10.4 Production-Time Specification Validation
+### 11.4 Production-Time Specification Validation
 
 The framework does not validate production behavior against specifications at runtime. Specifications inform production configuration through the build/deploy process, but enforcement happens in tests, not production.
 
-### 10.5 Distributed Experiment Execution
+### 11.5 Distributed Experiment Execution
 
 Experiments run within a single JVM. Distributed experiment coordination (across nodes, cloud, etc.) is out of scope.
 
-### 10.6 Real-Time Baseline Updates
+### 11.6 Real-Time Baseline Updates
 
 Baselines are generated at experiment completion, not continuously updated during execution.
 
-### 10.7 Experiment Scheduling and Orchestration
+### 11.7 Experiment Scheduling and Orchestration
 
 Experiments are run on-demand via JUnit. There is no built-in scheduler for periodic experiment execution.
 
-### 10.8 Visual Dashboard / UI
+### 11.8 Visual Dashboard / UI
 
 There is no web UI or dashboard. Results are reported via JUnit's standard mechanisms.
 
-### 10.9 IDE-Specific Integration
+### 11.9 IDE-Specific Integration
 
 IDE plugins for baseline editing, spec creation, or result visualization are not in scope.
 
 ---
 
-## 11. Open Questions and Recommendations
+## 12. Open Questions and Recommendations
 
-| Question | Recommendation |
-|----------|----------------|
-| **Should specs support inheritance/composition?** | **No, not in v1.** Keep specs simple and flat. Composition can be added later if needed. |
-| **Should baselines auto-expire?** | **No.** Baselines are historical records. Specs reference them; if a spec becomes stale, re-run experiments and create a new spec version. |
-| **What if use case method throws an exception?** | **Record as a failure type in UseCaseResult.** Use case methods should catch expected exceptions and record them as values. Unexpected exceptions bubble up as test infrastructure failures. |
-| **Can one spec reference multiple use cases?** | **No.** One spec = one use case. If you need to test multiple use cases together, create a composite use case. |
-| **How to handle flaky use case implementations?** | **That's the point.** The framework measures flakiness. If a use case is too flaky, that's surfaced in the baseline, and the spec must accommodate it or the implementation must improve. |
-| **Should success criteria support custom functions?** | **Not in v1.** Start with a simple expression language. Custom evaluators can be added via SPI in v2. |
-| **Where should baseline/spec files live?** | **`src/test/resources/punit/`** by default. Configurable via annotation parameters and system properties. |
-| **What file format for baselines/specs?** | **YAML is the default.** YAML supports comments (useful for approval notes and documentation), is more human-readable for nested structures, and version-controls well. JSON is supported as an optional alternative for tooling compatibility. The framework auto-detects format based on file extension (`.yaml`/`.yml` vs `.json`). |
-| **Should the number of ExperimentConfigs be limited?** | **No.** The framework has built-in cost thresholds (time budget, token budget) which naturally limit execution. If budget is exhausted, execution stops and completed configs produce baselines. |
-| **Can multi-config experiments be resumed after interruption?** | **No, not in v1.** Partial execution is not supported initially. Re-run the entire experiment if interrupted. |
-| **Can ExperimentConfigs run in parallel?** | **No, not initially.** Configs execute sequentially. Parallel config execution may be added in a future version. |
-| **Can you filter/re-run specific ExperimentConfigs?** | **Not in v1.** This capability may be added later. For now, re-run the entire experiment or create a smaller design. |
-| **How do you create a spec from a multi-config experiment?** | **Human selection.** The framework generates a human-readable `SUMMARY.yaml` report with analysis. Humans review results, select the best config, and manually create a specification referencing that config's baseline. |
-
----
-
-## 12. Glossary
-
-| Term | Definition |
-|------|------------|
-| **Use Case** | A test/experiment-only function that invokes production code and returns a `UseCaseResult`. Reused by experiments and probabilistic tests. Identified by a use case ID. |
-| **Use Case ID** | A unique string identifier for a use case (e.g., `usecase.json.generation`). |
-| **UseCaseResult** | A neutral container of key-value observations (`Map<String, Object>` of values) produced by a use case invocation. Interpreted as data for measurement by experiments, as input for assertions by tests. |
-| **Experiment** | Executes a use case across one or more `ExperimentConfig`s in experiment mode (no pass/fail, no CI gating). Produces empirical baselines. |
-| **ExperimentDesign** | Declarative description of what is explored. Composed of `ExperimentFactor`s, each with one or more `ExperimentLevel`s. Defines the space of exploration. Static, reviewable, versionable. |
-| **ExperimentFactor** | One independently varied dimension in an experiment (e.g., `model`, `temperature`, `retryPolicy`). Domain-neutral. |
-| **ExperimentLevel** | One deliberately chosen setting of a factor. May be categorical (`gpt-4o`) or numeric (`0.2`). Finite and intentional. |
-| **ExperimentConfig** | One concrete combination of `ExperimentLevel`s across all factors. Fully specified, executable. The unit of execution and observation. |
-| **ExperimentGoal** | Optional criteria for early termination (e.g., `successRate >= 0.90`). When a config achieves the goal, remaining configs are skipped. |
-| **Early Termination** | Stopping an experiment before all configs are tested, either due to goal achievement or budget exhaustion. |
-| **Static Factor** | An `ExperimentFactor` with levels enumerated up front. Cardinality is known and finite. |
-| **Adaptive Factor** | An `ExperimentFactor` with levels generated dynamically through iterative refinement. Initial level is provided; subsequent levels are discovered. |
-| **Adaptive Experiment** | An experiment containing at least one `AdaptiveFactor`. Configs are discovered incrementally using empirical feedback. |
-| **RefinementStrategy** | SPI for generating refined levels based on iteration feedback. Backend-specific (e.g., llmx provides LLM-based prompt refinement). |
-| **IterationFeedback** | Structured feedback from one adaptive iteration, including aggregated results and failure observations. Used by `RefinementStrategy`. |
-| **Iteration History** | Complete record of all iterations in an adaptive experiment, capturing each level tried and its results. Recorded in baselines for provenance. |
-| **Level Serialization** | Configuration for how adaptive factor levels are recorded in baselines. Supports inline YAML, external file references, and custom serializers for complex objects. |
-| **External Level Reference** | A `$ref` pointer in a baseline that references an externalized level stored in a separate file. Used for large or complex content. |
-| **Empirical Baseline** | Machine-generated record of observed behavior from executing an `ExperimentConfig` (or adaptive iteration). |
-| **Aggregated Report** | Summary of results across all configs in an experiment (`SUMMARY.yaml`). |
-| **Execution Specification** | Human-approved contract derived from baselines, defining expected behavior for conformance testing. |
-| **Conformance Test** | A probabilistic test that validates behavior against a specification. |
-| **Backend** | A pluggable component that provides domain-specific execution context. Registered via SPI (`ExperimentBackend`). |
-| **llmx** | The LLM-specific backend extension (`org.javai.punit.llmx`). Reference implementation of the backend SPI. Does not pollute the core framework. |
-| **Success Criteria** | An expression evaluated against `UseCaseResult` to determine per-sample success. |
-| **Provenance** | The chain of artifacts from definition to enforcement: Use Case → ExperimentDesign → ExperimentConfig → Baseline → Specification → Conformance Test. |
+| Question                                                        | Recommendation                                                                                                                                                                                                                                                                                                                         |
+|-----------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Should specs support inheritance/composition?**               | **No, not in v1.** Keep specs simple and flat. Composition can be added later if needed.                                                                                                                                                                                                                                               |
+| **Should baselines auto-expire?**                               | **No.** Baselines are historical records. Specs reference them; if a spec becomes stale, re-run experiments and create a new spec version.                                                                                                                                                                                             |
+| **What if use case method throws an exception?**                | **Record as a failure type in UseCaseResult.** Use case methods should catch expected exceptions and record them as values. Unexpected exceptions bubble up as test infrastructure failures.                                                                                                                                           |
+| **Can one spec reference multiple use cases?**                  | **No.** One spec = one use case. If you need to test multiple use cases together, create a composite use case.                                                                                                                                                                                                                         |
+| **How to handle flaky use case implementations?**               | **That's the point.** The framework measures flakiness. If a use case is too flaky, that's surfaced in the baseline, and the spec must accommodate it or the implementation must improve.                                                                                                                                              |
+| **Should success criteria support custom functions?**           | **Not in v1.** Start with a simple expression language. Custom evaluators can be added via SPI in v2.                                                                                                                                                                                                                                  |
+| **Where should baseline/spec files live?**                      | **`src/test/resources/punit/`** by default. Configurable via annotation parameters and system properties.                                                                                                                                                                                                                              |
+| **What file format for baselines/specs?**                       | **YAML is the default.** YAML supports comments (useful for approval notes and documentation), is more human-readable for nested structures, and version-controls well. JSON is supported as an optional alternative for tooling compatibility. The framework auto-detects format based on file extension (`.yaml`/`.yml` vs `.json`). |
+| **Should the number of ExperimentConfigs be limited?**          | **No.** The framework has built-in cost thresholds (time budget, token budget) which naturally limit execution. If budget is exhausted, execution stops and completed configs produce baselines.                                                                                                                                       |
+| **Can multi-config experiments be resumed after interruption?** | **No, not in v1.** Partial execution is not supported initially. Re-run the entire experiment if interrupted.                                                                                                                                                                                                                          |
+| **Can ExperimentConfigs run in parallel?**                      | **No, not initially.** Configs execute sequentially. Parallel config execution may be added in a future version.                                                                                                                                                                                                                       |
+| **Can you filter/re-run specific ExperimentConfigs?**           | **Not in v1.** This capability may be added later. For now, re-run the entire experiment or create a smaller design.                                                                                                                                                                                                                   |
+| **How do you create a spec from a multi-config experiment?**    | **Human selection.** The framework generates a human-readable `SUMMARY.yaml` report with analysis. Humans review results, select the best config, and manually create a specification referencing that config's baseline.                                                                                                              |
 
 ---
 
-## 13. Appendix: Sketch of Key Class Implementations
+## 13. Glossary
+
+| Term                               | Definition                                                                                                                                                                                                                              |
+|------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Use Case**                       | A test/experiment-only function that invokes production code and returns a `UseCaseResult`. Reused by experiments and probabilistic tests. Identified by a use case ID.                                                                 |
+| **Use Case ID**                    | A unique string identifier for a use case (e.g., `usecase.json.generation`).                                                                                                                                                            |
+| **UseCaseResult**                  | A neutral container of key-value observations (`Map<String, Object>` of values) produced by a use case invocation. Interpreted as data for measurement by experiments, as input for assertions by tests.                                |
+| **Experiment**                     | Executes a use case across one or more `ExperimentConfig`s in experiment mode (no pass/fail, no CI gating). Produces empirical baselines.                                                                                               |
+| **ExperimentDesign**               | Declarative description of what is explored. Composed of `ExperimentFactor`s, each with one or more `ExperimentLevel`s. Defines the space of exploration. Static, reviewable, versionable.                                              |
+| **ExperimentFactor**               | One independently varied dimension in an experiment (e.g., `model`, `temperature`, `retryPolicy`). Domain-neutral.                                                                                                                      |
+| **ExperimentLevel**                | One deliberately chosen setting of a factor. May be categorical (`gpt-4o`) or numeric (`0.2`). Finite and intentional.                                                                                                                  |
+| **ExperimentConfig**               | One concrete combination of `ExperimentLevel`s across all factors. Fully specified, executable. The unit of execution and observation.                                                                                                  |
+| **ExperimentGoal**                 | Optional criteria for early termination (e.g., `successRate >= 0.90`). When a config achieves the goal, remaining configs are skipped.                                                                                                  |
+| **Early Termination**              | Stopping an experiment before all configs are tested, either due to goal achievement or budget exhaustion.                                                                                                                              |
+| **Static Factor**                  | An `ExperimentFactor` with levels enumerated up front. Cardinality is known and finite.                                                                                                                                                 |
+| **Adaptive Factor**                | An `ExperimentFactor` with levels generated dynamically through iterative refinement. Initial level is provided; subsequent levels are discovered.                                                                                      |
+| **Adaptive Experiment**            | An experiment containing at least one `AdaptiveFactor`. Configs are discovered incrementally using empirical feedback.                                                                                                                  |
+| **RefinementStrategy**             | SPI for generating refined levels based on iteration feedback. Backend-specific (e.g., llmx provides LLM-based prompt refinement).                                                                                                      |
+| **IterationFeedback**              | Structured feedback from one adaptive iteration, including aggregated results and failure observations. Used by `RefinementStrategy`.                                                                                                   |
+| **Iteration History**              | Complete record of all iterations in an adaptive experiment, capturing each level tried and its results. Recorded in baselines for provenance.                                                                                          |
+| **Level Serialization**            | Configuration for how adaptive factor levels are recorded in baselines. Supports inline YAML, external file references, and custom serializers for complex objects.                                                                     |
+| **External Level Reference**       | A `$ref` pointer in a baseline that references an externalized level stored in a separate file. Used for large or complex content.                                                                                                      |
+| **Empirical Baseline**             | Machine-generated record of observed behavior from executing an `ExperimentConfig` (or adaptive iteration).                                                                                                                             |
+| **Aggregated Report**              | Summary of results across all configs in an experiment (`SUMMARY.yaml`).                                                                                                                                                                |
+| **Execution Specification**        | Human-approved contract derived from baselines, defining expected behavior for conformance testing.                                                                                                                                     |
+| **Conformance Test**               | A probabilistic test that validates behavior against a specification.                                                                                                                                                                   |
+| **Backend**                        | A pluggable component that provides domain-specific execution context. Registered via SPI (`ExperimentBackend`).                                                                                                                        |
+| **llmx**                           | The LLM-specific backend extension (`org.javai.punit.llmx`). Reference implementation of the backend SPI. Does not pollute the core framework.                                                                                          |
+| **Success Criteria**               | An expression evaluated against `UseCaseResult` to determine per-sample success.                                                                                                                                                        |
+| **Provenance**                     | The chain of artifacts from definition to enforcement: Use Case → ExperimentDesign → ExperimentConfig → Baseline → Specification → Conformance Test.                                                                                    |
+| **PromptContributor**              | Interface for extracting prompt components from production code. Enables experiments to use the same prompts as the application. (January 2026)                                                                                         |
+| **FailureCategorizer**             | User-provided function that classifies failed samples into categories (e.g., "json_syntax", "hallucination") for refinement analysis. (January 2026)                                                                                    |
+| **TokenEstimator**                 | Interface for estimating token counts when LLM providers don't report them. Framework provides built-in estimators per model. (January 2026)                                                                                            |
+| **BasicCostEstimator**             | Fallback token estimator using word-count heuristics (~1.3 tokens per word). Used for unknown models. (January 2026)                                                                                                                    |
+| **Sample Size Advisory**           | Guidance included in baseline output indicating how many samples are needed for various precision levels. (January 2026)                                                                                                                |
+| **Stability Threshold**            | Optional parameter that terminates an experiment early when the confidence interval width reaches a target precision. (January 2026)                                                                                                    |
+| **Adaptive Prompt Experiment**     | A specialized adaptive experiment that refines prompt components using LLM-assisted analysis. (January 2026)                                                                                                                            |
+| **Refinement Model**               | The LLM used to analyze failures and propose prompt improvements. Configured via system property; no hardcoded default. (January 2026)                                                                                                  |
+| **RegressionThreshold**            | A record containing the statistically-derived minimum pass rate for regression tests, including experimental basis, test configuration, and derivation metadata. (January 2026)                                                         |
+| **One-Sided Lower Bound**          | A statistical threshold below which the true success rate is unlikely to fall. Used for regression testing because we only care about detecting degradation, not improvement. (January 2026)                                            |
+| **Wilson Score Bound**             | A more robust confidence bound for binomial proportions, suitable for small samples or extreme success rates. Preferred over normal approximation for most punit use cases. (January 2026)                                              |
+| **ThresholdDerivationPolicy**      | Enum controlling how test thresholds are derived from specifications: DERIVE (adjust for sample size), RAW (use as-is), or REQUIRE_MATCHING_SAMPLES (fail if sizes differ). (January 2026)                                              |
+| **Derived Thresholds**             | Pre-computed one-sided lower bounds in baseline output for common test sample sizes (50, 100, 200, 500), enabling quick threshold lookup. (January 2026)                                                                                |
+| **Sample-Size-First Approach**     | Operational mode where the organization specifies sample count and confidence level; framework computes the threshold. Cost-driven organizations prefer this. (January 2026)                                                            |
+| **Confidence-First Approach**      | Operational mode where the organization specifies desired confidence, effect size, and power; framework computes required sample size. Quality-driven organizations prefer this. (January 2026)                                         |
+| **Threshold-First Approach**       | Operational mode where the organization specifies an explicit threshold (possibly the raw experimental rate); framework computes implied confidence and warns if false positive rate is high. (January 2026)                            |
+| **False Positive (Type I Error)**  | A test failure when the system has not actually degraded. The probability of this is controlled by the significance level α. When a test reports "FAILED with 95% confidence", there is a 5% false positive probability. (January 2026) |
+| **False Negative (Type II Error)** | A test pass when the system has actually degraded. The probability of this is β; statistical power is 1-β. (January 2026)                                                                                                               |
+| **Effect Size**                    | The minimum degradation the test is designed to detect (e.g., "detect a 5% drop in pass rate"). Required for sample size calculation in confidence-first approach. (January 2026)                                                       |
+| **Statistical Power**              | The probability of correctly detecting a real degradation (1-β). Typically set to 0.80 (80%). Required for sample size calculation in confidence-first approach. (January 2026)                                                         |
+| **Statistical Companion Document** | Formal documentation of punit's statistical methods, written in language suitable for professional statistician review. Complements the developer-focused documentation. (January 2026)                                                 |
+| **punit-statistics Module**        | Isolated Maven/Gradle module containing all statistical calculations with no dependencies on punit-core or punit-experiment. Designed for independent review by statisticians and rigorous unit testing. (January 2026)                 |
+
+---
+
+## 14. Appendix: Sketch of Key Class Implementations
 
 The following sketches illustrate the intended structure of key classes. These are **not** executable code but serve as design guidance.
 
-### 13.1 UseCaseResult
+### 14.1 UseCaseResult
 
 ```java
 package org.javai.punit.experiment.model;
@@ -3404,7 +4752,7 @@ public final class UseCaseResult {
 }
 ```
 
-### 13.2 ExperimentExtension
+### 14.2 ExperimentExtension
 
 ```java
 package org.javai.punit.experiment.engine;
@@ -3520,7 +4868,7 @@ public class ExperimentExtension
 }
 ```
 
-### 13.3 ExecutionSpecification
+### 14.3 ExecutionSpecification
 
 ```java
 package org.javai.punit.spec.model;
@@ -3589,7 +4937,7 @@ public final class ExecutionSpecification {
 }
 ```
 
-### 13.4 SpecificationRegistry
+### 14.4 SpecificationRegistry
 
 ```java
 package org.javai.punit.spec.registry;
@@ -3674,7 +5022,7 @@ public class SpecificationRegistry {
 }
 ```
 
-### 13.5 SuccessCriteria
+### 14.5 SuccessCriteria
 
 ```java
 package org.javai.punit.spec.model;
@@ -3737,7 +5085,7 @@ class ExpressionSuccessCriteria implements SuccessCriteria {
 
 ---
 
-## 14. Conclusion
+## 15. Conclusion
 
 This plan establishes a disciplined extension to punit that:
 
