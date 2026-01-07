@@ -123,12 +123,12 @@ $$\text{Upper} \approx 0.963$$
 
 #### 2.3.3 Method Selection
 
-| Condition | Recommended Method |
-|-----------|-------------------|
-| $n \geq 40$ and $0.1 \leq \hat{p} \leq 0.9$ | Wald acceptable |
-| $n \geq 20$ and ($\hat{p} < 0.1$ or $\hat{p} > 0.9$) | Wilson preferred |
-| $n < 20$ | Wilson strongly recommended |
-| $n < 10$ | Wilson required; Wald inappropriate |
+| Condition                                            | Recommended Method                  |
+|------------------------------------------------------|-------------------------------------|
+| $n \geq 40$ and $0.1 \leq \hat{p} \leq 0.9$          | Wald acceptable                     |
+| $n \geq 20$ and ($\hat{p} < 0.1$ or $\hat{p} > 0.9$) | Wilson preferred                    |
+| $n < 20$                                             | Wilson strongly recommended         |
+| $n < 10$                                             | Wilson required; Wald inappropriate |
 
 **For PUnit**: Given typical use cases (high success rates *p* > 0.85, test sample sizes 50-200), the Wilson interval is the default.
 
@@ -144,10 +144,10 @@ $$n = \frac{1.96^2 \times 0.95 \times 0.05}{0.02^2} = \frac{0.1825}{0.0004} \app
 
 | Target Precision (95% CI) | Required *n* (for *p* ≈ 0.95) |
 |---------------------------|-------------------------------|
-| ±5% | 73 |
-| ±3% | 203 |
-| ±2% | 456 |
-| ±1% | 1,825 |
+| ±5%                       | 73                            |
+| ±3%                       | 203                           |
+| ±2%                       | 456                           |
+| ±1%                       | 1,825                         |
 
 ---
 
@@ -186,11 +186,11 @@ $$p_{\text{lower}} = \hat{p} - z_\alpha \cdot \text{SE}$$
 
 Note: For one-sided bounds, we use $z_\alpha$ (not $z_{\alpha/2}$).
 
-| Confidence Level | $z_\alpha$ | Interpretation |
-|------------------|-----------|----------------|
-| 90% | 1.282 | 10% false positive rate |
-| 95% | 1.645 | 5% false positive rate |
-| 99% | 2.326 | 1% false positive rate |
+| Confidence Level | $z_\alpha$ | Interpretation          |
+|------------------|------------|-------------------------|
+| 90%              | 1.282      | 10% false positive rate |
+| 95%              | 1.645      | 5% false positive rate  |
+| 99%              | 2.326      | 1% false positive rate  |
 
 ### 3.4 Threshold Calculation (Normal Approximation)
 
@@ -227,18 +227,158 @@ For experimental rate $\hat{p}_{\text{exp}} = 0.951$ from $n_{\text{exp}} = 1000
 
 | Test Samples | Method | 95% Threshold | 99% Threshold |
 |--------------|--------|---------------|---------------|
-| 50 | Wilson | 0.890 | 0.869 |
-| 100 | Wilson | 0.904 | 0.889 |
-| 200 | Wilson | 0.918 | 0.907 |
-| 500 | Wilson | 0.932 | 0.925 |
+| 50           | Wilson | 0.890         | 0.869         |
+| 100          | Wilson | 0.904         | 0.889         |
+| 200          | Wilson | 0.918         | 0.907         |
+| 500          | Wilson | 0.932         | 0.925         |
 
 **Observation**: Smaller test samples require lower thresholds to maintain the same false positive rate.
 
 ---
 
-## 4. Test Execution and Interpretation
+## 4. The Perfect Baseline Problem ($\hat{p} = 1$)
 
-### 4.1 Decision Rule
+### 4.1 Problem Statement
+
+A critical pathology arises when the baseline experiment observes **zero failures**:
+
+$$k = n \implies \hat{p} = 1$$
+
+This commonly occurs when testing highly reliable systems (e.g., well-established third-party APIs) where failures are rare but not impossible.
+
+**Example**: An experiment with $n = 1000$ trials against a payment gateway API yields $k = 1000$ successes.
+
+### 4.2 Why Standard Methods Fail
+
+#### 4.2.1 Standard Error Collapse
+
+When $\hat{p} = 1$:
+
+$$\text{SE}(\hat{p}) = \sqrt{\frac{1 \times 0}{n}} = 0$$
+
+The plug-in standard error collapses to zero, regardless of sample size.
+
+#### 4.2.2 Threshold Degeneracy
+
+Using the normal approximation threshold formula:
+
+$$p_{\text{threshold}} = \hat{p} - z_\alpha \cdot \text{SE} = 1 - z_\alpha \times 0 = 1$$
+
+**Consequence**: Any single failure causes the test to fail, regardless of test sample size or confidence level. This produces an undefined (or effectively 50%) false positive rate.
+
+#### 4.2.3 Wald Interval Collapse
+
+The Wald confidence interval becomes $[1, 1]$—a degenerate point interval that provides no information about uncertainty.
+
+### 4.3 Interpretation of 100% Observed Success
+
+An observed rate of $\hat{p} = 1$ from $n$ trials does **not** mean $p = 1$. Rather, it provides evidence that:
+
+$$P(p \geq p_{\text{lower}} \mid k=n, n) = 1 - \alpha$$
+
+where $p_{\text{lower}}$ is derived using methods that remain valid at the boundary.
+
+**The Rule of Three** (quick approximation): With $n$ trials and zero failures, we can be approximately 95% confident that:
+
+$$p \geq 1 - \frac{3}{n}$$
+
+| Baseline Samples | 95% Lower Bound (Rule of Three) |
+|------------------|---------------------------------|
+| 100              | 0.970                           |
+| 300              | 0.990                           |
+| 1000             | 0.997                           |
+| 3000             | 0.999                           |
+
+### 4.4 PUnit's Solution: Wilson Lower Bound
+
+PUnit resolves this pathology using the **Wilson score lower bound**, which remains well-defined when $\hat{p} = 1$.
+
+**Key implementation requirement**: Baselines store $(k, n)$, not merely $\hat{p}$. The observed rate can be computed ($\hat{p} = k/n$), but raw counts are essential for proper statistical treatment of boundary cases.
+
+**Procedure**:
+1. Compute the one-sided Wilson lower bound $p_0$ from the baseline $(k, n)$
+2. Use $p_0$ (not $\hat{p}$) as the effective baseline for threshold derivation
+3. Apply the standard threshold formula using $p_0$
+
+#### 4.4.1 Wilson Lower Bound Formula
+
+The general Wilson one-sided lower bound is:
+
+$$p_{\text{lower}} = \frac{\hat{p} + \frac{z^2}{2n} - z\sqrt{\frac{\hat{p}(1-\hat{p})}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}$$
+
+When $\hat{p} = 1$, this simplifies to:
+
+$$p_{\text{lower}} = \frac{n}{n + z^2}$$
+
+#### 4.4.2 Worked Example
+
+**Baseline**: $n = 1000$ trials, $k = 1000$ successes (100% observed)
+
+**Step 1**: Compute Wilson lower bound (95% one-sided, $z = 1.645$):
+
+$$p_0 = \frac{1000}{1000 + 2.706} = \frac{1000}{1002.706} \approx 0.9973$$
+
+**Step 2**: Derive test threshold for $n_{\text{test}} = 100$:
+
+$$\text{SE}_{\text{test}} = \sqrt{\frac{0.9973 \times 0.0027}{100}} \approx 0.0052$$
+
+$$p_{\text{threshold}} = 0.9973 - 1.645 \times 0.0052 = 0.9973 - 0.0086 \approx 0.989$$
+
+**Interpretation**: For 100-sample tests, the threshold is 0.989 (at most 1 failure permitted). Compare this to the naive approach, which would set threshold = 1.0 (zero failures permitted), producing an undefined false positive rate.
+
+#### 4.4.3 Reference Table: Thresholds for 100% Baselines
+
+| Baseline $n$ | $p_0$ (Wilson 95%) | Test $n=50$ threshold | Test $n=100$ threshold |
+|--------------|--------------------|-----------------------|------------------------|
+| 100          | 0.9647             | 0.922                 | 0.935                  |
+| 300          | 0.9883             | 0.964                 | 0.973                  |
+| 1000         | 0.9973             | 0.985                 | 0.989                  |
+| 3000         | 0.9991             | 0.993                 | 0.996                  |
+
+### 4.5 Extended Example: Highly Reliable API
+
+**Scenario**: Testing a payment gateway integration.
+
+**Baseline experiment**: 2000 transactions, 0 failures ($\hat{p} = 1$).
+
+**Goal**: Configure regression tests with 95% confidence.
+
+**PUnit's calculation**:
+
+1. Wilson lower bound: $p_0 = \frac{2000}{2000 + 2.706} = 0.9986$
+
+2. For 100-sample test:
+   - $\text{SE} = \sqrt{0.9986 \times 0.0014 / 100} = 0.0037$
+   - $p_{\text{threshold}} = 0.9986 - 1.645 \times 0.0037 = 0.993$
+
+3. For 50-sample test:
+   - $\text{SE} = \sqrt{0.9986 \times 0.0014 / 50} = 0.0053$
+   - $p_{\text{threshold}} = 0.9986 - 1.645 \times 0.0053 = 0.990$
+
+**Result**: Even for this highly reliable system, PUnit produces statistically principled thresholds with valid confidence level interpretation.
+
+### 4.6 Theoretical Note: Beta-Binomial Alternative
+
+For statisticians reviewing this framework: the **Beta-Binomial posterior predictive** approach offers a theoretically superior treatment that fully propagates baseline uncertainty and produces integer thresholds. However, PUnit uses the Wilson bound because:
+
+- It requires no prior specification
+- It is simpler to implement and audit
+- It produces results that are practically equivalent for typical sample sizes
+- It remains within the frequentist paradigm familiar to most practitioners
+
+Organizations with strong Bayesian infrastructure or specific requirements for integer thresholds may wish to implement their own threshold derivation using the posterior predictive:
+
+$$K_t \mid k, n \sim \text{BetaBinomial}(n_t, a + k, b + n - k)$$
+
+where $(a, b)$ are prior hyperparameters (Jeffreys: $a = b = 0.5$).
+
+See Gelman et al. (2013) for a complete treatment.
+
+---
+
+## 5. Test Execution and Interpretation
+
+### 5.1 Decision Rule
 
 Given a test with $n_{\text{test}}$ samples and threshold $p_{\text{threshold}}$:
 
@@ -249,12 +389,12 @@ Given a test with $n_{\text{test}}$ samples and threshold $p_{\text{threshold}}$
    - If $\hat{p}_{\text{test}} \geq p_{\text{threshold}}$: **PASS** (no evidence of degradation)
    - If $\hat{p}_{\text{test}} < p_{\text{threshold}}$: **FAIL** (statistically significant degradation)
 
-### 4.2 Type I and Type II Errors
+### 5.2 Type I and Type II Errors
 
-| | True state: No degradation | True state: Degradation |
-|---|---------------------------|------------------------|
-| **Test passes** | Correct (True Negative) | Type II Error (False Negative) |
-| **Test fails** | Type I Error (False Positive) | Correct (True Positive) |
+|                 | True state: No degradation    | True state: Degradation        |
+|-----------------|-------------------------------|--------------------------------|
+| **Test passes** | Correct (True Negative)       | Type II Error (False Negative) |
+| **Test fails**  | Type I Error (False Positive) | Correct (True Positive)        |
 
 - **Type I error rate** ($\alpha$): Controlled by threshold derivation. If threshold is set at $(1-\alpha)$ confidence, then $P(\text{False Positive}) = \alpha$.
 
@@ -263,7 +403,7 @@ Given a test with $n_{\text{test}}$ samples and threshold $p_{\text{threshold}}$
   - Sample size
   - Threshold
 
-### 4.3 Statistical Power
+### 5.3 Statistical Power
 
 Power is the probability of correctly detecting degradation when it exists:
 
@@ -286,7 +426,7 @@ $$\text{Power} = \Phi\left(\frac{0.95 - 0.90 - 1.645 \times 0.0218}{0.0300}\righ
 
 With 100 samples, we have only 68% power to detect a 5-percentage-point degradation.
 
-### 4.4 Sample Size for Desired Power
+### 5.4 Sample Size for Desired Power
 
 To achieve power $(1-\beta)$ for detecting effect size $\delta = p_0 - p_1$:
 
@@ -296,17 +436,17 @@ $$n = \left(\frac{z_\alpha \sqrt{p_0(1-p_0)} + z_\beta \sqrt{p_1(1-p_1)}}{\delta
 
 $$n = \left(\frac{1.645 \times 0.218 + 0.842 \times 0.300}{0.05}\right)^2 = \left(\frac{0.359 + 0.253}{0.05}\right)^2 = (12.24)^2 \approx 150$$
 
-| Effect Size | Power 80% | Power 90% | Power 95% |
-|-------------|-----------|-----------|-----------|
-| 5% (95%→90%) | 150 | 200 | 250 |
-| 10% (95%→85%) | 40 | 55 | 70 |
-| 3% (95%→92%) | 410 | 550 | 700 |
+| Effect Size   | Power 80% | Power 90% | Power 95% |
+|---------------|-----------|-----------|-----------|
+| 5% (95%→90%)  | 150       | 200       | 250       |
+| 10% (95%→85%) | 40        | 55        | 70        |
+| 3% (95%→92%)  | 410       | 550       | 700       |
 
 ---
 
-## 5. The Three Operational Approaches: Mathematical Formulation
+## 6. The Three Operational Approaches: Mathematical Formulation
 
-### 5.1 Approach 1: Sample-Size-First
+### 6.1 Approach 1: Sample-Size-First
 
 **Given**: $n_{\text{test}}$, $\alpha$, experimental basis $(\hat{p}_{\text{exp}}, n_{\text{exp}})$
 
@@ -316,7 +456,7 @@ $$p_{\text{threshold}} = \hat{p}_{\text{exp}} - z_\alpha \sqrt{\frac{\hat{p}_{\t
 
 **Trade-off**: Fixed cost; confidence is controlled; threshold (sensitivity) is determined.
 
-### 5.2 Approach 2: Confidence-First
+### 6.2 Approach 2: Confidence-First
 
 **Given**: $\alpha$, desired power $(1-\beta)$, minimum detectable effect $\delta$, experimental basis
 
@@ -326,7 +466,7 @@ $$n_{\text{test}} = \left(\frac{z_\alpha \sqrt{\hat{p}_{\text{exp}}(1-\hat{p}_{\
 
 **Trade-off**: Fixed confidence and detection capability; cost (sample size) is determined.
 
-### 5.3 Approach 3: Threshold-First
+### 6.3 Approach 3: Threshold-First
 
 **Given**: $n_{\text{test}}$, $p_{\text{threshold}}$ (often = $\hat{p}_{\text{exp}}$), experimental basis
 
@@ -347,20 +487,20 @@ $$\alpha = 1 - \Phi(0) = 0.50$$
 
 ---
 
-## 6. Reporting and Interpretation
+## 7. Reporting and Interpretation
 
-### 6.1 Test Failure Report
+### 7.1 Test Failure Report
 
 When $\hat{p}_{\text{test}} < p_{\text{threshold}}$, the report should include:
 
-| Metric | Value | Interpretation |
-|--------|-------|----------------|
-| Observed rate | $\hat{p}_{\text{test}}$ | Point estimate from test |
-| Threshold | $p_{\text{threshold}}$ | Derived from experimental basis |
-| Shortfall | $p_{\text{threshold}} - \hat{p}_{\text{test}}$ | Magnitude of deviation |
-| Z-score | $(\hat{p}_{\text{test}} - \hat{p}_{\text{exp}}) / \text{SE}$ | Standardized deviation |
-| One-tailed p-value | $\Phi(z)$ | Probability of observing this or worse |
-| Confidence level | $1 - \alpha$ | Pre-specified false positive control |
+| Metric             | Value                                                        | Interpretation                         |
+|--------------------|--------------------------------------------------------------|----------------------------------------|
+| Observed rate      | $\hat{p}_{\text{test}}$                                      | Point estimate from test               |
+| Threshold          | $p_{\text{threshold}}$                                       | Derived from experimental basis        |
+| Shortfall          | $p_{\text{threshold}} - \hat{p}_{\text{test}}$               | Magnitude of deviation                 |
+| Z-score            | $(\hat{p}_{\text{test}} - \hat{p}_{\text{exp}}) / \text{SE}$ | Standardized deviation                 |
+| One-tailed p-value | $\Phi(z)$                                                    | Probability of observing this or worse |
+| Confidence level   | $1 - \alpha$                                                 | Pre-specified false positive control   |
 
 **Example**: Test observes 87/100 successes against threshold 0.916:
 
@@ -371,13 +511,13 @@ When $\hat{p}_{\text{test}} < p_{\text{threshold}}$, the report should include:
 - p-value: $\Phi(-3.75) < 0.0001$
 - Interpretation: Highly significant degradation; probability of this result under $H_0$ is < 0.01%.
 
-### 6.2 Confidence Statement
+### 7.2 Confidence Statement
 
 Every failure report should include a plain-language confidence statement:
 
 > "This test was configured with 95% confidence. There is a 5% probability that this failure is due to sampling variance rather than actual system degradation. The observed p-value of < 0.0001 indicates the result is highly unlikely under the null hypothesis of no degradation."
 
-### 6.3 Multiple Testing Considerations
+### 7.3 Multiple Testing Considerations
 
 When running multiple probabilistic tests:
 
@@ -390,9 +530,9 @@ $$P(\text{at least one false positive}) = 1 - (1-\alpha)^m$$
 
 | Number of tests | Per-test α = 0.05 | Per-test α = 0.01 |
 |-----------------|-------------------|-------------------|
-| 5 | 22.6% | 4.9% |
-| 10 | 40.1% | 9.6% |
-| 20 | 64.2% | 18.2% |
+| 5               | 22.6%             | 4.9%              |
+| 10              | 40.1%             | 9.6%              |
+| 20              | 64.2%             | 18.2%             |
 
 **Mitigation options**:
 - Bonferroni correction: Use $\alpha' = \alpha / m$
@@ -401,9 +541,9 @@ $$P(\text{at least one false positive}) = 1 - (1-\alpha)^m$$
 
 ---
 
-## 7. Assumptions and Validity Conditions
+## 8. Assumptions and Validity Conditions
 
-### 7.1 When Normal Approximation is Valid
+### 8.1 When Normal Approximation is Valid
 
 The normal approximation to the binomial is adequate when:
 
@@ -417,7 +557,7 @@ $$n \cdot p \geq 10 \quad \text{and} \quad n \cdot (1-p) \geq 10$$
 - Need $n \geq 200$ for conservative criterion
 - Wilson interval recommended for $n < 200$
 
-### 7.2 Independence Violations
+### 8.2 Independence Violations
 
 If trials are not independent, the effective sample size is reduced:
 
@@ -429,7 +569,7 @@ where $\rho$ is the intraclass correlation.
 
 **Mitigation**: Increase sample size or introduce delays between trials.
 
-### 7.3 Non-Stationarity
+### 8.3 Non-Stationarity
 
 If *p* changes during the experiment:
 
@@ -441,7 +581,7 @@ If *p* changes during the experiment:
 
 ---
 
-## 8. Summary of Key Formulas
+## 9. Summary of Key Formulas
 
 ### Estimation
 
@@ -458,6 +598,14 @@ $$\frac{\hat{p} + \frac{z^2}{2n} \pm z\sqrt{\frac{\hat{p}(1-\hat{p})}{n} + \frac
 ### One-Sided Lower Bound (for threshold derivation)
 
 $$p_{\text{threshold}} = \hat{p} - z_\alpha \cdot \text{SE}$$
+
+### Wilson Lower Bound (for $\hat{p} = 1$)
+
+$$p_{\text{lower}} = \frac{n}{n + z^2}$$
+
+### Rule of Three (quick approximation for zero failures)
+
+$$p \geq 1 - \frac{3}{n} \quad \text{(95% confidence)}$$
 
 ### Sample Size for Precision
 
@@ -478,6 +626,14 @@ $$n = \left(\frac{z_\alpha \sqrt{p_0(1-p_0)} + z_\beta \sqrt{p_1(1-p_1)}}{p_0 - 
 3. Brown, L. D., Cai, T. T., & DasGupta, A. (2001). Interval estimation for a binomial proportion. *Statistical Science*, 16(2), 101-133.
 
 4. Newcombe, R. G. (1998). Two-sided confidence intervals for the single proportion: comparison of seven methods. *Statistics in Medicine*, 17(8), 857-872.
+
+5. Hanley, J. A., & Lippman-Hand, A. (1983). If nothing goes wrong, is everything all right? Interpreting zero numerators. *JAMA*, 249(13), 1743-1745. [The "Rule of Three"]
+
+6. Clopper, C. J., & Pearson, E. S. (1934). The use of confidence or fiducial limits illustrated in the case of the binomial. *Biometrika*, 26(4), 404-413.
+
+7. Gelman, A., Carlin, J. B., Stern, H. S., Dunson, D. B., Vehtari, A., & Rubin, D. B. (2013). *Bayesian Data Analysis* (3rd ed.). Chapman and Hall/CRC. [Beta-Binomial posterior predictive]
+
+8. Jeffreys, H. (1946). An invariant form for the prior probability in estimation problems. *Proceedings of the Royal Society of London. Series A*, 186(1007), 453-461. [Jeffreys prior]
 
 ---
 
