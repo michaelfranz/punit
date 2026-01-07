@@ -182,6 +182,18 @@ Interpretation:
 
 Your experiment observed 95.1%, but the **true** success rate (what you'd see if you ran infinite samples) is somewhere in the confidence interval. With 1000 samples, that interval is narrow (±1.3%). With fewer samples, it's wider.
 
+### Special Case: When All Trials Succeed
+
+Sometimes an experiment completes with **zero failures**—particularly when testing highly reliable third-party APIs or well-tuned systems. This produces an observed rate of 100%.
+
+**What 100% actually means**: It does *not* mean "this system is perfect and will never fail." It means "no failures occurred in N trials." There may still be a small probability of failure that simply wasn't observed during the experiment.
+
+**Example**: An experiment runs 1000 trials against a payment gateway with zero failures. The 100% observed rate tells us the true success rate is very high—but statistical analysis reveals we can only be 95% confident that the true rate is at least 99.73%, not 100%.
+
+**PUnit handles this automatically**: The framework uses proven statistical techniques (specifically, the Wilson score bound) to derive sensible thresholds even when no failures are observed. You don't need to take special action—PUnit will compute appropriate thresholds that account for the uncertainty inherent in observing "perfect" results.
+
+For technical details, see [Statistical Companion: The Perfect Baseline Problem](./STATISTICAL-COMPANION.md#4-the-perfect-baseline-problem-hatp--1).
+
 ### For Managers
 
 The baseline tells you: "Under controlled conditions, here's how the system performs." It's not a guarantee—it's an empirical measurement with known precision.
@@ -552,5 +564,5 @@ The goal is not to eliminate uncertainty—that's impossible with non-determinis
 
 *For technical implementation details, see the [PLAN-EXP.md](./PLAN-EXP.md) design document.*
 
-*For formal statistical foundations, see the [Statistical Companion Document](./STATISTICAL-COMPANION.md) (coming soon).*
+*For formal statistical foundations, see the [Statistical Companion Document](./STATISTICAL-COMPANION.md).*
 
