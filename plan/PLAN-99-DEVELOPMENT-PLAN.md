@@ -12,7 +12,7 @@ PUnit development is organized into three major tracks:
 |-------|-------------|--------|
 | **Core Framework** | Foundational `@ProbabilisticTest` infrastructure | C1–C8 |
 | **Experiment Extension** | `@Experiment`, baselines, specifications | E1–E8 |
-| **Enhancements** | Statistical improvements, prompt refinement | A, B, C |
+| **Enhancements** | Statistical improvements, prompt refinement, tooling | A, B, C, D |
 
 ---
 
@@ -550,7 +550,78 @@ Reports include:
 
 ---
 
-**Track 3 Total**: 14-18 days (Planned)
+---
+
+### Phase D: Baseline Review and Approval Workflow
+
+**Status**: 📋 Planned
+
+**Priority**: P1
+
+**Goals**: Provide Gradle tasks for reviewing baselines and creating specifications
+
+**Deliverables**:
+
+#### D.1 `punitReview` Task
+
+Display baseline information with computed statistics:
+
+```bash
+./gradlew punitReview --useCase=json.generation     # Display baseline
+./gradlew punitReview --list-pending                # List unapproved baselines
+```
+
+Features:
+- Display current baseline with raw data (samples, successes, rate)
+- Compute and display 95% confidence interval on-the-fly
+- Show history of previous baseline runs
+- Compare current to previous baselines
+- Identify pending approvals (baselines without specs)
+
+#### D.2 `punitApprove` Task
+
+Create specification from baseline (non-interactive):
+
+```bash
+./gradlew punitApprove --useCase=json.generation
+./gradlew punitApprove --useCase=json.generation --notes="Reviewed after fix"
+./gradlew punitApprove --useCase=json.generation --force  # New version
+```
+
+Features:
+- Non-interactive (no stdin prompts) for CI/CD compatibility
+- Auto-capture approval metadata (timestamp, user)
+- Auto-increment version if spec exists
+- Validate baseline exists before approval
+
+#### D.3 Baseline History
+
+Baseline files include history of previous runs:
+
+```yaml
+history:
+  - generatedAt: 2026-01-05T10:00:00Z
+    samples: 1000
+    successes: 912
+    observedRate: 0.912
+  - generatedAt: 2026-01-03T09:15:00Z
+    samples: 500
+    successes: 471
+    observedRate: 0.942
+```
+
+Features:
+- Auto-append on each experiment run
+- Configurable history limit (default 10)
+- Enables trend analysis at review time
+
+**Dependencies**: Phase E2
+
+**Estimated Effort**: 3-4 days
+
+---
+
+**Track 3 Total**: 17-22 days (Planned)
 
 ---
 
@@ -579,8 +650,9 @@ Reports include:
 | Enhancement | A | Cost/Statistical Enhancements | 📋 | 3-4 |
 | Enhancement | B | Adaptive Prompt Refinement | 📋 | 5-6 |
 | Enhancement | C | Threshold Derivation | 📋 | 6-8 |
+| Enhancement | D | Review & Approval Workflow | 📋 | 3-4 |
 
-**Total Estimated Effort**: 62-83 days
+**Total Estimated Effort**: 65-87 days
 
 ---
 
@@ -588,9 +660,10 @@ Reports include:
 
 1. ✅ Complete Phases C1-C8 (Core Framework)
 2. ✅ Complete Phases E1-E8 (Experiment Extension)
-3. 📋 Phase C (isolated statistics module + threshold derivation)
-4. 📋 Phase A (cost/statistical enhancements)
-5. 📋 Phase B (prompt refinement)
+3. 📋 Phase D (review & approval workflow) — enables practical usage
+4. 📋 Phase C (isolated statistics module + threshold derivation)
+5. 📋 Phase A (cost/statistical enhancements)
+6. 📋 Phase B (prompt refinement)
 
 ---
 
@@ -603,7 +676,6 @@ Reports include:
 | Cross-experiment state management | Each experiment is independent |
 | Visualization/dashboards | Results via JUnit only |
 | Retry orchestration | Application's responsibility |
-| Iteration history in baselines | Available as runtime output only |
 
 ---
 

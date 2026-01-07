@@ -8,12 +8,12 @@ This document tracks the current implementation status of PUnit's development ph
 
 ## Status Legend
 
-| Symbol | Status        | Description                                   |
-|--------|---------------|-----------------------------------------------|
-| ✅      | **Complete**  | Fully implemented and tested                  |
-| 🔄     | **Partial**   | Partially implemented; some elements remain   |
-| 📋     | **Planned**   | Design complete; implementation pending       |
-| ⏳     | **Future**    | Deferred to v2 or later                       |
+| Symbol | Status       | Description                                 |
+|--------|--------------|---------------------------------------------|
+| ✅      | **Complete** | Fully implemented and tested                |
+| 🔄     | **Partial**  | Partially implemented; some elements remain |
+| 📋     | **Planned**  | Design complete; implementation pending     |
+| ⏳      | **Future**   | Deferred to v2 or later                     |
 
 ---
 
@@ -149,12 +149,12 @@ This document tracks the current implementation status of PUnit's development ph
 
 ## Summary
 
-| Track        | Complete | Planned | Total |
-|--------------|----------|---------|-------|
-| Core (C)     | 8        | 0       | 8     |
-| Experiment (E) | 10     | 0       | 10    |
-| Enhancement  | 0        | 3       | 3     |
-| **Total**    | **18**   | **3**   | **21** |
+| Track          | Complete | Planned | Total  |
+|----------------|----------|---------|--------|
+| Core (C)       | 8        | 0       | 8      |
+| Experiment (E) | 10       | 0       | 10     |
+| Enhancement    | 0        | 3       | 3      |
+| **Total**      | **18**   | **3**   | **21** |
 
 ---
 

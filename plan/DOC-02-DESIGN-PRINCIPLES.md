@@ -24,36 +24,56 @@ The following principles are **non-negotiable** and must be preserved throughout
 | Assertions    | Observations, not failures | Failures gate outcomes                       |
 | Specification | None required              | Spec-driven (preferred) or inline thresholds |
 
-## 1.4 Discovery Precedes Specification Precedes Testing
+## 1.4 Use Cases, Experiments, and Tests
 
-The canonical flow is:
+### The Use Case
+
+A **use case** is application code that invokes behavior exhibiting some degree of stochastic variation. The use case itself knows nothing about experiments or tests—it simply executes and returns a `UseCaseResult` that can be evaluated.
+
+Where the stochastic behavior resides is irrelevant to PUnit. The use case may invoke it directly (e.g., calling an LLM API) or indirectly (e.g., through layers of application logic). The key point is that the use case terminates with an observable outcome.
+
+### Experiment Modes
+
+Experiments invoke use cases in one of two modes:
+
+| Mode | Purpose | When to Use |
+|------|---------|-------------|
+| **Exploration** | Traverse a matrix of configurations (Factors × Levels) to find one that satisfies requirements | When the optimal configuration is unknown |
+| **Baseline Derivation** | Run the use case many times (e.g., 1000×) with a fixed configuration to measure the empirical pass/fail rate | Always required before creating a specification |
+
+**Exploration is optional.** If the configuration is already known (e.g., the model, temperature, and system prompt are predetermined), skip directly to baseline derivation.
+
+### The Canonical Flow
 
 ```
-  Use Case
+  Use Case (application code)
        ↓
-  ExperimentDesign (Factors + Levels)
+  ┌─────────────────────────────────────┐
+  │  Exploration (optional)             │
+  │  ExperimentDesign: Factors + Levels │
+  │            ↓                        │
+  │  ExperimentConfig (chosen config)   │
+  └─────────────────────────────────────┘
        ↓
-  ExperimentConfig
+  Baseline Derivation (required)
        ↓
-  Empirical Baselines
+  Empirical Baseline
        ↓
-  Execution Specification
+  Execution Specification (human-approved)
        ↓
   Probabilistic Conformance Tests
 ```
 
-This flow reflects the disciplined progression from **discovery** (experiments) through **codification** (specifications) to **enforcement** (tests). Each artifact builds on the previous:
+| Stage    | Artifact                 | Purpose                                              |
+|----------|--------------------------|------------------------------------------------------|
+| Define   | Use Case                 | Application code invoking stochastic behavior        |
+| Explore  | ExperimentDesign         | *Optional:* Factors and levels to explore            |
+| Choose   | ExperimentConfig         | The configuration to use (explored or predetermined) |
+| Measure  | Empirical Baseline       | Observed pass/fail rate over many trials             |
+| Approve  | Execution Specification  | Human-reviewed contract derived from baseline        |
+| Enforce  | Probabilistic Tests      | CI-gated validation against specification            |
 
-| Stage   | Artifact                        | Purpose                            |
-|---------|---------------------------------|------------------------------------|
-| Define  | Use Case                        | The behavior to observe/test       |
-| Design  | ExperimentDesign                | What factors and levels to explore |
-| Execute | ExperimentConfig                | Concrete configuration to run      |
-| Record  | Empirical Baselines             | Observed behavior per config       |
-| Approve | Execution Specification         | Human-approved contract            |
-| Enforce | Probabilistic Conformance Tests | CI-gated validation                |
-
-Hard-coded thresholds in `@ProbabilisticTest` remain supported but are explicitly a **transitional pattern**. The framework will encourage spec-driven testing and discourage arbitrary thresholds.
+Hard-coded thresholds in `@ProbabilisticTest` remain supported but are explicitly a **transitional pattern**. The framework encourages spec-driven testing and discourages arbitrary thresholds.
 
 ## 1.5 Production Code Must Remain Uncontaminated
 

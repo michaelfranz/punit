@@ -2,7 +2,7 @@
 
 ## 8.1 Pluggable Backends
 
-Backends provide domain-specific execution context via SPI:
+Backends provide domain-specific configuration via SPI:
 
 ```java
 public interface ExperimentBackend {

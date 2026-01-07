@@ -72,23 +72,42 @@ public class ExperimentExtension
 ```java
 public final class ExecutionSpecification {
     
-    private final String specId;
     private final String useCaseId;
     private final int version;
+    
+    // Approval metadata
     private final Instant approvedAt;
     private final String approvedBy;
     private final String approvalNotes;
-    private final List<String> sourceBaselines;
-    private final Map<String, Object> executionContext;
-    private final SpecRequirements requirements;
-    private final CostEnvelope costEnvelope;
+    
+    // Raw baseline data (for statistical derivation at test time)
+    private final BaselineData baseline;
+    
+    // Configuration used during experiment
+    private final Map<String, Object> configuration;
+    
+    // Success criteria expression
+    private final String successCriteria;
     
     public boolean isApproved() { return approvedAt != null && approvedBy != null; }
-    public double getMinPassRate() { return requirements.minPassRate(); }
+    
+    // Raw data accessors - thresholds computed at test time, not stored here
+    public int getBaselineSamples() { return baseline.samples(); }
+    public int getBaselineSuccesses() { return baseline.successes(); }
+    public double getObservedRate() { return baseline.observedRate(); }
+    
     public SuccessCriteria getSuccessCriteria() { ... }
     
     public static ExecutionSpecification loadFrom(Path path) { ... }
     public void validate() throws SpecificationValidationException { ... }
+    
+    public record BaselineData(
+        Instant generatedAt,
+        int samples,
+        int successes,
+        int failures,
+        double observedRate
+    ) {}
 }
 ```
 

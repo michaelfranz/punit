@@ -14,57 +14,68 @@
                                         │ (invoked by)
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         Test / Experiment Space                                  │
-│                                                                                  │
+│                          Experiment / Test Space                                │
+│                                                                                 │
 │  ┌──────────────────────────────┐   ┌────────────────────────────────────────┐  │
 │  │    Use Case Functions        │   │     Result Interpretation              │  │
 │  │                              │   │                                        │  │
-│  │  - Invoke production code    │──▶│  UseCaseResult                        │  │
-│  │  - Capture observations      │   │  - Map<String, Object> values         │  │
-│  │  - Return UseCaseResult      │   │  - Neutral, descriptive data          │  │
-│  │  - Never called by prod      │   │  - No assertions embedded             │  │
+│  │  - Invoke production code    │──▶│  UseCaseResult                         │  │
+│  │  - Capture observations      │   │  - Map<String, Object> values          │  │
+│  │  - Return UseCaseResult      │   │  - Neutral, descriptive data           │  │
+│  │  - Never called by prod      │   │  - No assertions embedded              │  │
 │  └──────────────────────────────┘   └────────────────────────────────────────┘  │
-│              │                                        │                          │
-│              ▼                                        ▼                          │
+│              │                                        │                         │
+│              ▼                                        ▼                         │
 │  ┌──────────────────────────────────────────────────────────────────────────┐   │
-│  │                      Execution Modes                                      │   │
-│  │                                                                           │   │
-│  │  ┌─────────────────────────┐     ┌─────────────────────────────────┐     │   │
-│  │  │   @Experiment           │     │  @ProbabilisticTest             │     │   │
-│  │  │                         │     │                                 │     │   │
-│  │  │ - Exploratory           │     │ - Conformance testing           │     │   │
-│  │  │ - No pass/fail          │     │ - Binary pass/fail              │     │   │
-│  │  │ - Produces baseline     │     │ - Consumes specification        │     │   │
-│  │  │ - Never gates CI        │     │ - Gates CI                      │     │   │
-│  │  │ - Varies context        │     │ - Fixed context (from spec)     │     │   │
-│  │  └─────────────────────────┘     └─────────────────────────────────┘     │   │
-│  │              │                               │                            │   │
-│  │              ▼                               ▼                            │   │
-│  │  ┌──────────────────────────────────────────────────────────────────┐    │   │
-│  │  │              Shared Execution Engine                              │    │   │
-│  │  │                                                                   │    │   │
-│  │  │  - Sample generation & invocation                                 │    │   │
-│  │  │  - Result aggregation (SampleResultAggregator)                    │    │   │
-│  │  │  - Budget monitoring (time, tokens, cost)                         │    │   │
-│  │  │  - Early termination evaluation                                   │    │   │
-│  │  │  - Structured reporting via JUnit TestReporter                    │    │   │
-│  │  └──────────────────────────────────────────────────────────────────┘    │   │
-│  └───────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                  │
+│  │                           @Experiment                                    │   │
+│  │                                                                          │   │
+│  │  ┌─────────────────────────────┐   ┌─────────────────────────────────┐   │   │
+│  │  │  Exploration Mode           │   │  Baseline Derivation Mode       │   │   │
+│  │  │  (optional)                 │   │  (required)                     │   │   │
+│  │  │                             │   │                                 │   │   │
+│  │  │ - Traverse Factors × Levels │   │ - Fixed configuration           │   │   │
+│  │  │ - Find satisfactory config  │   │ - Many samples (e.g., 1000×)    │   │   │
+│  │  │ - Produces ExperimentConfig │   │ - Produces Empirical Baseline   │   │   │
+│  │  └─────────────────────────────┘   └─────────────────────────────────┘   │   │
+│  │                                                                          │   │
+│  │  • Never gates CI    • No pass/fail verdict    • Descriptive data only   │   │
+│  └──────────────────────────────────────────────────────────────────────────┘   │
+│                │                                                                │
+│                │  Empirical Baseline → Execution Specification                  │
+│                ▼                                                                │
+│  ┌──────────────────────────────────────────────────────────────────────────┐   │
+│  │                       @ProbabilisticTest                                 │   │
+│  │                                                                          │   │
+│  │  • Conformance testing           • Binary pass/fail verdict              │   │
+│  │  • Consumes specification        • Gates CI                              │   │
+│  │  • Fixed context (from spec)     • Enforcement, not discovery            │   │
+│  └──────────────────────────────────────────────────────────────────────────┘   │
+│                │                                                                │
+│                ▼                                                                │
+│  ┌──────────────────────────────────────────────────────────────────────────┐   │
+│  │                    Shared Execution Engine                               │   │
+│  │                                                                          │   │
+│  │  - Sample generation & invocation                                        │   │
+│  │  - Result aggregation (SampleResultAggregator)                           │   │
+│  │  - Budget monitoring (time, tokens, cost)                                │   │
+│  │  - Early termination evaluation                                          │   │
+│  │  - Structured reporting via JUnit TestReporter                           │   │
+│  └──────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
 │  ┌───────────────────────────────┐   ┌────────────────────────────────────┐     │
 │  │   Empirical Baseline          │   │   Execution Specification          │     │
 │  │   (Machine-generated)         │──▶│   (Human-approved)                 │     │
 │  │                               │   │                                    │     │
 │  │   - Observed success rates    │   │   - useCaseId:version              │     │
-│  │   - Variance, failure modes   │   │   - minPassRate (approved)         │     │
-│  │   - Cost metrics              │   │   - Execution context              │     │
-│  │   - Context metadata          │   │   - Cost envelopes                 │     │
-│  │   - Descriptive only          │   │   - Normative contract             │     │
+│  │   - Variance, failure modes   │   │   - Raw baseline data (for stats)  │     │
+│  │   - Cost metrics              │   │   - Configuration                  │     │
+│  │   - Configuration metadata    │   │   - Approval metadata              │     │
+│  │   - Descriptive only          │   │   - Empirical truth                │     │
 │  └───────────────────────────────┘   └────────────────────────────────────┘     │
-│                                                                                  │
+│                                                                                 │
 │  ┌──────────────────────────────────────────────────────────────────────────┐   │
-│  │                    Backend Extensions (via SPI)                           │   │
-│  │                                                                           │   │
+│  │                    Backend Extensions (via SPI)                          │   │
+│  │                                                                          │   │
 │  │  ┌───────────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │   │
 │  │  │ llmx              │  │ Randomized   │  │ Distributed  │  │ Hardware │ │   │
 │  │  │ (reference impl)  │  │ Algorithm    │  │ System       │  │ Sensor   │ │   │
@@ -72,7 +83,7 @@
 │  │  │ model, temperature│  │ (future)     │  │ (future)     │  │ (future) │ │   │
 │  │  │ provider, tokens  │  │              │  │              │  │          │ │   │
 │  │  └───────────────────┘  └──────────────┘  └──────────────┘  └──────────┘ │   │
-│  │        ↑                                                                  │   │
+│  │        ↑                                                                 │   │
 │  │        │ org.javai.punit.llmx (does NOT pollute core)                    │   │
 │  └──────────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -98,8 +109,8 @@
                                │ depends on
                                ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                         punit (core)                               │
-│                                                                    │
+│                         punit (core)                              │
+│                                                                   │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌───────────┐ │
 │  │ punit-core  │  │  punit-     │  │ punit-spec  │  │ punit-    │ │
 │  │             │←─│  experiment │←─│             │  │ backends- │ │
@@ -110,12 +121,12 @@
 
 > **Critical Constraint**: The core punit packages (`org.javai.punit.*`) **MUST NOT** import from `org.javai.punit.llmx`. Dependencies flow **one direction only**: `llmx → punit-core`.
 
-**Enforcement**:
+**Enforcement** :
 - ArchUnit tests verify no reverse dependencies
 - Build-time checks prevent accidental coupling
 - Future: llmx may be extracted to a separate JAR/module
 
-**Decision Point**: Whether these are separate modules/JARs or packages within a single module is an implementation detail. For simplicity, we recommend starting with packages in a single module, with module separation as a future enhancement if needed.
+**Decision Point** : Whether these are separate modules/JARs or packages within a single module is an implementation detail. For simplicity, we recommend starting with packages in a single module, with module separation as a future enhancement if needed.
 
 ## 2.3 Registry & Storage Concepts
 
@@ -133,10 +144,11 @@ src/test/resources/punit/baselines/
 Each baseline file contains:
 - Use case ID
 - Timestamp of generation
-- Execution context (backend-specific parameters)
+- Configuration (backend-specific parameters)
 - Statistical observations (success rate, variance, failure distribution)
 - Cost metrics (tokens consumed, time elapsed)
-- Sample size and confidence metadata
+- Sample size metadata
+- History of previous baseline runs
 
 ### Execution Specification Storage
 
@@ -155,10 +167,9 @@ src/test/resources/punit/specs/
 
 Each specification file contains:
 - Use case ID and version
-- Approved minimum pass rate
-- Execution context configuration
-- Cost envelopes (max time, max tokens)
-- Reference to source baseline(s)
+- Raw baseline data (samples, successes, failures, observedRate)
+- Configuration (backend-specific parameters)
+- Success criteria expression
 - Approval metadata (who, when, why)
 
 ### Specification Registry
