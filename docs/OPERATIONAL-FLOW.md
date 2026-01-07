@@ -449,8 +449,10 @@ Precisely which option to choose depends on your organization's priorities and b
 It means: "The observed behavior is statistically inconsistent with the baseline at the configured confidence level."
 
 With 95% confidence:
-- 95% of failures indicate real degradation
-- 5% of failures are **false positives** (random bad luck)
+- If the system truly has not degraded, then the probability of seeing a failure is ≤ 5% (false alarm rate).
+- But the fraction of observed failures that are “real” depends on how often real degradations occur (base rate) and on power (ability to detect degradations of a given size).
+
+In other words, at 95% confidence, if there has been no real degradation, we expect at most a 5% chance of a false alarm on any single run. A failure is evidence of degradation, not absolute proof. Repeated failures strengthen that evidence.
 
 This is the fundamental trade-off of statistical testing. Higher confidence (99%) reduces false positives but requires more samples.
 

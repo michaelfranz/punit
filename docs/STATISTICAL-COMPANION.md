@@ -289,6 +289,8 @@ $$p \geq 1 - \frac{3}{n}$$
 | 1000             | 0.997                           |
 | 3000             | 0.999                           |
 
+(Side note: this assumes conditions are stable and runs are independent.)
+
 ### 4.4 PUnit's Solution: Wilson Lower Bound
 
 PUnit resolves this pathology using the **Wilson score lower bound**, which remains well-defined when $\hat{p} = 1$.
