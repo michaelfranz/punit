@@ -468,85 +468,886 @@ public @interface AdaptivePromptExperiment {
 
 ---
 
-### Phase C: Pass Rate Threshold Derivation
+### Phase C: Statistics Engine and Operational Approaches
 
 **Status**: 📋 Planned
 
 **Priority**: P1
 
-**Goals**: Enable statistically-derived pass rate thresholds for probabilistic tests
+**Goals**: 
+- Implement an isolated statistics engine with professional-grade nomenclature
+- Support all three operational approaches for threshold derivation
+- Integrate statistics into the probabilistic test driver for pass/fail determination
+- Produce qualified test reports with full statistical context
 
-**Deliverables**:
+---
 
 #### C.1 Problem Statement
 
-An experiment runs 1000 samples and observes 95.1% success rate. If the regression test runs only 100 samples with a 95.1% threshold, normal sampling variance will cause false failures.
+An experiment runs 1000 samples and observes 95.1% success rate. If the regression test runs only 100 samples with a 95.1% threshold, normal sampling variance will cause false failures ~50% of the time.
 
-**Solution**: Derive a one-sided lower confidence bound that accounts for increased variance in smaller test samples.
+**Solution**: A statistics engine that:
+1. Derives thresholds accounting for test sample variance
+2. Computes required sample sizes for desired power
+3. Reports confidence levels for observed results
+
+---
 
 #### C.2 punit-statistics Module
 
 Per Design Principle 1.6, an isolated module with:
-- No dependencies on punit-core or punit-experiment
-- Only Java standard library
-- Comprehensive unit tests with worked examples
-- Code readable by professional statisticians
+- **No dependencies** on punit-core, punit-experiment, or JUnit
+- **Only dependencies**: Java standard library + Apache Commons Statistics
+- **Comprehensive unit tests** with worked examples using real-world variable names
+- **Code readable by professional statisticians** (standard terminology)
 
-#### C.3 Wilson Score Lower Bound
+**Package structure**:
 
 ```
-p_lower = (p̂ + z²/2n - z√(p̂(1-p̂)/n + z²/4n²)) / (1 + z²/n)
+org.javai.punit.statistics/
+├── BinomialProportionEstimator.java    # Point estimates and CIs
+├── ThresholdDeriver.java               # Derive threshold from baseline
+├── SampleSizeCalculator.java           # Power analysis for sample size
+├── ConfidenceCalculator.java           # Implied confidence for given threshold
+├── TestVerdictEvaluator.java           # Pass/fail with statistical context
+└── model/
+    ├── ProportionEstimate.java         # p̂, n, CI
+    ├── DerivedThreshold.java           # Threshold with derivation metadata
+    ├── SampleSizeRequirement.java      # Required n with power context
+    ├── VerdictWithConfidence.java      # Pass/fail + statistical qualification
+    └── OperationalApproach.java        # Enum: SAMPLE_SIZE_FIRST, CONFIDENCE_FIRST, THRESHOLD_FIRST
 ```
 
-Preferred for small samples or extreme success rates.
+---
 
-#### C.4 RegressionThreshold and Calculator
+#### C.3 Core Statistical Components
+
+**C.3.1 BinomialProportionEstimator**
+
+Wraps Apache Commons Statistics for binomial proportion analysis:
 
 ```java
-public record RegressionThreshold(
-    ExperimentalBasis basis,
-    TestConfiguration testConfig,
-    double minPassRate,
-    DerivationMetadata derivation
-) {}
-
-public class RegressionThresholdCalculator {
-    public RegressionThreshold calculate(
-            int experimentSamples,
-            int experimentSuccesses,
-            int testSamples,
-            double confidenceLevel) { ... }
+public class BinomialProportionEstimator {
+    
+    /**
+     * Compute point estimate and confidence interval for a proportion.
+     * Uses Wilson score interval (preferred for all sample sizes).
+     */
+    public ProportionEstimate estimate(int successes, int trials, double confidenceLevel) {
+        double pHat = (double) successes / trials;
+        double z = zScoreForConfidence(confidenceLevel);
+        
+        // Wilson score interval
+        double denominator = 1 + z * z / trials;
+        double center = (pHat + z * z / (2 * trials)) / denominator;
+        double margin = z * Math.sqrt(pHat * (1 - pHat) / trials + z * z / (4 * trials * trials)) / denominator;
+        
+        return new ProportionEstimate(pHat, trials, center - margin, center + margin, confidenceLevel);
+    }
+    
+    /**
+     * Compute one-sided lower bound (for threshold derivation).
+     * Critical for detecting degradation without false alarms.
+     */
+    public double lowerBound(int successes, int trials, double confidenceLevel) {
+        // One-sided: use z for (1 - alpha) not (1 - alpha/2)
+        // Special handling for p̂ = 1 (zero failures case)
+        ...
+    }
+    
+    private double zScoreForConfidence(double confidence) {
+        // Uses Apache Commons Statistics NormalDistribution
+        return NormalDistribution.of(0, 1).inverseCumulativeProbability(confidence);
+    }
 }
 ```
 
-#### C.5 Three Operational Approaches
+**C.3.2 ThresholdDeriver**
 
-| Approach | Given | Framework Computes |
-|----------|-------|-------------------|
-| **Sample-Size-First** (Cost-Driven) | Samples + Confidence | Threshold |
-| **Confidence-First** (Quality-Driven) | Confidence + Effect + Power | Sample Size |
-| **Threshold-First** (Baseline-Anchored) | Samples + Explicit Threshold | Implied Confidence |
-
-#### C.6 Enhanced @ProbabilisticTest
+Derives pass/fail threshold for a given operational approach:
 
 ```java
-@ProbabilisticTest(
-    spec = "my-spec:v1",
-    thresholdConfidence = 0.95,
-    derivationPolicy = ThresholdDerivationPolicy.DERIVE
-)
+public class ThresholdDeriver {
+    
+    private final BinomialProportionEstimator estimator;
+    
+    /**
+     * Sample-Size-First: Given test samples and desired confidence,
+     * derive the threshold that achieves that confidence.
+     */
+    public DerivedThreshold deriveSampleSizeFirst(
+            int baselineSamples,
+            int baselineSuccesses,
+            int testSamples,
+            double thresholdConfidence) {
+        
+        double baselineRate = (double) baselineSuccesses / baselineSamples;
+        double threshold = estimator.lowerBound(baselineSuccesses, baselineSamples, thresholdConfidence);
+        
+        // Adjust for test sample variance if baseline much larger than test
+        // (more sophisticated: use predictive interval)
+        
+        return new DerivedThreshold(
+            threshold,
+            OperationalApproach.SAMPLE_SIZE_FIRST,
+            new DerivationContext(baselineRate, baselineSamples, testSamples, thresholdConfidence)
+        );
+    }
+    
+    /**
+     * Threshold-First: Given explicit threshold, compute implied confidence.
+     * Warns if confidence is too low (high false positive risk).
+     */
+    public DerivedThreshold deriveThresholdFirst(
+            int baselineSamples,
+            int baselineSuccesses,
+            int testSamples,
+            double explicitThreshold) {
+        
+        // Compute what confidence level this threshold implies
+        double impliedConfidence = computeImpliedConfidence(
+            baselineSuccesses, baselineSamples, testSamples, explicitThreshold);
+        
+        boolean isStatisticallySound = impliedConfidence >= 0.80;
+        
+        return new DerivedThreshold(
+            explicitThreshold,
+            OperationalApproach.THRESHOLD_FIRST,
+            new DerivationContext(baselineRate, baselineSamples, testSamples, impliedConfidence),
+            isStatisticallySound
+        );
+    }
+}
 ```
 
-#### C.7 Qualified Failure Reporting
+**C.3.3 SampleSizeCalculator**
 
-Reports include:
-- Observed pass rate vs. threshold
-- Confidence level and statistical method used
-- Probability of false positive
+Power analysis for Confidence-First approach:
 
-**Dependencies**: Phases E2, E3, E4
+```java
+public class SampleSizeCalculator {
+    
+    /**
+     * Confidence-First: Given desired confidence, effect size, and power,
+     * compute required sample size.
+     * 
+     * @param baselineRate Observed success rate from experiment (p₀)
+     * @param minDetectableEffect Degradation to detect (e.g., 0.05 = 5% drop)
+     * @param confidence Desired confidence level (1 - α)
+     * @param power Desired power (1 - β)
+     * @return Required sample size
+     */
+    public SampleSizeRequirement calculateForPower(
+            double baselineRate,
+            double minDetectableEffect,
+            double confidence,
+            double power) {
+        
+        double p0 = baselineRate;                      // Null hypothesis (no degradation)
+        double p1 = baselineRate - minDetectableEffect; // Alternative (degraded)
+        
+        double zAlpha = zScoreForConfidence(confidence);
+        double zBeta = zScoreForConfidence(power);
+        
+        // Sample size formula for one-sided binomial test
+        double numerator = Math.pow(zAlpha * Math.sqrt(p0 * (1 - p0)) 
+                                  + zBeta * Math.sqrt(p1 * (1 - p1)), 2);
+        double denominator = Math.pow(p0 - p1, 2);
+        
+        int requiredSamples = (int) Math.ceil(numerator / denominator);
+        
+        return new SampleSizeRequirement(
+            requiredSamples,
+            confidence,
+            power,
+            minDetectableEffect,
+            p0,
+            p1
+        );
+    }
+}
+```
 
-**Estimated Effort**: 6-8 days
+**C.3.4 TestVerdictEvaluator**
+
+Determines pass/fail with full statistical context:
+
+```java
+public class TestVerdictEvaluator {
+    
+    /**
+     * Evaluate test results against threshold, producing qualified verdict.
+     */
+    public VerdictWithConfidence evaluate(
+            int testSuccesses,
+            int testSamples,
+            DerivedThreshold threshold) {
+        
+        double observedRate = (double) testSuccesses / testSamples;
+        boolean passed = observedRate >= threshold.value();
+        
+        // Compute false positive probability if test failed
+        double falsePositiveProbability = passed ? 0.0 
+            : computeFalsePositiveProbability(threshold);
+        
+        return new VerdictWithConfidence(
+            passed,
+            observedRate,
+            threshold,
+            falsePositiveProbability,
+            generateInterpretation(passed, observedRate, threshold)
+        );
+    }
+    
+    private String generateInterpretation(boolean passed, double observed, DerivedThreshold threshold) {
+        if (passed) {
+            return String.format(
+                "Observed %.1f%% ≥ %.1f%% threshold. No evidence of degradation.",
+                observed * 100, threshold.value() * 100);
+        } else {
+            return String.format(
+                "Observed %.1f%% < %.1f%% threshold. " +
+                "This indicates degradation with %.0f%% confidence. " +
+                "There is a %.1f%% probability this is a false positive.",
+                observed * 100, threshold.value() * 100,
+                threshold.context().confidence() * 100,
+                (1 - threshold.context().confidence()) * 100);
+        }
+    }
+}
+```
+
+---
+
+#### C.4 Integration with ProbabilisticTestExtension
+
+The existing `ProbabilisticTestExtension` must be enhanced to:
+
+1. **Load specification** (raw baseline data)
+2. **Read annotation parameters** (operational approach inputs)
+3. **Determine operational approach** based on which parameters are set
+4. **Invoke statistics engine** to derive runtime threshold
+5. **Execute samples** and aggregate results
+6. **Invoke verdict evaluator** for qualified pass/fail
+7. **Report with statistical context**
+
+```java
+public class ProbabilisticTestExtension implements TestTemplateInvocationContextProvider {
+    
+    private final ThresholdDeriver thresholdDeriver;
+    private final SampleSizeCalculator sampleSizeCalculator;
+    private final TestVerdictEvaluator verdictEvaluator;
+    
+    @Override
+    public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(...) {
+        
+        // 1. Load spec if present
+        ExecutionSpecification spec = loadSpec(annotation.spec());
+        
+        // 2. Determine operational approach and derive threshold
+        DerivedThreshold threshold = deriveThreshold(spec, annotation);
+        
+        // 3. Determine sample count (may be computed for Confidence-First)
+        int sampleCount = determineSampleCount(spec, annotation, threshold);
+        
+        // 4. Generate invocation contexts for each sample
+        return IntStream.range(0, sampleCount)
+            .mapToObj(i -> createInvocationContext(i, threshold, spec));
+    }
+    
+    private DerivedThreshold deriveThreshold(ExecutionSpecification spec, ProbabilisticTest annotation) {
+        OperationalApproach approach = determineApproach(annotation);
+        
+        return switch (approach) {
+            case SAMPLE_SIZE_FIRST -> thresholdDeriver.deriveSampleSizeFirst(
+                spec.getBaselineSamples(),
+                spec.getBaselineSuccesses(),
+                annotation.samples(),
+                annotation.thresholdConfidence()
+            );
+            
+            case CONFIDENCE_FIRST -> {
+                SampleSizeRequirement req = sampleSizeCalculator.calculateForPower(
+                    spec.getObservedRate(),
+                    annotation.minDetectableEffect(),
+                    annotation.confidence(),
+                    annotation.power()
+                );
+                yield thresholdDeriver.deriveSampleSizeFirst(
+                    spec.getBaselineSamples(),
+                    spec.getBaselineSuccesses(),
+                    req.requiredSamples(),
+                    annotation.confidence()
+                );
+            }
+            
+            case THRESHOLD_FIRST -> thresholdDeriver.deriveThresholdFirst(
+                spec.getBaselineSamples(),
+                spec.getBaselineSuccesses(),
+                annotation.samples(),
+                annotation.minPassRate()
+            );
+        };
+    }
+    
+    // After all samples complete:
+    private void evaluateAndReport(SampleResultAggregator aggregator, DerivedThreshold threshold) {
+        VerdictWithConfidence verdict = verdictEvaluator.evaluate(
+            aggregator.getSuccessCount(),
+            aggregator.getTotalCount(),
+            threshold
+        );
+        
+        if (!verdict.passed()) {
+            // Report qualified failure
+            reportQualifiedFailure(verdict);
+        }
+    }
+}
+```
+
+---
+
+#### C.5 Qualified Test Reporting
+
+Test reports include full statistical context:
+
+**Pass Report**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ TEST: JsonGenerationTest.generatesValidJson                     │
+├─────────────────────────────────────────────────────────────────┤
+│ Status: PASSED                                                  │
+│ Approach: Sample-Size-First (100 samples, 95% confidence)       │
+├─────────────────────────────────────────────────────────────────┤
+│ Observed: 94/100 = 94.0%                                        │
+│ Threshold: 91.6% (derived from 95.1% baseline via Wilson bound) │
+├─────────────────────────────────────────────────────────────────┤
+│ INTERPRETATION:                                                 │
+│   Observed 94.0% ≥ 91.6% threshold.                             │
+│   No evidence of degradation from baseline.                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Fail Report**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ TEST: JsonGenerationTest.generatesValidJson                     │
+├─────────────────────────────────────────────────────────────────┤
+│ Status: FAILED                                                  │
+│ Approach: Sample-Size-First (100 samples, 95% confidence)       │
+├─────────────────────────────────────────────────────────────────┤
+│ Observed: 87/100 = 87.0%                                        │
+│ Threshold: 91.6% (derived from 95.1% baseline via Wilson bound) │
+│ Shortfall: 4.6% below threshold                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ STATISTICAL CONTEXT:                                            │
+│   Method: Wilson one-sided lower bound                          │
+│   Confidence: 95%                                               │
+│   False positive probability: 5%                                │
+├─────────────────────────────────────────────────────────────────┤
+│ INTERPRETATION:                                                 │
+│   This result indicates DEGRADATION from the baseline.          │
+│   There is a 5% probability this failure is due to sampling     │
+│   variance rather than actual system degradation.               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### C.6 Model Records
+
+```java
+public record ProportionEstimate(
+    double pointEstimate,    // p̂
+    int sampleSize,          // n
+    double lowerBound,       // CI lower
+    double upperBound,       // CI upper
+    double confidenceLevel   // e.g., 0.95
+) {}
+
+public record DerivedThreshold(
+    double value,                    // The threshold itself
+    OperationalApproach approach,    // How it was derived
+    DerivationContext context,       // Inputs used
+    boolean isStatisticallySound     // Warning flag for Threshold-First
+) {}
+
+public record DerivationContext(
+    double baselineRate,
+    int baselineSamples,
+    int testSamples,
+    double confidence
+) {}
+
+public record SampleSizeRequirement(
+    int requiredSamples,
+    double confidence,
+    double power,
+    double minDetectableEffect,
+    double nullRate,         // p₀ (baseline)
+    double alternativeRate   // p₁ (degraded)
+) {}
+
+public record VerdictWithConfidence(
+    boolean passed,
+    double observedRate,
+    DerivedThreshold threshold,
+    double falsePositiveProbability,
+    String interpretation
+) {}
+
+public enum OperationalApproach {
+    SAMPLE_SIZE_FIRST,   // Cost-driven: fix samples, derive threshold
+    CONFIDENCE_FIRST,    // Quality-driven: fix confidence, derive samples
+    THRESHOLD_FIRST      // Baseline-anchored: fix threshold, derive confidence
+}
+```
+
+---
+
+#### C.7 Unit Tests with Worked Examples
+
+Per Design Principle 1.6, unit tests use real-world variable names:
+
+```java
+@Test
+@DisplayName("Derive threshold for 100-sample test from 1000-sample baseline at 95% confidence")
+void deriveThresholdSampleSizeFirst() {
+    int baselineSamples = 1000;
+    int baselineSuccesses = 951;
+    double baselineRate = 0.951;
+    
+    int testSamples = 100;
+    double thresholdConfidence = 0.95;
+    
+    DerivedThreshold result = deriver.deriveSampleSizeFirst(
+        baselineSamples, baselineSuccesses, testSamples, thresholdConfidence);
+    
+    // Threshold should be lower than baseline rate to account for sampling variance
+    assertThat(result.value()).isLessThan(baselineRate);
+    
+    // With 95% confidence and 100 samples, expect threshold around 91-92%
+    assertThat(result.value()).isBetween(0.90, 0.93);
+    
+    assertThat(result.approach()).isEqualTo(OperationalApproach.SAMPLE_SIZE_FIRST);
+    assertThat(result.isStatisticallySound()).isTrue();
+}
+
+@Test
+@DisplayName("Calculate required samples for 99% confidence, 5% effect, 80% power")
+void calculateSampleSizeConfidenceFirst() {
+    double baselineRate = 0.95;
+    double minDetectableEffect = 0.05;  // Detect 5% degradation
+    double confidence = 0.99;
+    double power = 0.80;
+    
+    SampleSizeRequirement result = calculator.calculateForPower(
+        baselineRate, minDetectableEffect, confidence, power);
+    
+    // With these parameters, expect ~200-300 samples required
+    assertThat(result.requiredSamples()).isBetween(150, 350);
+    assertThat(result.alternativeRate()).isEqualTo(0.90);  // 95% - 5%
+}
+```
+
+---
+
+#### C.8 Narrative Test Class: Statistical Companion Validation
+
+**Purpose**: Build trust with users and prospective users by providing a test class that mirrors the worked examples in the [STATISTICAL-COMPANION.md](../docs/STATISTICAL-COMPANION.md) document.
+
+**Rationale**: After a qualified statistician reviews the STATISTICAL-COMPANION document, they can view this test class and see the **exact same logic** expressed in Java code. This one-to-one correspondence between documentation and executable code demonstrates that PUnit's implementation faithfully follows the documented statistical methods.
+
+**Location**: `src/test/java/org/javai/punit/statistics/StatisticalCompanionValidationTest.java`
+
+**Structure**: Three test cases, each written in a "narrative" style with extensive commentary interspersed with code—readable like a Jupyter notebook.
+
+---
+
+**Test Case 1: Baseline Estimation and Threshold Derivation**
+
+*Mirrors: STATISTICAL-COMPANION.md Sections 2 and 3*
+
+```java
+/**
+ * STATISTICAL COMPANION VALIDATION - TEST CASE 1
+ * ===============================================
+ * 
+ * This test validates the core flow from experimental observation to 
+ * test threshold derivation, as documented in Sections 2 and 3 of the
+ * Statistical Companion.
+ * 
+ * SCENARIO: JSON Generation Use Case
+ * ----------------------------------
+ * A customer service system uses an LLM to generate JSON responses.
+ * An experiment with n = 1000 trials yielded k = 951 successes.
+ * We need to derive an appropriate threshold for a regression test
+ * that will run only 100 samples.
+ * 
+ * REFERENCE: docs/STATISTICAL-COMPANION.md, Sections 2-3
+ */
+@Test
+@DisplayName("Companion §2-3: Baseline estimation to threshold derivation")
+void companionCase1_BaselineToThreshold() {
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 2.1: Point Estimation (Companion §2.1)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // The experiment observed 951 successes out of 1000 trials.
+    // The maximum likelihood estimate (MLE) of the true success rate is:
+    //
+    //   p̂ = k/n = 951/1000 = 0.951
+    //
+    
+    int experimentTrials = 1000;
+    int experimentSuccesses = 951;
+    
+    double pointEstimate = (double) experimentSuccesses / experimentTrials;
+    
+    assertThat(pointEstimate)
+        .as("Point estimate p̂ = k/n")
+        .isEqualTo(0.951);
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 2.2: Standard Error (Companion §2.2)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // The standard error quantifies uncertainty in our point estimate:
+    //
+    //   SE = √(p̂(1-p̂)/n) = √(0.951 × 0.049 / 1000) ≈ 0.00683
+    //
+    
+    double standardError = estimator.standardError(experimentSuccesses, experimentTrials);
+    
+    assertThat(standardError)
+        .as("Standard error SE = √(p̂(1-p̂)/n)")
+        .isCloseTo(0.00683, within(0.0001));
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 2.3: Wilson Score Confidence Interval (Companion §2.3.2)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // PUnit uses the Wilson score interval, which is more accurate than
+    // the normal approximation for all sample sizes.
+    //
+    // For 95% confidence (z = 1.96):
+    //   Lower ≈ 0.937
+    //   Upper ≈ 0.963
+    //
+    
+    ProportionEstimate estimate = estimator.estimate(
+        experimentSuccesses, experimentTrials, 0.95);
+    
+    assertThat(estimate.lowerBound())
+        .as("Wilson 95% CI lower bound")
+        .isCloseTo(0.937, within(0.002));
+    
+    assertThat(estimate.upperBound())
+        .as("Wilson 95% CI upper bound")
+        .isCloseTo(0.963, within(0.002));
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 3: Threshold Derivation (Companion §3.2)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // For a test running only 100 samples, we need a threshold that
+    // accounts for increased sampling variance. Using the Wilson
+    // one-sided lower bound at 95% confidence:
+    //
+    //   threshold ≈ 0.916
+    //
+    // This means: if the true rate is still 0.951, a test with 100
+    // samples has only a 5% chance of observing a rate below 0.916.
+    //
+    
+    int testSamples = 100;
+    double thresholdConfidence = 0.95;
+    
+    DerivedThreshold threshold = deriver.deriveSampleSizeFirst(
+        experimentTrials, experimentSuccesses, testSamples, thresholdConfidence);
+    
+    assertThat(threshold.value())
+        .as("Derived threshold for 100-sample test at 95% confidence")
+        .isCloseTo(0.916, within(0.005));
+    
+    assertThat(threshold.approach())
+        .isEqualTo(OperationalApproach.SAMPLE_SIZE_FIRST);
+    
+    // ══════════════════════════════════════════════════════════════════
+    // INTERPRETATION
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // Starting from 951/1000 observed successes (95.1%), we derived a
+    // threshold of 91.6% for a 100-sample test at 95% confidence.
+    //
+    // The 3.5% gap (95.1% → 91.6%) accounts for:
+    //   1. Uncertainty in the baseline estimate
+    //   2. Increased variance with smaller test sample
+    //   3. Desired 95% confidence against false positives
+    //
+}
+```
+
+---
+
+**Test Case 2: The Perfect Baseline Problem**
+
+*Mirrors: STATISTICAL-COMPANION.md Section 4*
+
+```java
+/**
+ * STATISTICAL COMPANION VALIDATION - TEST CASE 2
+ * ===============================================
+ * 
+ * This test validates PUnit's handling of the "perfect baseline" edge case,
+ * where an experiment observes 100% success rate.
+ * 
+ * SCENARIO: Payment Gateway Integration
+ * -------------------------------------
+ * Testing a highly reliable payment gateway API. An experiment with
+ * n = 1000 trials yields k = 1000 successes (zero failures).
+ * 
+ * PROBLEM: Standard methods collapse when p̂ = 1:
+ *   - Standard error = √(1 × 0 / n) = 0
+ *   - Naive threshold = 1.0 (one failure fails the test!)
+ * 
+ * SOLUTION: Wilson lower bound remains valid for p̂ = 1.
+ * 
+ * REFERENCE: docs/STATISTICAL-COMPANION.md, Section 4
+ */
+@Test
+@DisplayName("Companion §4: Perfect baseline problem (p̂ = 1)")
+void companionCase2_PerfectBaseline() {
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 4.1: The Problem (Companion §4.1)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // Experiment: 1000 trials, 1000 successes, zero failures.
+    // Observed rate: p̂ = 1.0 (100%)
+    //
+    // This does NOT mean the system is perfect. It means:
+    //   "Zero failures occurred in 1000 trials"
+    //
+    
+    int experimentTrials = 1000;
+    int experimentSuccesses = 1000;
+    
+    double observedRate = (double) experimentSuccesses / experimentTrials;
+    assertThat(observedRate).isEqualTo(1.0);
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 4.2: Why Standard Methods Fail (Companion §4.2)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // Standard error collapses to zero:
+    //   SE = √(1.0 × 0.0 / 1000) = 0
+    //
+    // This makes normal-based thresholds degenerate to 1.0,
+    // meaning ANY single failure would fail the test.
+    //
+    
+    double naiveStandardError = Math.sqrt(1.0 * 0.0 / experimentTrials);
+    assertThat(naiveStandardError).isEqualTo(0.0);
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 4.4: Wilson Lower Bound (Companion §4.4)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // The Wilson score interval remains valid when p̂ = 1.
+    // For 95% confidence with n = 1000:
+    //
+    //   p_lower ≈ 0.9963 (i.e., 99.63%)
+    //
+    // This is sensible: we're 95% confident the true rate is at least
+    // 99.63%, even though we observed 100%.
+    //
+    
+    double wilsonLowerBound = estimator.lowerBound(
+        experimentSuccesses, experimentTrials, 0.95);
+    
+    assertThat(wilsonLowerBound)
+        .as("Wilson lower bound when p̂ = 1")
+        .isCloseTo(0.9963, within(0.001));
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 4.4.2: Threshold for Test (Companion §4.4.2)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // For a 100-sample test at 95% confidence:
+    //   threshold ≈ 0.964 (96.4%)
+    //
+    // This allows up to 3-4 failures in 100 samples without triggering
+    // a false positive.
+    //
+    
+    int testSamples = 100;
+    
+    DerivedThreshold threshold = deriver.deriveSampleSizeFirst(
+        experimentTrials, experimentSuccesses, testSamples, 0.95);
+    
+    assertThat(threshold.value())
+        .as("Threshold derived from perfect baseline")
+        .isBetween(0.95, 0.98);
+    
+    // ══════════════════════════════════════════════════════════════════
+    // INTERPRETATION
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // Even with a "perfect" 100% baseline, PUnit correctly derives a
+    // threshold below 1.0, allowing for sampling variance in the test.
+    //
+    // Key insight: Observing zero failures doesn't prove failures are
+    // impossible—it provides statistical evidence about their rarity.
+    //
+}
+```
+
+---
+
+**Test Case 3: Test Execution and Qualified Verdict**
+
+*Mirrors: STATISTICAL-COMPANION.md Section 6*
+
+```java
+/**
+ * STATISTICAL COMPANION VALIDATION - TEST CASE 3
+ * ===============================================
+ * 
+ * This test validates the full cycle from threshold to test verdict,
+ * including the qualified interpretation of results.
+ * 
+ * SCENARIO: Regression Test Failure
+ * ---------------------------------
+ * Baseline: 951/1000 (95.1%)
+ * Derived threshold: 91.6% (at 95% confidence for 100 samples)
+ * Test result: 87/100 (87.0%)
+ * 
+ * The test FAILS because 87% < 91.6%.
+ * But what does this failure mean statistically?
+ * 
+ * REFERENCE: docs/STATISTICAL-COMPANION.md, Section 6
+ */
+@Test
+@DisplayName("Companion §6: Test execution and qualified verdict")
+void companionCase3_TestVerdictWithQualification() {
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SETUP: Derive threshold from baseline (recap of Case 1)
+    // ══════════════════════════════════════════════════════════════════
+    
+    int baselineTrials = 1000;
+    int baselineSuccesses = 951;
+    int testSamples = 100;
+    double confidenceLevel = 0.95;
+    
+    DerivedThreshold threshold = deriver.deriveSampleSizeFirst(
+        baselineTrials, baselineSuccesses, testSamples, confidenceLevel);
+    
+    assertThat(threshold.value()).isCloseTo(0.916, within(0.005));
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 6.1: Test Execution (Companion §6.1)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // The test runs 100 samples and observes 87 successes, 13 failures.
+    // Observed rate: 87/100 = 87.0%
+    //
+    
+    int testSuccesses = 87;
+    int testFailures = 13;
+    double observedRate = (double) testSuccesses / testSamples;
+    
+    assertThat(observedRate).isEqualTo(0.87);
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 6.2: Pass/Fail Decision (Companion §6.2)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // Compare observed rate to threshold:
+    //   87.0% < 91.6%  →  TEST FAILS
+    //
+    // Shortfall: 4.6% below threshold
+    //
+    
+    VerdictWithConfidence verdict = verdictEvaluator.evaluate(
+        testSuccesses, testSamples, threshold);
+    
+    assertThat(verdict.passed())
+        .as("Test should FAIL when observed < threshold")
+        .isFalse();
+    
+    assertThat(verdict.observedRate()).isEqualTo(0.87);
+    
+    double shortfall = threshold.value() - observedRate;
+    assertThat(shortfall).isCloseTo(0.046, within(0.005));
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 6.3: Statistical Qualification (Companion §6.3)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // The failure is reported with statistical context:
+    //
+    //   "FAILED with 95% confidence"
+    //
+    // This means: if the true rate has NOT degraded from 95.1%, there
+    // is only a 5% probability of observing a rate this low by chance.
+    //
+    // Conversely: there is a 5% false positive probability.
+    //
+    
+    assertThat(verdict.falsePositiveProbability())
+        .as("False positive probability = 1 - confidence")
+        .isCloseTo(0.05, within(0.01));
+    
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 6.4: Interpretation (Companion §6.4)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // The verdict includes human-readable interpretation:
+    //
+    //   "This result indicates DEGRADATION from the baseline.
+    //    There is a 5% probability this failure is due to sampling
+    //    variance rather than actual system degradation."
+    //
+    
+    assertThat(verdict.interpretation())
+        .contains("degradation", "5%");
+    
+    // ══════════════════════════════════════════════════════════════════
+    // INTERPRETATION
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // A test failure does NOT mean "definitely broken."
+    // It means: "The observed behavior is statistically inconsistent
+    // with the baseline at the configured confidence level."
+    //
+    // With 95% confidence:
+    //   - If the system truly has not degraded, we expect at most a 5%
+    //     chance of this failure occurring (false positive).
+    //   - Repeated failures strengthen the evidence of real degradation.
+    //
+}
+```
+
+---
+
+**Relationship to Unit Tests**
+
+| Test Type | Purpose | Coverage |
+|-----------|---------|----------|
+| **Unit tests** (per component) | Comprehensive coverage of all edge cases | Every method, boundary condition |
+| **Companion validation tests** | Trust building via 1:1 document correspondence | The 3 core worked examples |
+
+Both test types are required. The companion validation tests are **in addition to** the comprehensive unit tests, not a replacement.
+
+---
+
+**Dependencies**: Phases E2, E3, E4, Apache Commons Statistics
+
+**Estimated Effort**: 8-10 days (includes companion validation tests)
 
 ---
 
@@ -621,7 +1422,7 @@ Features:
 
 ---
 
-**Track 3 Total**: 17-22 days (Planned)
+**Track 3 Total**: 19-24 days (Planned)
 
 ---
 
@@ -649,10 +1450,10 @@ Features:
 | Experiment | E8 | Documentation | ✅ | 3-4 |
 | Enhancement | A | Cost/Statistical Enhancements | 📋 | 3-4 |
 | Enhancement | B | Adaptive Prompt Refinement | 📋 | 5-6 |
-| Enhancement | C | Threshold Derivation | 📋 | 6-8 |
+| Enhancement | C | Statistics Engine & Operational Approaches | 📋 | 8-10 |
 | Enhancement | D | Review & Approval Workflow | 📋 | 3-4 |
 
-**Total Estimated Effort**: 65-87 days
+**Total Estimated Effort**: 67-91 days
 
 ---
 

@@ -150,21 +150,33 @@ class ArchitectureTest {
     }
 
     @Nested
-    @DisplayName("Future Extension Rules")
-    class FutureExtensionRules {
+    @DisplayName("Statistics Module Isolation")
+    class StatisticsModuleIsolation {
 
-        // These tests document the expected structure as extensions are added.
-        // They serve as executable documentation and will enforce constraints
-        // when the corresponding packages exist.
-
+        /**
+         * The statistics module is intentionally isolated from all other PUnit packages.
+         * 
+         * <p>This isolation enables:
+         * <ul>
+         *   <li><strong>Independent scrutiny:</strong> Statisticians can review calculations
+         *       without understanding the broader framework.</li>
+         *   <li><strong>Rigorous testing:</strong> Statistical concepts have dedicated unit tests
+         *       with worked examples using real-world variable names.</li>
+         *   <li><strong>Trust building:</strong> Calculations map directly to formulations in
+         *       the STATISTICAL-COMPANION document.</li>
+         * </ul>
+         * 
+         * <p>The statistics module may ONLY depend on:
+         * <ul>
+         *   <li>Java standard library</li>
+         *   <li>Apache Commons Statistics</li>
+         * </ul>
+         * 
+         * @see <a href="file:../../../../../plan/DOC-02-DESIGN-PRINCIPLES.md">Design Principles §1.6</a>
+         */
         @Test
-        @DisplayName("Statistics module should have no framework dependencies (when created)")
-        void statisticsModuleShouldBeIsolated() {
-            // This rule will become meaningful when punit-statistics is created.
-            // It documents the design principle from DOC-02-DESIGN-PRINCIPLES.md §1.6
-            //
-            // allowEmptyShould(true) is required because the statistics package
-            // doesn't exist yet - this is a forward-looking architectural constraint.
+        @DisplayName("Statistics module must not depend on any framework packages")
+        void statisticsModuleMustBeIsolated() {
             ArchRule rule = noClasses()
                     .that().resideInAPackage("org.javai.punit.statistics..")
                     .should().dependOnClassesThat()
@@ -173,9 +185,9 @@ class ArchitectureTest {
                             "org.javai.punit.engine..",
                             "org.javai.punit.experiment..",
                             "org.javai.punit.spec..",
+                            "org.javai.punit.model..",
                             "org.javai.punit.llmx.."
-                    )
-                    .allowEmptyShould(true);
+                    );
 
             rule.check(punitClasses);
         }

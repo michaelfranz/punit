@@ -1,6 +1,21 @@
 package org.javai.punit;
 
-import org.javai.punit.testsubjects.ProbabilisticTestSubjects.*;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.AlwaysFailingTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.AlwaysPassingTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.BarelyFailingTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.BarelyPassingTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ClassTimeBudgetTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ClassTokenBudgetTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ConfigurableSamplesTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.EarlyTerminationByImpossibilityTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.EvaluatePartialBudgetTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ExceptionThrowingTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.MinPassRateZeroTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.PartiallyFailingTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.PassesWithSomeFailuresTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.SingleSampleTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.SuccessGuaranteedEarlyTerminationTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.TerminateOnFirstFailureTest;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.testkit.engine.EngineTestKit;
@@ -13,11 +28,13 @@ import org.junit.platform.testkit.engine.EngineTestKit;
  */
 class ProbabilisticTestIntegrationTest {
 
-    @Test
+	public static final String JUNIT_ENGINE_ID = "junit-jupiter";
+
+	@Test
     void alwaysPassingTestPasses() {
         // With 80% of 10 = 8 required, after 8 consecutive successes
         // SUCCESS_GUARANTEED triggers and we skip remaining 2 samples
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(AlwaysPassingTest.class))
                 .execute()
                 .testEvents()
@@ -29,7 +46,7 @@ class ProbabilisticTestIntegrationTest {
 
     @Test
     void alwaysFailingTestFails() {
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(AlwaysFailingTest.class))
                 .execute()
                 .testEvents()
@@ -44,7 +61,7 @@ class ProbabilisticTestIntegrationTest {
     void partiallyFailingTestWithLowThresholdPasses() {
         PartiallyFailingTest.resetCounter();
         
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(PartiallyFailingTest.class))
                 .execute()
                 .testEvents()
@@ -60,7 +77,7 @@ class ProbabilisticTestIntegrationTest {
         
         // With 80% of 10 = 8 required, after 8 consecutive successes
         // SUCCESS_GUARANTEED triggers before we reach samples 9-10 that would fail
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(BarelyPassingTest.class))
                 .execute()
                 .testEvents()
@@ -74,7 +91,7 @@ class ProbabilisticTestIntegrationTest {
     void barelyFailingTestFails() {
         BarelyFailingTest.resetCounter();
         
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(BarelyFailingTest.class))
                 .execute()
                 .testEvents()
@@ -86,7 +103,7 @@ class ProbabilisticTestIntegrationTest {
 
     @Test
     void exceptionsTreatedAsFailures() {
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(ExceptionThrowingTest.class))
                 .execute()
                 .testEvents()
@@ -103,7 +120,7 @@ class ProbabilisticTestIntegrationTest {
         // after the first sample (whether it passes or fails).
         // When SUCCESS_GUARANTEED triggers, we don't re-throw sample failures
         // because the test has already passed.
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(MinPassRateZeroTest.class))
                 .execute()
                 .testEvents()
@@ -115,7 +132,7 @@ class ProbabilisticTestIntegrationTest {
 
     @Test
     void singleSampleTestWorks() {
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(SingleSampleTest.class))
                 .execute()
                 .testEvents()
@@ -135,7 +152,7 @@ class ProbabilisticTestIntegrationTest {
         // With 50% of 5 = 3 required, after 3 successes SUCCESS_GUARANTEED triggers
         System.setProperty("punit.samples", "5");
         try {
-            EngineTestKit.engine("junit-jupiter")
+            EngineTestKit.engine(JUNIT_ENGINE_ID)
                     .selectors(DiscoverySelectors.selectClass(ConfigurableSamplesTest.class))
                     .execute()
                     .testEvents()
@@ -160,7 +177,7 @@ class ProbabilisticTestIntegrationTest {
         // With 50% of 5 = 3 required, after 3 successes SUCCESS_GUARANTEED triggers
         System.setProperty("punit.samplesMultiplier", "0.5");
         try {
-            EngineTestKit.engine("junit-jupiter")
+            EngineTestKit.engine(JUNIT_ENGINE_ID)
                     .selectors(DiscoverySelectors.selectClass(ConfigurableSamplesTest.class))
                     .execute()
                     .testEvents()
@@ -186,7 +203,7 @@ class ProbabilisticTestIntegrationTest {
         // With 60% of 10 = 6 required, after 6 successes SUCCESS_GUARANTEED triggers
         System.setProperty("punit.minPassRate", "0.6");
         try {
-            EngineTestKit.engine("junit-jupiter")
+            EngineTestKit.engine(JUNIT_ENGINE_ID)
                     .selectors(DiscoverySelectors.selectClass(BarelyFailingTest.class))
                     .execute()
                     .testEvents()
@@ -205,7 +222,7 @@ class ProbabilisticTestIntegrationTest {
     void earlyTerminationByImpossibility() {
         EarlyTerminationByImpossibilityTest.resetCounter();
         
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(EarlyTerminationByImpossibilityTest.class))
                 .execute()
                 .testEvents()
@@ -225,7 +242,7 @@ class ProbabilisticTestIntegrationTest {
     void terminatesOnFirstFailureWith100PercentRequired() {
         TerminateOnFirstFailureTest.resetCounter();
         
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(TerminateOnFirstFailureTest.class))
                 .execute()
                 .testEvents()
@@ -244,7 +261,7 @@ class ProbabilisticTestIntegrationTest {
     void passesWithSomeFailuresNoEarlyTermination() {
         PassesWithSomeFailuresTest.resetCounter();
         
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(PassesWithSomeFailuresTest.class))
                 .execute()
                 .testEvents()
@@ -259,7 +276,7 @@ class ProbabilisticTestIntegrationTest {
     void successGuaranteedEarlyTermination() {
         SuccessGuaranteedEarlyTerminationTest.resetCounter();
         
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(SuccessGuaranteedEarlyTerminationTest.class))
                 .execute()
                 .testEvents()
@@ -285,7 +302,7 @@ class ProbabilisticTestIntegrationTest {
         // Class has 100 token budget, each sample uses 30 tokens
         // After 4 samples: 120 tokens > 100 budget
         // With FAIL behavior, test should fail when budget exhausted
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(ClassTokenBudgetTest.class))
                 .execute()
                 .testEvents()
@@ -305,7 +322,7 @@ class ProbabilisticTestIntegrationTest {
         
         // Class has 50ms time budget, each sample takes 20ms
         // Should run ~2-3 samples before budget exhausted
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(ClassTimeBudgetTest.class))
                 .execute()
                 .testEvents()
@@ -323,7 +340,7 @@ class ProbabilisticTestIntegrationTest {
         // With EVALUATE_PARTIAL, test should pass if enough samples passed
         // before budget exhaustion (50 token budget, 30 per sample = 2 samples run)
         // 2/2 = 100% >= 50% required, so test passes
-        EngineTestKit.engine("junit-jupiter")
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
                 .selectors(DiscoverySelectors.selectClass(EvaluatePartialBudgetTest.class))
                 .execute()
                 .testEvents()
