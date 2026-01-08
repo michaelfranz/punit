@@ -98,13 +98,35 @@ public class ConfigurationResolver {
         effectiveSamples = Math.max(1, effectiveSamples);
 
         // Resolve minPassRate
-        double minPassRate = resolveDouble(
-                PROP_MIN_PASS_RATE, ENV_MIN_PASS_RATE,
-                annotation.minPassRate(),
-                DEFAULT_MIN_PASS_RATE);
+        // Note: minPassRate can be NaN when using statistical approaches (Sample-Size-First or Confidence-First)
+        // In those cases, the threshold is derived at runtime from baseline data
+        double annotationMinPassRate = annotation.minPassRate();
+        double minPassRate;
+        
+        if (Double.isNaN(annotationMinPassRate)) {
+            // Check for system property or env var override
+            String sysPropValue = System.getProperty(PROP_MIN_PASS_RATE);
+            String envValue = getEnvironmentVariable(ENV_MIN_PASS_RATE);
+            
+            if (sysPropValue != null && !sysPropValue.isEmpty()) {
+                minPassRate = Double.parseDouble(sysPropValue.trim());
+            } else if (envValue != null && !envValue.isEmpty()) {
+                minPassRate = Double.parseDouble(envValue.trim());
+            } else {
+                // Keep NaN to indicate it should be derived from spec
+                minPassRate = Double.NaN;
+            }
+        } else {
+            minPassRate = resolveDouble(
+                    PROP_MIN_PASS_RATE, ENV_MIN_PASS_RATE,
+                    annotationMinPassRate,
+                    DEFAULT_MIN_PASS_RATE);
+        }
 
-        // Validate minPassRate
-        validateMinPassRate(minPassRate, contextName);
+        // Validate minPassRate (only if set)
+        if (!Double.isNaN(minPassRate)) {
+            validateMinPassRate(minPassRate, contextName);
+        }
 
         // Resolve budget parameters
         long timeBudgetMs = resolveLong(
@@ -146,7 +168,7 @@ public class ConfigurationResolver {
     /**
      * Resolves an integer value with precedence: system prop > env var > annotation > default.
      */
-    private int resolveInt(String sysProp, String envVar, int annotationValue, int defaultValue) {
+    private int resolveInt(String sysProp, String envVar, int annotationValue, int ignored) {
         // 1. System property (highest priority)
         String sysPropValue = System.getProperty(sysProp);
         if (sysPropValue != null && !sysPropValue.isEmpty()) {
@@ -176,7 +198,7 @@ public class ConfigurationResolver {
     /**
      * Resolves a long value with precedence: system prop > env var > annotation > default.
      */
-    private long resolveLong(String sysProp, String envVar, long annotationValue, long defaultValue) {
+    private long resolveLong(String sysProp, String envVar, long annotationValue, long ignored) {
         // 1. System property (highest priority)
         String sysPropValue = System.getProperty(sysProp);
         if (sysPropValue != null && !sysPropValue.isEmpty()) {
@@ -206,7 +228,7 @@ public class ConfigurationResolver {
     /**
      * Resolves a double value with precedence: system prop > env var > annotation > default.
      */
-    private double resolveDouble(String sysProp, String envVar, double annotationValue, double defaultValue) {
+    private double resolveDouble(String sysProp, String envVar, double annotationValue, double ignored) {
         // 1. System property (highest priority)
         String sysPropValue = System.getProperty(sysProp);
         if (sysPropValue != null && !sysPropValue.isEmpty()) {

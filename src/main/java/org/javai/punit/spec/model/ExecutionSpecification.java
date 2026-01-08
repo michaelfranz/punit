@@ -10,13 +10,18 @@ import java.util.Objects;
 /**
  * A human-reviewed and approved contract derived from empirical baselines.
  *
- * <p>Specifications define:
+ * <p>Specifications contain:
  * <ul>
- *   <li>Expected minimum pass rate</li>
- *   <li>Execution context configuration</li>
- *   <li>Cost envelopes (max time, max tokens)</li>
- *   <li>Approval metadata (who, when, why)</li>
+ *   <li><strong>Baseline data</strong>: Raw empirical observations (samples, successes)
+ *       used for threshold derivation at runtime</li>
+ *   <li><strong>Execution context</strong>: Configuration for test execution</li>
+ *   <li><strong>Cost envelopes</strong>: Resource limits (time, tokens)</li>
+ *   <li><strong>Approval metadata</strong>: Who approved, when, and why</li>
  * </ul>
+ *
+ * <p>The specification does <em>not</em> contain pre-computed thresholds. Instead,
+ * thresholds are derived at runtime based on the raw baseline data and the
+ * operational approach specified in the {@code @ProbabilisticTest} annotation.
  *
  * <p>Specifications are normative (what should happen), unlike baselines
  * which are descriptive (what did happen).
@@ -33,6 +38,7 @@ public final class ExecutionSpecification {
 	private final Map<String, Object> executionContext;
 	private final SpecRequirements requirements;
 	private final CostEnvelope costEnvelope;
+	private final BaselineData baselineData;
 
 	private ExecutionSpecification(Builder builder) {
 		this.specId = Objects.requireNonNull(builder.specId, "specId must not be null");
@@ -51,6 +57,7 @@ public final class ExecutionSpecification {
 				? builder.requirements
 				: new SpecRequirements(1.0, "");
 		this.costEnvelope = builder.costEnvelope;
+		this.baselineData = builder.baselineData;
 	}
 
 	public static Builder builder() {
@@ -95,6 +102,57 @@ public final class ExecutionSpecification {
 
 	public CostEnvelope getCostEnvelope() {
 		return costEnvelope;
+	}
+
+	/**
+	 * Returns the raw baseline data used for threshold derivation.
+	 *
+	 * <p>This data is essential for computing thresholds at runtime based on
+	 * the operational approach specified in the test annotation.
+	 *
+	 * @return the baseline data, or null if not set (legacy specs)
+	 */
+	public BaselineData getBaselineData() {
+		return baselineData;
+	}
+
+	/**
+	 * Returns true if this specification has baseline data for threshold derivation.
+	 *
+	 * @return true if baseline data is present
+	 */
+	public boolean hasBaselineData() {
+		return baselineData != null && baselineData.samples() > 0;
+	}
+
+	/**
+	 * Returns the number of samples from the baseline experiment.
+	 *
+	 * @return the baseline sample count, or 0 if no baseline data
+	 */
+	public int getBaselineSamples() {
+		return baselineData != null ? baselineData.samples() : 0;
+	}
+
+	/**
+	 * Returns the number of successes from the baseline experiment.
+	 *
+	 * @return the baseline success count, or 0 if no baseline data
+	 */
+	public int getBaselineSuccesses() {
+		return baselineData != null ? baselineData.successes() : 0;
+	}
+
+	/**
+	 * Returns the observed success rate from the baseline experiment.
+	 *
+	 * @return the observed rate (0.0 to 1.0), or 0.0 if no baseline data
+	 */
+	public double getObservedRate() {
+		if (baselineData == null || baselineData.samples() == 0) {
+			return 0.0;
+		}
+		return (double) baselineData.successes() / baselineData.samples();
 	}
 
 	/**
@@ -157,6 +215,46 @@ public final class ExecutionSpecification {
 	public record CostEnvelope(long maxTimePerSampleMs, long maxTokensPerSample, long totalTokenBudget) {
 	}
 
+	/**
+	 * Raw data from the baseline experiment, used for threshold derivation at runtime.
+	 *
+	 * <p>This record contains the essential empirical observations needed to compute
+	 * statistically-sound thresholds based on the operational approach.
+	 *
+	 * @param samples Total number of trials in the baseline experiment
+	 * @param successes Number of successful trials
+	 * @param generatedAt When the baseline was generated
+	 */
+	public record BaselineData(int samples, int successes, Instant generatedAt) {
+
+		/**
+		 * Returns the observed success rate.
+		 *
+		 * @return the rate (0.0 to 1.0)
+		 */
+		public double observedRate() {
+			if (samples == 0) return 0.0;
+			return (double) successes / samples;
+		}
+
+		/**
+		 * Validates that the baseline data is consistent.
+		 *
+		 * @throws IllegalArgumentException if data is invalid
+		 */
+		public BaselineData {
+			if (samples < 0) {
+				throw new IllegalArgumentException("samples must be non-negative");
+			}
+			if (successes < 0) {
+				throw new IllegalArgumentException("successes must be non-negative");
+			}
+			if (successes > samples) {
+				throw new IllegalArgumentException("successes cannot exceed samples");
+			}
+		}
+	}
+
 	public static final class Builder {
 
 		private String specId;
@@ -169,6 +267,7 @@ public final class ExecutionSpecification {
 		private Map<String, Object> executionContext;
 		private SpecRequirements requirements;
 		private CostEnvelope costEnvelope;
+		private BaselineData baselineData;
 
 		private Builder() {
 		}
@@ -230,6 +329,21 @@ public final class ExecutionSpecification {
 
 		public Builder costEnvelope(long maxTimePerSampleMs, long maxTokensPerSample, long totalTokenBudget) {
 			this.costEnvelope = new CostEnvelope(maxTimePerSampleMs, maxTokensPerSample, totalTokenBudget);
+			return this;
+		}
+
+		public Builder baselineData(BaselineData baselineData) {
+			this.baselineData = baselineData;
+			return this;
+		}
+
+		public Builder baselineData(int samples, int successes, Instant generatedAt) {
+			this.baselineData = new BaselineData(samples, successes, generatedAt);
+			return this;
+		}
+
+		public Builder baselineData(int samples, int successes) {
+			this.baselineData = new BaselineData(samples, successes, null);
 			return this;
 		}
 

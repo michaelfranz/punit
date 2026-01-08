@@ -17,7 +17,55 @@ import java.lang.annotation.Target;
  * individual invocations may occasionally fail, but the overall behavior should
  * meet a statistical threshold.
  *
- * <h2>Example Usage</h2>
+ * <h2>Three Operational Approaches</h2>
+ *
+ * <p>PUnit supports three mutually exclusive approaches for configuring test thresholds.
+ * At any given time, you control two of the three variables (sample size, confidence, threshold);
+ * the third is determined by statistics.
+ *
+ * <h3>Approach 1: Sample-Size-First (Cost-Driven)</h3>
+ * <p>You specify: {@code samples} + {@code thresholdConfidence}<br>
+ * Framework computes: {@code minPassRate} (threshold)
+ *
+ * <pre>{@code
+ * @ProbabilisticTest(
+ *     spec = "json.generation:v1",
+ *     samples = 100,
+ *     thresholdConfidence = 0.95
+ * )
+ * void testWithCostConstraint() { ... }
+ * }</pre>
+ *
+ * <h3>Approach 2: Confidence-First (Quality-Driven)</h3>
+ * <p>You specify: {@code confidence} + {@code minDetectableEffect} + {@code power}<br>
+ * Framework computes: {@code samples} (required sample size)
+ *
+ * <pre>{@code
+ * @ProbabilisticTest(
+ *     spec = "json.generation:v1",
+ *     confidence = 0.99,
+ *     minDetectableEffect = 0.05,
+ *     power = 0.80
+ * )
+ * void testWithQualityConstraint() { ... }
+ * }</pre>
+ *
+ * <h3>Approach 3: Threshold-First (Baseline-Anchored)</h3>
+ * <p>You specify: {@code samples} + {@code minPassRate}<br>
+ * Framework computes: implied confidence (with warnings if statistically unsound)
+ *
+ * <pre>{@code
+ * @ProbabilisticTest(
+ *     spec = "json.generation:v1",
+ *     samples = 100,
+ *     minPassRate = 0.951
+ * )
+ * void testWithExplicitThreshold() { ... }
+ * }</pre>
+ *
+ * <h2>Legacy Mode (No Spec)</h2>
+ * <p>When no spec is provided, the test runs in legacy mode with inline parameters:
+ *
  * <pre>{@code
  * @ProbabilisticTest(samples = 100, minPassRate = 0.95)
  * void serviceReturnsValidResponse() {
@@ -25,9 +73,6 @@ import java.lang.annotation.Target;
  *     assertThat(response.isValid()).isTrue();
  * }
  * }</pre>
- *
- * <p>The test above will execute 100 times and pass if at least 95% of
- * invocations succeed.
  *
  * <h2>Budget Control</h2>
  * <p>You can set time and token budgets to control resource consumption:
@@ -51,24 +96,120 @@ import java.lang.annotation.Target;
 @ExtendWith(ProbabilisticTestExtension.class)
 public @interface ProbabilisticTest {
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // APPROACH 1: SAMPLE-SIZE-FIRST (Cost-Driven)
+    // Specify: samples + thresholdConfidence → Framework computes: minPassRate
+    // ═══════════════════════════════════════════════════════════════════════════
+
     /**
      * Number of sample invocations to execute.
      * Must be ≥ 1.
+     *
+     * <p>Used in:
+     * <ul>
+     *   <li>Approach 1 (Sample-Size-First): combined with {@code thresholdConfidence}</li>
+     *   <li>Approach 3 (Threshold-First): combined with {@code minPassRate}</li>
+     *   <li>Legacy mode: when no spec is provided</li>
+     * </ul>
      *
      * @return the number of samples to execute
      */
     int samples() default 100;
 
     /**
-     * Minimum pass rate required for overall test success.
-     * Value must be in range [0.0, 1.0]. The default is 1.0 (100% pass rate).
+     * Confidence level for threshold derivation (0.0 to 1.0).
+     *
+     * <p>Used in Approach 1 (Sample-Size-First): combined with {@code samples}
+     * to derive the minimum pass rate threshold from the baseline data.
+     *
+     * <p>Higher confidence means a lower threshold (more tolerant of variance),
+     * which reduces false positives but may miss subtle degradations.
+     *
+     * <p>Default: {@code Double.NaN} (not set, uses legacy mode or other approach).
+     *
+     * @return the confidence level for threshold derivation
+     */
+    double thresholdConfidence() default Double.NaN;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // APPROACH 2: CONFIDENCE-FIRST (Quality-Driven)
+    // Specify: confidence + minDetectableEffect + power → Framework computes: samples
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Required confidence level for the test result (0.0 to 1.0).
+     *
+     * <p>Used in Approach 2 (Confidence-First): combined with
+     * {@code minDetectableEffect} and {@code power} to compute the required sample size.
+     *
+     * <p>This is the probability that a "fail" verdict indicates real degradation
+     * rather than random sampling variance. A confidence of 0.95 means there's only
+     * a 5% chance of a false positive (failing when the system is actually fine).
+     *
+     * <p>Default: {@code Double.NaN} (not set, uses other approach).
+     *
+     * @return the required confidence level
+     */
+    double confidence() default Double.NaN;
+
+    /**
+     * Minimum degradation worth detecting (0.0 to 1.0).
+     *
+     * <p>Used in Approach 2 (Confidence-First): specifies the smallest drop
+     * from the baseline rate that should be detected.
+     *
+     * <p>Example: {@code 0.05} means "detect a 5% drop from baseline".
+     * If baseline is 95%, this would detect degradation to 90% or below.
+     *
+     * <p>Default: {@code Double.NaN} (required when using Confidence-First approach).
+     *
+     * @return the minimum detectable effect size
+     */
+    double minDetectableEffect() default Double.NaN;
+
+    /**
+     * Statistical power: probability of detecting a real degradation (0.0 to 1.0).
+     *
+     * <p>Used in Approach 2 (Confidence-First): combined with {@code confidence}
+     * and {@code minDetectableEffect} to compute sample size.
+     *
+     * <p>Example: {@code 0.80} means "80% chance of catching a real degradation".
+     * Higher power requires more samples.
+     *
+     * <p>Default: {@code Double.NaN} (required when using Confidence-First approach).
+     *
+     * @return the statistical power
+     */
+    double power() default Double.NaN;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // APPROACH 3: THRESHOLD-FIRST (Baseline-Anchored)
+    // Specify: samples + minPassRate → Framework computes: implied confidence
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Explicit minimum pass rate threshold (0.0 to 1.0).
+     *
+     * <p>Used in:
+     * <ul>
+     *   <li>Approach 3 (Threshold-First): when combined with {@code samples},
+     *       the framework computes the implied confidence and warns if statistically unsound</li>
+     *   <li>Legacy mode: when no spec is provided, this is the pass/fail threshold</li>
+     * </ul>
      *
      * <p>The test passes if and only if:
      * {@code (successes / samplesExecuted) >= minPassRate}
      *
+     * <p>Default: {@code Double.NaN} (derive from spec or use other approach).
+     * Legacy default: {@code 1.0} (100% pass rate required).
+     *
      * @return the minimum required pass rate (0.0 to 1.0)
      */
-    double minPassRate() default 1.0;
+    double minPassRate() default Double.NaN;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BUDGET CONTROLS
+    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Maximum wall-clock time budget in milliseconds for all samples.
@@ -139,23 +280,28 @@ public @interface ProbabilisticTest {
      */
     int maxExampleFailures() default 5;
 
-    // ========== Spec-Driven Test Support (Phase 4) ==========
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SPEC-DRIVEN TEST SUPPORT
+    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Reference to an execution specification.
      *
      * <p>Format: {@code "useCaseId:version"} (e.g., "usecase.json.generation:v3")
      *
-     * <p>When provided:
+     * <p>When provided, the spec supplies the baseline data (samples, successes, observed rate)
+     * needed to derive thresholds statistically. The operational approach is determined by
+     * which other annotation parameters are set:
+     *
      * <ul>
-     *   <li>The specification controls samples, minPassRate, budgets, and context</li>
-     *   <li>Inline parameter values are ignored (with a warning)</li>
-     *   <li>Success criteria from the spec are used to evaluate each sample</li>
+     *   <li>{@code thresholdConfidence} set → Approach 1 (Sample-Size-First)</li>
+     *   <li>{@code confidence + minDetectableEffect + power} set → Approach 2 (Confidence-First)</li>
+     *   <li>{@code minPassRate} set → Approach 3 (Threshold-First)</li>
      * </ul>
      *
      * <p>When empty (default):
      * <ul>
-     *   <li>Test behaves as before (inline parameters control execution)</li>
+     *   <li>Test runs in legacy mode using inline {@code samples} and {@code minPassRate}</li>
      *   <li>Success is determined by absence of AssertionError</li>
      * </ul>
      *

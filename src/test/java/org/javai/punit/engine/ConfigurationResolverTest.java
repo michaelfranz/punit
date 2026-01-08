@@ -261,6 +261,26 @@ class ConfigurationResolverTest {
             public String useCase() {
                 return "";
             }
+
+            @Override
+            public double thresholdConfidence() {
+                return Double.NaN;
+            }
+
+            @Override
+            public double confidence() {
+                return Double.NaN;
+            }
+
+            @Override
+            public double minDetectableEffect() {
+                return Double.NaN;
+            }
+
+            @Override
+            public double power() {
+                return Double.NaN;
+            }
         };
     }
 
