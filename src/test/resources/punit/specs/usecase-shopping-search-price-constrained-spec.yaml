@@ -1,0 +1,39 @@
+# Execution Specification
+# Auto-generated from empirical baseline - DO NOT EDIT MANUALLY
+# Modifications should be made through the approval workflow
+
+useCaseId: usecase.shopping.search.price-constrained
+specVersion: 1.0
+createdAt: 2026-01-08T21:56:19.148067Z
+
+provenance:
+  baselineId: usecase.shopping.search.price-constrained-baseline
+  experimentId: null
+  experimentClass: org.javai.punit.examples.shopping.experiment.ShoppingExperiment
+  experimentMethod: measurePriceConstraintCompliance
+  baselineGeneratedAt: 2026-01-08T21:55:15.329111Z
+  baselineSamples: 100
+
+approval:
+  approver: Jane Doe
+  approvedAt: 2026-01-08T21:56:19.148070Z
+  notes: "First ever approval"
+
+thresholds:
+  # Minimum acceptable success rate for tests
+  minSuccessRate: 0.9526
+  # Original observed rate from baseline
+  observedSuccessRate: 0.98
+  standardError: 0.014
+  confidenceLevel: 0.95
+  derivationMethod: "95% confidence interval lower bound"
+
+tolerances:
+  successRateMargin: 0.028
+  recommendedMinSamples: 30
+  recommendedMaxSamples: 100
+
+context:
+  backend: "mock"
+  query: "gift ideas"
+  maxPrice: 50.0

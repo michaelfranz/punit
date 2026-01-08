@@ -236,3 +236,76 @@ tasks.register("publishLocal") {
     description = "Builds and publishes to local Maven repository"
     dependsOn("publishMavenJavaPublicationToMavenLocalRepository")
 }
+
+// Task to approve baselines and generate specs
+// This reads baselines from punit/pending-approval/ and generates specs in src/test/resources/punit/specs/
+//
+// Usage:
+//   ./gradlew punitApprove                                    # Approve all pending baselines
+//   ./gradlew punitApprove --approver="Jane Doe"              # Specify approver name
+//   ./gradlew punitApprove --notes="Reviewed for v1.2"        # Add approval notes
+//   ./gradlew punitApprove --dry-run                          # Preview without writing
+//   ./gradlew punitApprove -Pbaseline=path/to/baseline.yaml   # Approve specific file
+//
+// Output:
+//   Specs are written to: src/test/resources/punit/specs/
+//   These can be used by @ProbabilisticTest with spec="<useCaseId>"
+//
+tasks.register<JavaExec>("punitApprove") {
+    description = "Approve baselines from punit/pending-approval/ and generate specs"
+    group = "punit"
+    
+    dependsOn("compileJava")
+    
+    mainClass.set("org.javai.punit.experiment.cli.ApproveBaseline")
+    classpath = sourceSets.main.get().runtimeClasspath
+    
+    // Pass through command line arguments
+    val approver: String? = project.findProperty("approver") as String?
+    val notes: String? = project.findProperty("notes") as String?
+    val baseline: String? = project.findProperty("baseline") as String?
+    val dryRun: Boolean = project.hasProperty("dry-run")
+    
+    args = buildList {
+        if (baseline != null) {
+            add("--baseline=$baseline")
+        }
+        if (approver != null) {
+            add("--approver=$approver")
+        }
+        if (notes != null) {
+            add("--notes=$notes")
+        }
+        if (dryRun) {
+            add("--dry-run")
+        }
+    }
+}
+
+// Task to promote baselines from build/ to pending-approval/
+// This copies ephemeral baselines to the version-controlled pending-approval directory
+//
+// Usage:
+//   ./gradlew punitPromote                           # Promote all new baselines
+//   ./gradlew punitPromote -Pbaseline=<filename>     # Promote specific baseline
+//
+tasks.register<Copy>("punitPromote") {
+    description = "Promote baselines from build/punit/baselines/ to punit/pending-approval/"
+    group = "punit"
+    
+    dependsOn("experiment")
+    
+    from(layout.buildDirectory.dir("punit/baselines"))
+    into("punit/pending-approval")
+    
+    // Only copy YAML files
+    include("*.yaml", "*.yml")
+    
+    doLast {
+        println("Baselines promoted to punit/pending-approval/")
+        println("Next steps:")
+        println("  1. Review the baselines")
+        println("  2. Commit them to version control")
+        println("  3. Run: ./gradlew punitApprove")
+    }
+}
