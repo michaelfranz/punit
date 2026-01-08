@@ -24,6 +24,43 @@ Create a working example that demonstrates:
 | Starting experiments | 1                         | Start simple, expand later                       |
 | Target use case      | `usecase.shopping.search` | Basic JSON validity check                        |
 
+### Baseline Lifecycle (Three-Stage Model)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              EXPERIMENT PHASE                               │
+│  ./gradlew experiment                                                       │
+│       ↓                                                                     │
+│  build/punit/baselines/usecase-shopping-search.yaml  (ephemeral)            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     ↓
+                          ./gradlew punitPromote
+                                     ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              REVIEW PHASE                                   │
+│  punit/pending-approval/usecase-shopping-search.yaml  (committed)           │
+│       ↓                                                                     │
+│  CI creates PR → Human reviews in GitHub/GitLab UI                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     ↓
+                    PR merge triggers ./gradlew punitApprove
+                                     ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              APPROVED PHASE                                 │
+│  src/test/resources/punit/specs/usecase-shopping-search.yaml                │
+│       ↓                                                                     │
+│  Tests reference spec for regression detection                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### File Locations
+
+| Location | Purpose | Git Status |
+|----------|---------|------------|
+| `build/punit/baselines/` | Experiment output (ephemeral) | `.gitignore` |
+| `punit/pending-approval/` | Awaiting human review | Committed |
+| `src/test/resources/punit/specs/` | Approved specs | Committed |
+
 ---
 
 ## Phase 1: Configure Mock for Varied, Realistic LLM Failure Modes
@@ -397,7 +434,7 @@ public ShoppingExperiment() {
 
 - [ ] `ShoppingExperiment` has a 1000-sample experiment method
 - [ ] Experiment uses `experimentRealistic()` configuration
-- [ ] Running `./gradlew experimentTests --tests "ShoppingExperiment.measureRealisticSearchReliability"` completes successfully
+- [ ] Running `./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"` completes successfully
 
 ---
 
@@ -407,12 +444,12 @@ public ShoppingExperiment() {
 
 1. Run the experiment:
    ```bash
-   ./gradlew experimentTests --tests "ShoppingExperiment.measureRealisticSearchReliability"
+   ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
    ```
 
 2. Verify baseline file is generated at:
    ```
-   src/test/resources/punit/baselines/usecase-shopping-search.yaml
+   build/punit/baselines/usecase-shopping-search.yaml
    ```
 
 3. Review baseline content for expected structure:
@@ -571,7 +608,7 @@ tasks.register("punitApprove") {
         val approver = System.getProperty("user.name") ?: "unknown"
         
         // Load baseline
-        val baselinePath = file("src/test/resources/punit/baselines/${useCase.replace('.', '-')}.yaml")
+        val baselinePath = file("build/punit/baselines/${useCase.replace('.', '-')}.yaml")
         if (!baselinePath.exists()) {
             throw GradleException("Baseline not found: $baselinePath")
         }
@@ -720,7 +757,7 @@ import org.junit.jupiter.api.DisplayName;
  *
  * <h2>Workflow</h2>
  * <pre>
- * 1. Run: ./gradlew experimentTests --tests "ShoppingExperiment.measureRealisticSearchReliability"
+ * 1. Run: ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
  * 2. Approve: ./gradlew punitApprove --useCase=usecase.shopping.search
  * 3. Test: ./gradlew test --tests "ShoppingAssistantSpecExamplesTest"
  * </pre>

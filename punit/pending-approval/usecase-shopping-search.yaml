@@ -1,0 +1,33 @@
+# Empirical Baseline for usecase.shopping.search
+# Generated automatically by punit experiment runner
+# DO NOT EDIT - create a specification based on this baseline instead
+
+useCaseId: usecase.shopping.search
+generatedAt: 2026-01-08T21:42:11.428704Z
+experimentClass: org.javai.punit.examples.shopping.experiment.ShoppingExperiment
+experimentMethod: measureRealisticSearchBaseline
+
+context:
+  backend: mock
+  query: wireless headphones
+
+execution:
+  samplesPlanned: 1000
+  samplesExecuted: 1000
+  terminationReason: COMPLETED
+
+statistics:
+  successRate:
+    observed: 0.9830
+    standardError: 0.0041
+    confidenceInterval95: [0.9750, 0.9910]
+  successes: 983
+  failures: 17
+  failureDistribution:
+    MALFORMED_JSON: 17
+
+cost:
+  totalTimeMs: 371
+  avgTimePerSampleMs: 0
+  totalTokens: 345202
+  avgTokensPerSample: 345

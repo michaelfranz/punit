@@ -22,24 +22,24 @@ import org.javai.punit.experiment.api.ExperimentContext;
  *
  * <h2>Usage</h2>
  * <p>Experiments use JUnit's {@code @TestTemplate} mechanism under the hood.
- * Run them using the {@code experimentTests} Gradle task:
+ * Run them using the {@code experiment} Gradle task:
  * <pre>{@code
- * ./gradlew experimentTests --tests "ShoppingExperiment"
+ * ./gradlew experiment --tests "ShoppingExperiment"
  * }</pre>
  *
  * <p>Or run a specific experiment method:
  * <pre>{@code
- * ./gradlew experimentTests --tests "ShoppingExperiment.measureBasicSearchReliability"
+ * ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
  * }</pre>
  *
  * <h2>Output</h2>
  * <p>Each experiment generates a baseline file in:
  * <pre>
- * src/test/resources/punit/baselines/
+ * build/punit/baselines/
  * </pre>
  *
- * <p>These baselines can then be used to create execution specifications
- * for probabilistic conformance tests.
+ * <p>These baselines can be reviewed and approved to create execution
+ * specifications (specs) in {@code src/test/resources/punit/specs/}.
  *
  * <h2>Implementation Note</h2>
  * <p>The {@code experimentTests} task is a standard JUnit {@code Test} task
@@ -96,7 +96,7 @@ public class ShoppingExperiment extends ShoppingUseCase {
      *
      * <h2>Usage</h2>
      * <pre>{@code
-     * ./gradlew experimentTests --tests "ShoppingExperiment.measureRealisticSearchBaseline"
+     * ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
      * }</pre>
      *
      * @see MockShoppingAssistant.MockConfiguration#experimentRealistic()

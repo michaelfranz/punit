@@ -112,16 +112,20 @@ tasks.test {
     exclude("**/testsubjects/**")
 }
 
-// Create experimentTests task for running experiments
+// Create experiment task for running experiments
 // This is a standard JUnit Test task configured for the experiment source set.
 // Experiments use JUnit's @TestTemplate mechanism under the hood.
 //
 // Usage:
-//   ./gradlew experimentTests --tests "ShoppingExperiment"
-//   ./gradlew experimentTests --tests "ShoppingExperiment.measureBasicSearchReliability"
+//   ./gradlew experiment --tests "ShoppingExperiment"
+//   ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
 //
-val experimentTests by tasks.registering(Test::class) {
-    description = "Runs experiment tests from src/experiment/java to generate empirical baselines"
+// Output:
+//   Baselines are written to: build/punit/baselines/
+//   These can be approved to create specs in: src/test/resources/punit/specs/
+//
+val experiment by tasks.registering(Test::class) {
+    description = "Runs experiments from src/experiment/java to generate empirical baselines"
     group = "verification"
     
     // Use the experiment source set
@@ -141,13 +145,15 @@ val experimentTests by tasks.registering(Test::class) {
     
     // Configure reports output directory
     reports {
-        html.outputLocation.set(layout.buildDirectory.dir("reports/experimentTests"))
+        html.outputLocation.set(layout.buildDirectory.dir("reports/experiment"))
         junitXml.outputLocation.set(layout.buildDirectory.dir("experiment-results"))
     }
     
     // System properties for experiment configuration
+    // Baselines go to build/ directory (ephemeral, regeneratable)
+    // Specs (approved baselines) go to src/test/resources/punit/specs/ (version controlled)
     systemProperty("punit.mode", "experiment")
-    systemProperty("punit.baseline.outputDir", layout.projectDirectory.dir("src/test/resources/punit/baselines").asFile.absolutePath)
+    systemProperty("punit.baseline.outputDir", layout.buildDirectory.dir("punit/baselines").get().asFile.absolutePath)
     
     // Experiments never fail the build (they're exploratory, not conformance tests)
     ignoreFailures = true

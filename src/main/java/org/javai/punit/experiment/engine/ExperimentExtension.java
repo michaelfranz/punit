@@ -447,12 +447,17 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
     }
     
     private Path resolveBaselineOutputPath(Experiment annotation, String useCaseId) {
-        String baseDir = annotation.baselineOutputDir();
         String filename = useCaseId.replace('.', '-') + "." + annotation.outputFormat();
         
-        // Try to resolve relative to test resources
-        Path path = Paths.get("src", "test", "resources", baseDir, filename);
-        return path;
+        // Check for system property override (set by Gradle experiment task)
+        String outputDirOverride = System.getProperty("punit.baseline.outputDir");
+        if (outputDirOverride != null && !outputDirOverride.isEmpty()) {
+            return Paths.get(outputDirOverride, filename);
+        }
+        
+        // Fallback: use annotation's baselineOutputDir relative to current directory
+        String baseDir = annotation.baselineOutputDir();
+        return Paths.get(baseDir, filename);
     }
     
     private void publishFinalReport(ExtensionContext context, ExperimentResultAggregator aggregator) {

@@ -59,6 +59,10 @@ public class ShoppingUseCase {
         
         int productCount = products.size();
 
+        // Capture failure mode for experiment statistics
+        FailureMode failureMode = response.failureMode();
+        String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
+
         return UseCaseResult.builder()
                 .value("isValidJson", isValidJson)
                 .value("hasAllRequiredFields", hasAllRequiredFields)
@@ -69,6 +73,8 @@ public class ShoppingUseCase {
                 .value("productCount", productCount)
                 .value("tokensUsed", response.tokensUsed())
                 .value("rawJson", response.rawJson())
+                .value("failureCategory", failureCategory)  // For experiment statistics
+                .value("failureMode", failureMode.name())   // Raw failure mode
                 .meta("query", query)
                 .meta("backend", context.getBackend())
                 .executionTime(executionTime)
@@ -113,6 +119,10 @@ public class ShoppingUseCase {
         boolean allProductsHaveRequiredAttributes = products.stream()
                 .allMatch(p -> p.name() != null && p.price() != null && p.category() != null);
 
+        // Capture failure mode for experiment statistics
+        FailureMode failureMode = response.failureMode();
+        String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
+
         return UseCaseResult.builder()
                 .value("isValidJson", isValidJson)
                 .value("hasAllRequiredFields", hasAllRequiredFields)
@@ -121,6 +131,8 @@ public class ShoppingUseCase {
                 .value("allProductsHaveRequiredAttributes", allProductsHaveRequiredAttributes)
                 .value("productCount", products.size())
                 .value("tokensUsed", response.tokensUsed())
+                .value("failureCategory", failureCategory)
+                .value("failureMode", failureMode.name())
                 .meta("query", query)
                 .meta("maxPrice", maxPrice)
                 .meta("backend", context.getBackend())
@@ -162,6 +174,10 @@ public class ShoppingUseCase {
         Integer reportedTotal = response.totalResults();
         boolean totalResultsMatchesActual = reportedTotal != null && reportedTotal == products.size();
 
+        // Capture failure mode for experiment statistics
+        FailureMode failureMode = response.failureMode();
+        String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
+
         return UseCaseResult.builder()
                 .value("isValidJson", isValidJson)
                 .value("hasAllRequiredFields", hasAllRequiredFields)
@@ -170,6 +186,8 @@ public class ShoppingUseCase {
                 .value("productCount", products.size())
                 .value("requestedMaxResults", maxResults)
                 .value("tokensUsed", response.tokensUsed())
+                .value("failureCategory", failureCategory)
+                .value("failureMode", failureMode.name())
                 .meta("query", query)
                 .meta("maxResults", maxResults)
                 .meta("backend", context.getBackend())
@@ -214,6 +232,10 @@ public class ShoppingUseCase {
                 .filter(p -> p.relevanceScore() != null && p.relevanceScore() < minRelevanceScore)
                 .count();
 
+        // Capture failure mode for experiment statistics
+        FailureMode failureMode = response.failureMode();
+        String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
+
         return UseCaseResult.builder()
                 .value("isValidJson", isValidJson)
                 .value("allProductsRelevant", allProductsRelevant)
@@ -221,6 +243,8 @@ public class ShoppingUseCase {
                 .value("lowRelevanceCount", (int) lowRelevanceCount)
                 .value("productCount", products.size())
                 .value("tokensUsed", response.tokensUsed())
+                .value("failureCategory", failureCategory)
+                .value("failureMode", failureMode.name())
                 .meta("query", query)
                 .meta("minRelevanceScore", minRelevanceScore)
                 .meta("backend", context.getBackend())
