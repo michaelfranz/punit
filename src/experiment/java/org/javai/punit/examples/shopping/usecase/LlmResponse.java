@@ -8,6 +8,9 @@ import java.util.Map;
  *
  * <p>This class captures both the raw response and parsed data,
  * allowing tests to verify format compliance and content quality.
+ *
+ * <p>The {@link #failureMode()} field tracks how the response failed (if at all),
+ * enabling observability into the distribution of failure types during experiments.
  */
 public class LlmResponse {
 
@@ -18,6 +21,7 @@ public class LlmResponse {
     private final List<Product> products;
     private final Integer totalResults;
     private final Map<String, Boolean> presentFields;
+    private final FailureMode failureMode;
 
     private LlmResponse(Builder builder) {
         this.rawJson = builder.rawJson;
@@ -27,6 +31,7 @@ public class LlmResponse {
         this.products = builder.products;
         this.totalResults = builder.totalResults;
         this.presentFields = builder.presentFields;
+        this.failureMode = builder.failureMode != null ? builder.failureMode : FailureMode.NONE;
     }
 
     /**
@@ -82,6 +87,27 @@ public class LlmResponse {
     }
 
     /**
+     * Returns the failure mode for this response.
+     *
+     * <p>This indicates how the response failed (if at all). A value of
+     * {@link FailureMode#NONE} indicates a valid response.
+     *
+     * @return the failure mode, never null
+     */
+    public FailureMode failureMode() {
+        return failureMode;
+    }
+
+    /**
+     * Returns true if this response represents a failure.
+     *
+     * @return true if {@link #failureMode()} is not {@link FailureMode#NONE}
+     */
+    public boolean isFailed() {
+        return failureMode.isFailure();
+    }
+
+    /**
      * Creates a new builder for constructing LlmResponse instances.
      */
     public static Builder builder() {
@@ -99,6 +125,7 @@ public class LlmResponse {
         private List<Product> products;
         private Integer totalResults;
         private Map<String, Boolean> presentFields;
+        private FailureMode failureMode;
 
         public Builder rawJson(String rawJson) {
             this.rawJson = rawJson;
@@ -132,6 +159,11 @@ public class LlmResponse {
 
         public Builder presentFields(Map<String, Boolean> presentFields) {
             this.presentFields = presentFields;
+            return this;
+        }
+
+        public Builder failureMode(FailureMode failureMode) {
+            this.failureMode = failureMode;
             return this;
         }
 

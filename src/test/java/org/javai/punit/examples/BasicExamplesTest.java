@@ -1,13 +1,11 @@
 package org.javai.punit.examples;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import java.util.Random;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.TokenChargeRecorder;
 import org.junit.jupiter.api.Disabled;
-
-import java.util.Random;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Example probabilistic tests demonstrating PUNIT features.
@@ -23,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * early due to budget exhaustion, which will cause the test to fail if the
  * budget exhaustion behavior is set to FAIL.
  */
-//@Disabled("Examples - run individually to explore PUNIT features. Contains failing samples by design.")
+@Disabled("Examples - run individually to explore PUNIT features. Contains failing samples by design.")
 class BasicExamplesTest {
 
     private final Random random = new Random();

@@ -1,10 +1,11 @@
 package org.javai.punit.examples.shopping.experiment;
 
+import java.util.Random;
+
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
 import org.javai.punit.experiment.api.Experiment;
 import org.javai.punit.experiment.api.ExperimentContext;
-import org.junit.jupiter.api.BeforeEach;
 
 /**
  * Experiments for the LLM-powered shopping assistant.
@@ -51,18 +52,76 @@ public class ShoppingExperiment extends ShoppingUseCase {
 
     /**
      * Creates a ShoppingExperiment with a mock shopping assistant.
-     * 
-     * <p>The mock assistant simulates LLM behavior with configurable
-     * reliability levels for testing different scenarios.
+     *
+     * <p>Uses the {@code experimentRealistic()} configuration which simulates
+     * realistic LLM behavior with ~95% success rate and varied failure modes:
+     * <ul>
+     *   <li>2.0% - Malformed JSON (syntax errors)</li>
+     *   <li>1.5% - Hallucinated field names</li>
+     *   <li>1.0% - Invalid field values (wrong types)</li>
+     *   <li>0.5% - Missing required fields</li>
+     * </ul>
      */
     public ShoppingExperiment() {
-        super(new MockShoppingAssistant());
+        super(new MockShoppingAssistant(
+                new Random(),
+                MockShoppingAssistant.MockConfiguration.experimentRealistic()
+        ));
     }
 
-    // ========== Basic Search Experiments ==========
+    // ========== Primary Experiment (1000 samples) ==========
 
     /**
-     * Experiment: Measure basic product search reliability.
+     * Experiment: Establish realistic baseline for basic product search.
+     *
+     * <p>This is the primary experiment for generating a statistically reliable
+     * baseline. It runs 1000 samples with the {@code experimentRealistic()}
+     * configuration (~95% success rate, varied failure modes).
+     *
+     * <h2>Purpose</h2>
+     * <p>Generate an empirical baseline that can be approved and used for
+     * spec-driven probabilistic tests. The large sample size ensures:
+     * <ul>
+     *   <li>Statistically reliable success rate estimate</li>
+     *   <li>Narrow confidence interval (~±1.3%)</li>
+     *   <li>Representative failure mode distribution</li>
+     * </ul>
+     *
+     * <h2>Expected Outcome</h2>
+     * <ul>
+     *   <li>Success rate: ~95% (±2%)</li>
+     *   <li>Failure distribution: ~40% malformed JSON, ~30% hallucinated fields,
+     *       ~20% invalid values, ~10% missing fields</li>
+     * </ul>
+     *
+     * <h2>Usage</h2>
+     * <pre>{@code
+     * ./gradlew experimentTests --tests "ShoppingExperiment.measureRealisticSearchBaseline"
+     * }</pre>
+     *
+     * @see MockShoppingAssistant.MockConfiguration#experimentRealistic()
+     */
+    @Experiment(
+            useCase = "usecase.shopping.search",
+            samples = 1000,
+            tokenBudget = 500000,
+            timeBudgetMs = 600000,
+            experimentId = "shopping-search-realistic-v1"
+    )
+    @ExperimentContext(
+            backend = "mock",
+            parameters = {
+                    "query = wireless headphones"
+            }
+    )
+    void measureRealisticSearchBaseline() {
+        // Method body is optional—execution is driven by the use case
+    }
+
+    // ========== Legacy Experiments (smaller samples) ==========
+
+    /**
+     * Experiment: Measure basic product search reliability (legacy, 100 samples).
      *
      * <p>Gathers empirical data about:
      * <ul>
@@ -72,8 +131,12 @@ public class ShoppingExperiment extends ShoppingUseCase {
      *   <li>Token consumption per query</li>
      * </ul>
      *
-     * <p>Expected outcome: ~90% success rate for valid JSON with all required fields.
+     * <p>Expected outcome: ~95% success rate for valid JSON with all required fields.
+     *
+     * @deprecated Use {@link #measureRealisticSearchBaseline()} for statistically
+     *             reliable baselines (1000 samples).
      */
+    @Deprecated
     @Experiment(
         useCase = "usecase.shopping.search",
         samples = 100,
@@ -84,7 +147,6 @@ public class ShoppingExperiment extends ShoppingUseCase {
     @ExperimentContext(
         backend = "mock",
         parameters = {
-            "simulatedReliability = default",
             "query = wireless headphones"
         }
     )
@@ -97,7 +159,10 @@ public class ShoppingExperiment extends ShoppingUseCase {
      *
      * <p>Uses a more reliable mock configuration to establish an upper bound
      * on expected success rates.
+     *
+     * @deprecated Legacy experiment. Use {@link #measureRealisticSearchBaseline()}.
      */
+    @Deprecated
     @Experiment(
         useCase = "usecase.shopping.search",
         samples = 100,
@@ -108,7 +173,6 @@ public class ShoppingExperiment extends ShoppingUseCase {
     @ExperimentContext(
         backend = "mock",
         parameters = {
-            "simulatedReliability = high",
             "query = laptop bag"
         }
     )
@@ -128,7 +192,10 @@ public class ShoppingExperiment extends ShoppingUseCase {
      *   <li>Average number of price violations per response</li>
      *   <li>Correlation between price limit and violation rate</li>
      * </ul>
+     *
+     * @deprecated Legacy experiment with smaller sample size.
      */
+    @Deprecated
     @Experiment(
         useCase = "usecase.shopping.search.price-constrained",
         samples = 100,
@@ -139,7 +206,6 @@ public class ShoppingExperiment extends ShoppingUseCase {
     @ExperimentContext(
         backend = "mock",
         parameters = {
-            "simulatedReliability = default",
             "query = gift ideas",
             "maxPrice = 50.00"
         }
@@ -153,7 +219,10 @@ public class ShoppingExperiment extends ShoppingUseCase {
      *
      * <p>Tests behavior with a very low price limit to understand
      * edge case handling.
+     *
+     * @deprecated Legacy experiment with smaller sample size.
      */
+    @Deprecated
     @Experiment(
         useCase = "usecase.shopping.search.price-constrained",
         samples = 50,
@@ -164,7 +233,6 @@ public class ShoppingExperiment extends ShoppingUseCase {
     @ExperimentContext(
         backend = "mock",
         parameters = {
-            "simulatedReliability = default",
             "query = budget accessories",
             "maxPrice = 20.00"
         }
@@ -184,7 +252,10 @@ public class ShoppingExperiment extends ShoppingUseCase {
      *   <li>Rate of responses respecting the limit</li>
      *   <li>Consistency between totalResults field and actual count</li>
      * </ul>
+     *
+     * @deprecated Legacy experiment with smaller sample size.
      */
+    @Deprecated
     @Experiment(
         useCase = "usecase.shopping.search.limited-results",
         samples = 100,
@@ -195,7 +266,6 @@ public class ShoppingExperiment extends ShoppingUseCase {
     @ExperimentContext(
         backend = "mock",
         parameters = {
-            "simulatedReliability = default",
             "query = coffee makers",
             "maxResults = 5"
         }
@@ -216,7 +286,10 @@ public class ShoppingExperiment extends ShoppingUseCase {
      *   <li>Average relevance score across all responses</li>
      *   <li>Distribution of low-relevance product counts</li>
      * </ul>
+     *
+     * @deprecated Legacy experiment with smaller sample size.
      */
+    @Deprecated
     @Experiment(
         useCase = "usecase.shopping.search.relevance",
         samples = 100,
@@ -227,7 +300,6 @@ public class ShoppingExperiment extends ShoppingUseCase {
     @ExperimentContext(
         backend = "mock",
         parameters = {
-            "simulatedReliability = default",
             "query = bluetooth speaker waterproof",
             "minRelevanceScore = 0.7"
         }
@@ -241,7 +313,10 @@ public class ShoppingExperiment extends ShoppingUseCase {
      *
      * <p>Uses a higher minimum relevance score to understand
      * the upper bound of relevance quality.
+     *
+     * @deprecated Legacy experiment with smaller sample size.
      */
+    @Deprecated
     @Experiment(
         useCase = "usecase.shopping.search.relevance",
         samples = 50,
@@ -252,7 +327,6 @@ public class ShoppingExperiment extends ShoppingUseCase {
     @ExperimentContext(
         backend = "mock",
         parameters = {
-            "simulatedReliability = high",
             "query = premium headphones noise cancelling",
             "minRelevanceScore = 0.85"
         }
@@ -268,7 +342,10 @@ public class ShoppingExperiment extends ShoppingUseCase {
      *
      * <p>Uses low reliability configuration to establish a lower bound
      * and understand degraded behavior patterns.
+     *
+     * @deprecated Legacy experiment with smaller sample size.
      */
+    @Deprecated
     @Experiment(
         useCase = "usecase.shopping.search",
         samples = 100,
@@ -279,7 +356,6 @@ public class ShoppingExperiment extends ShoppingUseCase {
     @ExperimentContext(
         backend = "mock",
         parameters = {
-            "simulatedReliability = low",
             "query = electronics sale"
         }
     )
