@@ -16,6 +16,25 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Spec-driven probabilistic tests for the shopping assistant.
+ * Demonstrates spec-driven probabilistic testing with statistically grounded thresholds.
+ * <p>
+ * If you run this test class just once, it's possible that every sample run passes, but this is
+ * just luck. Run the test class multiple times to see the power of PUnit in action. You will
+ * see the occasional fail, but take a look at the failure report in the log to see the conclusion based
+ * on statistical significance: The test as a whole may fail, but the log may reveal that, from a statistical
+ * perspective, the failure is not significant. In real-world scenarios, this is where PUnit's power shines:
+ * it allows you to make data-informed decisions about whether to act on test failure.
+ * <p>
+ * Hence: When you get a failure from a probabilistic test, ALWAYS READ THE TEST LOG to understand
+ * the statistical significance of the failure. If the failure is not statistically significant, it may
+ * be a false positive, and you can safely ignore it. Whatever you do, do not spend a ton of budget investigating
+ * it! On the other hand, if the failure is statistically significant, PUnit will give the verdict of FAILED.
+ * Now you have data-backed justification to start an investigation.
+ * <p>
+ * Why does the test show up as FAILED in the IDE if PUnit gives the verdict of PASSED? Just because a FAIL is
+ * statistically insignificant, it does not mean it should be ignored. It simply means you should think twice
+ * before sending in a team of investigators. In other words: Take a quick look at the error messages; perhaps re-run
+ * the test. Above all: stay cool.
  *
  * <p>These tests demonstrate the complete PUnit workflow:
  * <ol>
@@ -83,6 +102,9 @@ class ShoppingAssistantSpecExamplesTest {
         // we can make data-informed decisions about whether to act on test failure. Without PUnit,
         // we would be flying blind, taking guesses, chasing false flags, or simply labeling certain FAILS
         // as "flaky" - and then ignoring them.
+        // For those interested in where the probabilistic test gets its data from: It comes from a spec file which
+        // was generated from the baseline experiment. It is located in a subfolder of the resources directory, and
+        // in this case it is named "ShoppingUseCase.spec".
         provider.register(ShoppingUseCase.class, () ->
             new ShoppingUseCase(
                 new MockShoppingAssistant(

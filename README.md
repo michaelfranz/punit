@@ -18,7 +18,7 @@ PUNIT is a JUnit 5 extension for testing non-deterministic systems. It runs test
 - [IDE Integration](#ide-integration)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
-- [Known Limitations](#known-limitations)
+- [Understanding Test Results](#understanding-test-results)
 
 ## Why PUNIT?
 
@@ -586,24 +586,13 @@ punit.elapsedMs=15234
 punit.method.tokensConsumed=8500
 ```
 
-## Known Limitations
+## Understanding Test Results
 
-### IDE Test Result Aggregation
+### Reading PUnit Verdicts
 
-JUnit 5's result model aggregates child results: **if any child test fails, the parent container is marked as failed**. This means that in IDEs like IntelliJ IDEA, Eclipse, or VS Code, a probabilistic test class will show as ❌ (failed) even if PUnit's statistical verdict is PASS.
+When any sample fails, the IDE shows the test as ❌ FAILED. **This is correct behavior** - even statistically insignificant failures deserve attention. The key is knowing *how much* attention.
 
-**Example:**
-```
-❌ MyProbabilisticTest                    ← IDE shows class as failed
-    ❌ sample() > Sample 1/100            ← Individual sample failed
-    ✅ sample() > Sample 2/100
-    ✅ sample() > Sample 3/100
-    ...
-    ✅ Sample 98/100
-    PUnit PASSED: sample()                ← But PUnit says it passed (97/98 = 99% >= 95%)
-```
-
-**The console summary at the end of each test shows the true PUnit verdict:**
+**Always read the console summary:**
 ```
 ═══════════════════════════════════════════════════════════════
 PUnit PASSED: sample()
@@ -612,18 +601,26 @@ PUnit PASSED: sample()
 ═══════════════════════════════════════════════════════════════
 ```
 
-**Why this happens:**
-- JUnit 5 has no extension point to override the parent container's verdict based on child statistics
-- IDEs rely on JUnit's result aggregation model
-- Even extending JUnit would not help, as IDEs would need to adapt their result display logic
+**Interpreting Results:**
 
-**Workaround:**
-- Look at the **console output** for the definitive PUnit verdict
-- The final summary clearly shows PASSED or FAILED with statistical qualification
-- CI/CD pipelines can parse the structured report entries for automation
+| IDE Shows | Console Says   | What To Do                                                                       |
+|-----------|----------------|----------------------------------------------------------------------------------|
+| ❌ FAILED  | `PUnit PASSED` | Take a quick look. Probably fine - rerun if concerned. Don't send investigators. |
+| ❌ FAILED  | `PUnit FAILED` | Statistically significant. You have data-informed justification to investigate.  |
+| ✅ PASSED  | `PUnit PASSED` | All samples passed. Move on.                                                     |
 
-**Future:**
-This is a fundamental limitation of the current JUnit 5 and IDE ecosystem. We have documented this as a requirement for future IDE integration. If PUnit gains adoption, IDE vendors may consider adding support for probabilistic/statistical test verdicts.
+**Why it works this way:**
+
+The red ❌(or whatever icon your IDE uses) ensures you don't ignore failures completely. The console verdict tells you
+how to *prioritize*:
+- **Statistically insignificant failure:** Glance at error messages, maybe rerun, stay cool
+- **Statistically significant failure:** Dig in - the data says something is wrong
+
+This is what PUnit is all about: **data-informed decisions about whether to act on test failure.** Without PUnit, you'd be flying blind, chasing false flags, or labeling failures as "flaky" and ignoring them.
+
+A last word on statistically significant failure: We live in a universe in which rare things happen occasionally. So
+even in the case where a statistically significant failure has occurred, it can still sometimes be a false positive.
+But the power of the statistics behind PUnit means that this will itself occur very rarely, maybe one time in a hundred, depending on your test scenario. PUnit is powerful, but it's not magic!
 
 ## Requirements
 
