@@ -1,24 +1,40 @@
 package org.javai.punit.spec.registry;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.javai.punit.spec.model.ExecutionSpecification;
 
 /**
  * Loads execution specifications from YAML or JSON files.
+ * 
+ * <p>Validates schema version compatibility and content integrity via fingerprint verification.
  */
 public final class SpecificationLoader {
 
 	private static final Pattern YAML_KEY_VALUE = Pattern.compile("^\\s*(\\w+)\\s*:\\s*(.+?)\\s*$");
+	
+	/** Supported schema versions. */
+	private static final Set<String> SUPPORTED_SCHEMA_VERSIONS = Set.of("punit-spec-1");
+	
+	/** Field name for content fingerprint. */
+	private static final String FINGERPRINT_FIELD = "contentFingerprint";
+	
+	/** Field name for schema version. */
+	private static final String SCHEMA_VERSION_FIELD = "schemaVersion";
 
 	private SpecificationLoader() {
 	}
@@ -45,8 +61,13 @@ public final class SpecificationLoader {
 
 	/**
 	 * Parses a specification from YAML content.
+	 * 
+	 * @throws SpecificationIntegrityException if schema version is unsupported or fingerprint doesn't match
 	 */
 	public static ExecutionSpecification parseYaml(String content) {
+		// First, validate schema version and content integrity
+		validateIntegrity(content);
+		
 		ExecutionSpecification.Builder builder = ExecutionSpecification.builder();
 		Map<String, Object> executionContext = new LinkedHashMap<>();
 		List<String> sourceBaselines = new ArrayList<>();
@@ -96,6 +117,7 @@ public final class SpecificationLoader {
 				} else if (line.startsWith("sourceBaselines:")) {
 					inSourceBaselines = true;
 				}
+				// Skip schemaVersion and contentFingerprint - already validated
 				continue;
 			}
 
@@ -133,6 +155,84 @@ public final class SpecificationLoader {
 		builder.costEnvelope(maxTimePerSampleMs, maxTokensPerSample, totalTokenBudget);
 
 		return builder.build();
+	}
+	
+	/**
+	 * Validates schema version and content integrity.
+	 * 
+	 * @throws SpecificationIntegrityException if validation fails
+	 */
+	private static void validateIntegrity(String content) {
+		String schemaVersion = extractFieldValue(content, SCHEMA_VERSION_FIELD);
+		String storedFingerprint = extractFieldValue(content, FINGERPRINT_FIELD);
+		
+		// Validate schema version
+		if (schemaVersion == null || schemaVersion.isEmpty()) {
+			throw new SpecificationIntegrityException(
+					"Missing schemaVersion field. Spec files must include schemaVersion.");
+		}
+		if (!SUPPORTED_SCHEMA_VERSIONS.contains(schemaVersion)) {
+			throw new SpecificationIntegrityException(
+					"Unsupported schema version: " + schemaVersion + 
+					". Supported versions: " + SUPPORTED_SCHEMA_VERSIONS);
+		}
+		
+		// Validate content fingerprint
+		if (storedFingerprint == null || storedFingerprint.isEmpty()) {
+			throw new SpecificationIntegrityException(
+					"Missing contentFingerprint field. Spec files must include a content fingerprint.");
+		}
+		
+		// Compute expected fingerprint (content up to and including schemaVersion line)
+		String contentForHashing = extractContentForHashing(content);
+		String computedFingerprint = computeFingerprint(contentForHashing);
+		
+		if (!storedFingerprint.equals(computedFingerprint)) {
+			throw new SpecificationIntegrityException(
+					"Content fingerprint mismatch. The spec file may have been modified outside " +
+					"the approval workflow. Expected: " + computedFingerprint + 
+					", Found: " + storedFingerprint);
+		}
+	}
+	
+	/**
+	 * Extracts the content that should be used for fingerprint computation.
+	 * This is all content up to and including the schemaVersion line.
+	 */
+	private static String extractContentForHashing(String content) {
+		int fingerprintIdx = content.indexOf(FINGERPRINT_FIELD + ":");
+		if (fingerprintIdx < 0) {
+			return content;
+		}
+		return content.substring(0, fingerprintIdx);
+	}
+	
+	/**
+	 * Extracts a top-level field value from YAML content.
+	 */
+	private static String extractFieldValue(String content, String fieldName) {
+		String prefix = fieldName + ":";
+		int idx = content.indexOf(prefix);
+		if (idx < 0) return null;
+		
+		int lineEnd = content.indexOf('\n', idx);
+		if (lineEnd < 0) lineEnd = content.length();
+		
+		String line = content.substring(idx, lineEnd);
+		return extractValue(line);
+	}
+	
+	/**
+	 * Computes a SHA-256 fingerprint of the given content.
+	 */
+	private static String computeFingerprint(String content) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
+			return HexFormat.of().formatHex(hash);
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException("SHA-256 algorithm not available", e);
+		}
 	}
 
 	/**

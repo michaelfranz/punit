@@ -1,14 +1,14 @@
 package org.javai.punit.engine;
 
+import java.lang.reflect.Method;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.spec.model.ExecutionSpecification;
+import org.javai.punit.spec.registry.SpecificationIntegrityException;
 import org.javai.punit.spec.registry.SpecificationNotFoundException;
 import org.javai.punit.spec.registry.SpecificationRegistry;
-
-import java.lang.reflect.Method;
 
 /**
  * Resolves effective configuration for a probabilistic test by merging values from
@@ -403,9 +403,7 @@ public class ConfigurationResolver {
         // New pattern: use case class reference
         Class<?> useCaseClass = annotation.useCase();
         if (useCaseClass != null && useCaseClass != Void.class) {
-            String useCaseId = UseCaseProvider.resolveId(useCaseClass);
-            // Spec ID format: useCaseId:v1 (default to v1)
-            return useCaseId + ":v1";
+            return UseCaseProvider.resolveId(useCaseClass);
         }
 
         // Legacy pattern: explicit spec ID
@@ -420,8 +418,9 @@ public class ConfigurationResolver {
     /**
      * Loads the minPassRate from a specification file.
      *
-     * @param specId the specification ID (format: useCaseId:vN)
+     * @param specId the specification ID (the use case ID)
      * @return the minPassRate from the spec, or default if spec not found
+     * @throws SpecificationIntegrityException if spec file fails integrity validation
      */
     private double loadMinPassRateFromSpec(String specId) {
         try {
@@ -431,6 +430,9 @@ public class ConfigurationResolver {
             if (minPassRate > 0 && minPassRate <= 1.0) {
                 return minPassRate;
             }
+        } catch (SpecificationIntegrityException e) {
+            // Integrity failures must propagate - indicates tampering or corruption
+            throw e;
         } catch (SpecificationNotFoundException e) {
             // Spec not found - fall through to default
             // This is not an error - the test can still run with default threshold

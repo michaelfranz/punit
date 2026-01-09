@@ -45,7 +45,3 @@ When reviewing a baseline file, check:
       Please review the baseline data in `punit/pending-approval/`.
 ```
 
-## Approval Log
-
-Approvals are logged in `APPROVAL_LOG.md` for audit purposes.
-

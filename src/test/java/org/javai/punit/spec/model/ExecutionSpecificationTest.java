@@ -1,0 +1,397 @@
+package org.javai.punit.spec.model;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import org.javai.punit.spec.model.ExecutionSpecification.BaselineData;
+import org.javai.punit.spec.model.ExecutionSpecification.CostEnvelope;
+import org.javai.punit.spec.model.ExecutionSpecification.SpecRequirements;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+@DisplayName("ExecutionSpecification")
+class ExecutionSpecificationTest {
+
+    private ExecutionSpecification.Builder validBuilder() {
+        return ExecutionSpecification.builder()
+            .specId("TestSpec")
+            .useCaseId("TestUseCase")
+            .approvedAt(Instant.now())
+            .approvedBy("tester");
+    }
+
+    @Nested
+    @DisplayName("builder")
+    class BuilderTests {
+
+        @Test
+        @DisplayName("builds with all fields")
+        void buildsWithAllFields() {
+            Instant now = Instant.now();
+            ExecutionSpecification spec = ExecutionSpecification.builder()
+                .specId("TestSpec")
+                .useCaseId("TestUseCase")
+                .version(2)
+                .approvedAt(now)
+                .approvedBy("approver")
+                .approvalNotes("Notes here")
+                .sourceBaselines(List.of("baseline1", "baseline2"))
+                .executionContext(Map.of("model", "gpt-4"))
+                .requirements(0.9, "isValid == true")
+                .costEnvelope(100, 500, 10000)
+                .baselineData(100, 85)
+                .build();
+
+            assertThat(spec.getSpecId()).isEqualTo("TestSpec");
+            assertThat(spec.getUseCaseId()).isEqualTo("TestUseCase");
+            assertThat(spec.getVersion()).isEqualTo(2);
+            assertThat(spec.getApprovedAt()).isEqualTo(now);
+            assertThat(spec.getApprovedBy()).isEqualTo("approver");
+            assertThat(spec.getApprovalNotes()).isEqualTo("Notes here");
+            assertThat(spec.getSourceBaselines()).containsExactly("baseline1", "baseline2");
+            assertThat(spec.getExecutionContext()).containsEntry("model", "gpt-4");
+            assertThat(spec.getMinPassRate()).isEqualTo(0.9);
+            assertThat(spec.getCostEnvelope().maxTimePerSampleMs()).isEqualTo(100);
+            assertThat(spec.getBaselineSamples()).isEqualTo(100);
+        }
+
+        @Test
+        @DisplayName("throws on null specId")
+        void throwsOnNullSpecId() {
+            assertThatThrownBy(() -> 
+                ExecutionSpecification.builder()
+                    .useCaseId("UseCase")
+                    .build()
+            ).isInstanceOf(NullPointerException.class);
+        }
+
+        @Test
+        @DisplayName("throws on null useCaseId")
+        void throwsOnNullUseCaseId() {
+            assertThatThrownBy(() -> 
+                ExecutionSpecification.builder()
+                    .specId("Spec")
+                    .build()
+            ).isInstanceOf(NullPointerException.class);
+        }
+
+        @Test
+        @DisplayName("defaults to empty lists and maps")
+        void defaultsToEmptyCollections() {
+            ExecutionSpecification spec = validBuilder().build();
+
+            assertThat(spec.getSourceBaselines()).isEmpty();
+            assertThat(spec.getExecutionContext()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("defaults requirements")
+        void defaultsRequirements() {
+            ExecutionSpecification spec = validBuilder().build();
+
+            assertThat(spec.getMinPassRate()).isEqualTo(1.0);
+        }
+
+        @Test
+        @DisplayName("can set requirements with record")
+        void canSetRequirementsWithRecord() {
+            ExecutionSpecification spec = validBuilder()
+                .requirements(new SpecRequirements(0.8, "criteria"))
+                .build();
+
+            assertThat(spec.getRequirements().minPassRate()).isEqualTo(0.8);
+            assertThat(spec.getRequirements().successCriteria()).isEqualTo("criteria");
+        }
+
+        @Test
+        @DisplayName("can set cost envelope with record")
+        void canSetCostEnvelopeWithRecord() {
+            ExecutionSpecification spec = validBuilder()
+                .costEnvelope(new CostEnvelope(100, 200, 300))
+                .build();
+
+            assertThat(spec.getCostEnvelope().totalTokenBudget()).isEqualTo(300);
+        }
+
+        @Test
+        @DisplayName("can set baseline data with record")
+        void canSetBaselineDataWithRecord() {
+            ExecutionSpecification spec = validBuilder()
+                .baselineData(new BaselineData(50, 40, Instant.now()))
+                .build();
+
+            assertThat(spec.getBaselineSamples()).isEqualTo(50);
+        }
+
+        @Test
+        @DisplayName("can set baseline data with timestamp")
+        void canSetBaselineDataWithTimestamp() {
+            Instant now = Instant.now();
+            ExecutionSpecification spec = validBuilder()
+                .baselineData(50, 40, now)
+                .build();
+
+            assertThat(spec.getBaselineData().generatedAt()).isEqualTo(now);
+        }
+    }
+
+    @Nested
+    @DisplayName("baseline data")
+    class BaselineDataTests {
+
+        @Test
+        @DisplayName("hasBaselineData returns true when present")
+        void hasBaselineDataReturnsTrue() {
+            ExecutionSpecification spec = validBuilder()
+                .baselineData(100, 85)
+                .build();
+
+            assertThat(spec.hasBaselineData()).isTrue();
+        }
+
+        @Test
+        @DisplayName("hasBaselineData returns false when absent")
+        void hasBaselineDataReturnsFalse() {
+            ExecutionSpecification spec = validBuilder().build();
+
+            assertThat(spec.hasBaselineData()).isFalse();
+        }
+
+        @Test
+        @DisplayName("hasBaselineData returns false when samples is 0")
+        void hasBaselineDataReturnsFalseForZeroSamples() {
+            ExecutionSpecification spec = validBuilder()
+                .baselineData(0, 0)
+                .build();
+
+            assertThat(spec.hasBaselineData()).isFalse();
+        }
+
+        @Test
+        @DisplayName("getBaselineSamples returns 0 when no data")
+        void getBaselineSamplesReturnsZero() {
+            ExecutionSpecification spec = validBuilder().build();
+
+            assertThat(spec.getBaselineSamples()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("getBaselineSuccesses returns 0 when no data")
+        void getBaselineSuccessesReturnsZero() {
+            ExecutionSpecification spec = validBuilder().build();
+
+            assertThat(spec.getBaselineSuccesses()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("getObservedRate returns 0 when no data")
+        void getObservedRateReturnsZeroWhenNoData() {
+            ExecutionSpecification spec = validBuilder().build();
+
+            assertThat(spec.getObservedRate()).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("getObservedRate returns 0 when samples is 0")
+        void getObservedRateReturnsZeroForZeroSamples() {
+            ExecutionSpecification spec = validBuilder()
+                .baselineData(0, 0)
+                .build();
+
+            assertThat(spec.getObservedRate()).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("getObservedRate calculates correctly")
+        void getObservedRateCalculatesCorrectly() {
+            ExecutionSpecification spec = validBuilder()
+                .baselineData(100, 85)
+                .build();
+
+            assertThat(spec.getObservedRate()).isEqualTo(0.85);
+        }
+    }
+
+    @Nested
+    @DisplayName("approval")
+    class ApprovalTests {
+
+        @Test
+        @DisplayName("isApproved returns true when valid")
+        void isApprovedReturnsTrue() {
+            ExecutionSpecification spec = validBuilder().build();
+
+            assertThat(spec.isApproved()).isTrue();
+        }
+
+        @Test
+        @DisplayName("isApproved returns false when approvedAt is null")
+        void isApprovedReturnsFalseWhenApprovedAtNull() {
+            ExecutionSpecification spec = ExecutionSpecification.builder()
+                .specId("Spec")
+                .useCaseId("UseCase")
+                .approvedBy("approver")
+                .build();
+
+            assertThat(spec.isApproved()).isFalse();
+        }
+
+        @Test
+        @DisplayName("isApproved returns false when approvedBy is null")
+        void isApprovedReturnsFalseWhenApprovedByNull() {
+            ExecutionSpecification spec = ExecutionSpecification.builder()
+                .specId("Spec")
+                .useCaseId("UseCase")
+                .approvedAt(Instant.now())
+                .build();
+
+            assertThat(spec.isApproved()).isFalse();
+        }
+
+        @Test
+        @DisplayName("isApproved returns false when approvedBy is empty")
+        void isApprovedReturnsFalseWhenApprovedByEmpty() {
+            ExecutionSpecification spec = ExecutionSpecification.builder()
+                .specId("Spec")
+                .useCaseId("UseCase")
+                .approvedAt(Instant.now())
+                .approvedBy("")
+                .build();
+
+            assertThat(spec.isApproved()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("validate")
+    class ValidateTests {
+
+        @Test
+        @DisplayName("succeeds for valid spec")
+        void succeedsForValidSpec() {
+            ExecutionSpecification spec = validBuilder().build();
+
+            // Should not throw
+            spec.validate();
+        }
+
+        @Test
+        @DisplayName("throws when not approved")
+        void throwsWhenNotApproved() {
+            ExecutionSpecification spec = ExecutionSpecification.builder()
+                .specId("Spec")
+                .useCaseId("UseCase")
+                .build();
+
+            assertThatThrownBy(spec::validate)
+                .isInstanceOf(SpecificationValidationException.class)
+                .hasMessageContaining("lacks approval metadata");
+        }
+
+        @Test
+        @DisplayName("throws when minPassRate is negative")
+        void throwsWhenMinPassRateNegative() {
+            ExecutionSpecification spec = validBuilder()
+                .requirements(-0.1, "")
+                .build();
+
+            assertThatThrownBy(spec::validate)
+                .isInstanceOf(SpecificationValidationException.class)
+                .hasMessageContaining("invalid minPassRate");
+        }
+
+        @Test
+        @DisplayName("throws when minPassRate is greater than 1")
+        void throwsWhenMinPassRateGreaterThanOne() {
+            ExecutionSpecification spec = validBuilder()
+                .requirements(1.5, "")
+                .build();
+
+            assertThatThrownBy(spec::validate)
+                .isInstanceOf(SpecificationValidationException.class)
+                .hasMessageContaining("invalid minPassRate");
+        }
+    }
+
+    @Nested
+    @DisplayName("success criteria")
+    class SuccessCriteriaTests {
+
+        @Test
+        @DisplayName("returns alwaysTrue when no criteria set")
+        void returnsAlwaysTrueWhenNoCriteria() {
+            ExecutionSpecification spec = validBuilder().build();
+
+            assertThat(spec.getSuccessCriteria().getDescription()).isEqualTo("(always true)");
+        }
+
+        @Test
+        @DisplayName("returns alwaysTrue when criteria is empty")
+        void returnsAlwaysTrueWhenEmpty() {
+            ExecutionSpecification spec = validBuilder()
+                .requirements(0.8, "")
+                .build();
+
+            assertThat(spec.getSuccessCriteria().getDescription()).isEqualTo("(always true)");
+        }
+
+        @Test
+        @DisplayName("parses criteria expression")
+        void parsesCriteriaExpression() {
+            ExecutionSpecification spec = validBuilder()
+                .requirements(0.8, "isValid == true")
+                .build();
+
+            assertThat(spec.getSuccessCriteria().getDescription()).isEqualTo("isValid == true");
+        }
+    }
+
+    @Nested
+    @DisplayName("BaselineData")
+    class BaselineDataRecordTests {
+
+        @Test
+        @DisplayName("computes observedRate")
+        void computesObservedRate() {
+            BaselineData data = new BaselineData(100, 85, Instant.now());
+
+            assertThat(data.observedRate()).isEqualTo(0.85);
+        }
+
+        @Test
+        @DisplayName("observedRate is 0 for 0 samples")
+        void observedRateIsZeroForZeroSamples() {
+            BaselineData data = new BaselineData(0, 0, null);
+
+            assertThat(data.observedRate()).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("throws for negative samples")
+        void throwsForNegativeSamples() {
+            assertThatThrownBy(() -> new BaselineData(-1, 0, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("samples must be non-negative");
+        }
+
+        @Test
+        @DisplayName("throws for negative successes")
+        void throwsForNegativeSuccesses() {
+            assertThatThrownBy(() -> new BaselineData(10, -1, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("successes must be non-negative");
+        }
+
+        @Test
+        @DisplayName("throws when successes exceeds samples")
+        void throwsWhenSuccessesExceedSamples() {
+            assertThatThrownBy(() -> new BaselineData(10, 20, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("successes cannot exceed samples");
+        }
+    }
+}
+

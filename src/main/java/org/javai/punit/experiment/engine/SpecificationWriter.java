@@ -1,12 +1,15 @@
 package org.javai.punit.experiment.engine;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.HexFormat;
 import java.util.Map;
-
 import org.javai.punit.experiment.model.ExecutionSpecification;
 
 /**
@@ -16,11 +19,11 @@ import org.javai.punit.experiment.model.ExecutionSpecification;
  * and designed to be human-readable and version-control friendly.
  *
  * <h2>Output Format</h2>
- * <p>Specs are written to match the expected loader format:
+ * <p>Specs are written as flat YAML files:
  * <pre>
- * specId: usecase.shopping.search:v1
- * useCaseId: usecase.shopping.search
- * version: 1
+ * specId: ShoppingUseCase
+ * useCaseId: ShoppingUseCase
+ * 
  * approvedAt: 2026-01-08T...
  * approvedBy: developer
  * approvalNotes: "..."
@@ -32,21 +35,29 @@ import org.javai.punit.experiment.model.ExecutionSpecification;
  * 
  * requirements:
  *   minPassRate: 0.975
- *   successCriteria: "isValidJson == true"
+ * 
+ * schemaVersion: punit-spec-1
+ * contentFingerprint: a1b2c3...
  * </pre>
  */
 public final class SpecificationWriter {
 
     private static final DateTimeFormatter ISO_FORMAT = DateTimeFormatter.ISO_INSTANT;
+    
+    /** Current schema version for spec files. */
+    public static final String SCHEMA_VERSION = "punit-spec-1";
+    
+    /** Field name for the content fingerprint (used for tamper detection). */
+    public static final String FINGERPRINT_FIELD = "contentFingerprint";
 
     private SpecificationWriter() {
     }
 
     /**
-     * Writes a specification to a file using the standard directory structure.
+     * Writes a specification to a file using the flat directory structure.
      *
-     * <p>For spec ID "usecase.shopping.search:v1", writes to:
-     * {@code specsRoot/usecase.shopping.search/v1.yaml}
+     * <p>For use case "ShoppingUseCase", writes to:
+     * {@code specsRoot/ShoppingUseCase.yaml}
      *
      * @param spec the specification to write
      * @param specsRoot the root specs directory (e.g., src/test/resources/punit/specs)
@@ -54,25 +65,9 @@ public final class SpecificationWriter {
      */
     public static void writeToRegistry(ExecutionSpecification spec, Path specsRoot) throws IOException {
         String useCaseId = spec.getUseCaseId();
-        int version = 1; // Default version for new specs
+        Path specPath = specsRoot.resolve(useCaseId + ".yaml");
         
-        // Extract version from provenance if available
-        if (spec.getProvenance() != null && spec.getProvenance().getExperimentId() != null) {
-            String expId = spec.getProvenance().getExperimentId();
-            // Try to extract version from experiment ID like "shopping-search-v1"
-            int vIdx = expId.lastIndexOf("-v");
-            if (vIdx > 0 && vIdx < expId.length() - 2) {
-                try {
-                    version = Integer.parseInt(expId.substring(vIdx + 2));
-                } catch (NumberFormatException ignored) {
-                }
-            }
-        }
-        
-        Path specDir = specsRoot.resolve(useCaseId);
-        Path specPath = specDir.resolve("v" + version + ".yaml");
-        
-        write(spec, specPath, version);
+        write(spec, specPath);
     }
 
     /**
@@ -83,19 +78,7 @@ public final class SpecificationWriter {
      * @throws IOException if writing fails
      */
     public static void write(ExecutionSpecification spec, Path path) throws IOException {
-        write(spec, path, 1);
-    }
-
-    /**
-     * Writes a specification to a specific file path with explicit version.
-     *
-     * @param spec the specification to write
-     * @param path the output path
-     * @param version the spec version number
-     * @throws IOException if writing fails
-     */
-    public static void write(ExecutionSpecification spec, Path path, int version) throws IOException {
-        String yaml = toYaml(spec, version);
+        String yaml = toYaml(spec);
         Files.createDirectories(path.getParent());
         Files.writeString(path, yaml);
     }
@@ -104,10 +87,9 @@ public final class SpecificationWriter {
      * Converts a specification to YAML format compatible with SpecificationLoader.
      *
      * @param spec the specification to convert
-     * @param version the version number
      * @return the YAML string
      */
-    public static String toYaml(ExecutionSpecification spec, int version) {
+    public static String toYaml(ExecutionSpecification spec) {
         StringBuilder sb = new StringBuilder();
 
         // Header
@@ -116,11 +98,9 @@ public final class SpecificationWriter {
         sb.append("# Format compatible with SpecificationLoader\n");
         sb.append("\n");
 
-        // Core identity (required by SpecificationLoader)
-        String specId = spec.getUseCaseId() + ":v" + version;
-        sb.append("specId: ").append(specId).append("\n");
+        // Core identity
+        sb.append("specId: ").append(spec.getUseCaseId()).append("\n");
         sb.append("useCaseId: ").append(spec.getUseCaseId()).append("\n");
-        sb.append("version: ").append(version).append("\n");
         sb.append("\n");
 
         // Approval metadata (required by SpecificationLoader)
@@ -166,14 +146,13 @@ public final class SpecificationWriter {
             sb.append("\n");
         }
 
-        // Requirements (required by SpecificationLoader)
+        // Requirements
         sb.append("requirements:\n");
         if (spec.getThresholds() != null) {
             sb.append("  minPassRate: ").append(formatDouble(spec.getThresholds().getMinSuccessRate())).append("\n");
         } else {
             sb.append("  minPassRate: 0.95\n");
         }
-        sb.append("  successCriteria: \"isValidJson == true\"\n");
         sb.append("\n");
 
         // Cost envelope (optional)
@@ -186,10 +165,11 @@ public final class SpecificationWriter {
             sb.append("\n");
         }
 
-        // Execution context (optional)
-        if (spec.getContext() != null && !spec.getContext().isEmpty()) {
+        // Execution context (only if it contains meaningful non-default values)
+        Map<String, Object> meaningfulContext = filterMeaningfulContext(spec.getContext());
+        if (!meaningfulContext.isEmpty()) {
             sb.append("executionContext:\n");
-            for (Map.Entry<String, Object> entry : spec.getContext().entrySet()) {
+            for (Map.Entry<String, Object> entry : meaningfulContext.entrySet()) {
                 sb.append("  ").append(entry.getKey()).append(": ");
                 appendYamlValue(sb, entry.getValue());
                 sb.append("\n");
@@ -210,8 +190,33 @@ public final class SpecificationWriter {
             sb.append("# recommendedMinSamples: ").append(tol.getRecommendedMinSamples()).append("\n");
             sb.append("# recommendedMaxSamples: ").append(tol.getRecommendedMaxSamples()).append("\n");
         }
+        sb.append("\n");
+
+        // Schema version and content fingerprint (for integrity verification)
+        sb.append("schemaVersion: ").append(SCHEMA_VERSION).append("\n");
+        
+        // Compute fingerprint of content up to this point
+        String contentForHashing = sb.toString();
+        String fingerprint = computeFingerprint(contentForHashing);
+        sb.append(FINGERPRINT_FIELD).append(": ").append(fingerprint).append("\n");
 
         return sb.toString();
+    }
+    
+    /**
+     * Computes a SHA-256 fingerprint of the given content.
+     *
+     * @param content the content to hash
+     * @return the hex-encoded SHA-256 hash
+     */
+    public static String computeFingerprint(String content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
+        }
     }
 
     private static String formatInstant(Instant instant) {
@@ -245,6 +250,36 @@ public final class SpecificationWriter {
         } else {
             sb.append("\"").append(escapeYamlString(value.toString())).append("\"");
         }
+    }
+    
+    /**
+     * Filters out default/meaningless context entries.
+     * Returns only entries that provide useful information.
+     */
+    private static Map<String, Object> filterMeaningfulContext(Map<String, Object> context) {
+        if (context == null) {
+            return Map.of();
+        }
+        
+        Map<String, Object> meaningful = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : context.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            
+            // Skip default backend value
+            if ("backend".equals(key) && "generic".equals(value)) {
+                continue;
+            }
+            
+            // Skip null or empty values
+            if (value == null || (value instanceof String && ((String) value).isEmpty())) {
+                continue;
+            }
+            
+            meaningful.put(key, value);
+        }
+        
+        return meaningful;
     }
 }
 

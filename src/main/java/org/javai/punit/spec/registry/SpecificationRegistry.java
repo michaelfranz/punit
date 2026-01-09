@@ -15,7 +15,8 @@ import org.javai.punit.spec.model.ExecutionSpecification;
  * <p>Specifications are loaded from the filesystem and cached.
  *
  * <h2>Spec ID Format</h2>
- * <p>Spec IDs use the format: {@code "useCaseId:vN"} (e.g., "usecase.json.gen:v3")
+ * <p>Spec IDs are simply the use case ID (e.g., "ShoppingUseCase").
+ * Specs are stored as flat files: {@code punit/specs/{useCaseId}.yaml}
  */
 public class SpecificationRegistry {
 
@@ -61,26 +62,33 @@ public class SpecificationRegistry {
 	/**
 	 * Resolves a specification by its ID.
 	 *
-	 * @param specId the specification ID (format: "useCaseId:vN")
+	 * @param specId the specification ID (the use case ID, e.g., "ShoppingUseCase")
 	 * @return the loaded specification
 	 * @throws SpecificationNotFoundException if not found
 	 * @throws org.javai.punit.spec.model.SpecificationValidationException if invalid
 	 */
 	public ExecutionSpecification resolve(String specId) {
 		Objects.requireNonNull(specId, "specId must not be null");
-		return cache.computeIfAbsent(specId, this::loadSpec);
+		// Strip any legacy version suffix (e.g., ":v1") for backwards compatibility
+		String useCaseId = stripVersionSuffix(specId);
+		return cache.computeIfAbsent(useCaseId, this::loadSpec);
 	}
 
-	private ExecutionSpecification loadSpec(String specId) {
-		ParsedSpecId parsed = ParsedSpecId.parse(specId);
-		Path specDir = specsRoot.resolve(parsed.useCaseId());
+	private String stripVersionSuffix(String specId) {
+		int colonIndex = specId.lastIndexOf(':');
+		if (colonIndex > 0 && specId.substring(colonIndex + 1).startsWith("v")) {
+			return specId.substring(0, colonIndex);
+		}
+		return specId;
+	}
 
-		Path specPath = resolveSpecPath(specDir, parsed.version());
+	private ExecutionSpecification loadSpec(String useCaseId) {
+		Path specPath = resolveSpecPath(useCaseId);
 
 		if (specPath == null) {
 			throw new SpecificationNotFoundException(
-					"Specification not found: " + specId +
-							" (tried .yaml and .json in " + specDir + ")");
+					"Specification not found: " + useCaseId +
+							" (tried " + useCaseId + ".yaml/.yml/.json in " + specsRoot + ")");
 		}
 
 		try {
@@ -89,20 +97,21 @@ public class SpecificationRegistry {
 			return spec;
 		} catch (IOException e) {
 			throw new SpecificationLoadException(
-					"Failed to load specification: " + specId, e);
+					"Failed to load specification: " + useCaseId, e);
 		}
 	}
 
-	private Path resolveSpecPath(Path specDir, int version) {
+	private Path resolveSpecPath(String useCaseId) {
+		// Flat structure: specs/{useCaseId}.yaml
 		// YAML is preferred (default format)
-		Path yamlPath = specDir.resolve("v" + version + ".yaml");
+		Path yamlPath = specsRoot.resolve(useCaseId + ".yaml");
 		if (Files.exists(yamlPath)) return yamlPath;
 
-		Path ymlPath = specDir.resolve("v" + version + ".yml");
+		Path ymlPath = specsRoot.resolve(useCaseId + ".yml");
 		if (Files.exists(ymlPath)) return ymlPath;
 
 		// JSON as fallback
-		Path jsonPath = specDir.resolve("v" + version + ".json");
+		Path jsonPath = specsRoot.resolve(useCaseId + ".json");
 		if (Files.exists(jsonPath)) return jsonPath;
 
 		return null;
@@ -117,15 +126,10 @@ public class SpecificationRegistry {
 	public boolean exists(String specId) {
 		if (specId == null) return false;
 
-		if (cache.containsKey(specId)) return true;
+		String useCaseId = stripVersionSuffix(specId);
+		if (cache.containsKey(useCaseId)) return true;
 
-		try {
-			ParsedSpecId parsed = ParsedSpecId.parse(specId);
-			Path specDir = specsRoot.resolve(parsed.useCaseId());
-			return resolveSpecPath(specDir, parsed.version()) != null;
-		} catch (IllegalArgumentException e) {
-			return false;
-		}
+		return resolveSpecPath(useCaseId) != null;
 	}
 
 	/**
@@ -135,22 +139,5 @@ public class SpecificationRegistry {
 		cache.clear();
 	}
 
-	/**
-	 * Parsed specification ID.
-	 */
-	private record ParsedSpecId(String useCaseId, int version) {
-
-		static ParsedSpecId parse(String specId) {
-			int colonIndex = specId.lastIndexOf(':');
-			if (colonIndex < 0 || !specId.substring(colonIndex + 1).startsWith("v")) {
-				throw new IllegalArgumentException(
-						"Invalid spec ID format: " + specId +
-								". Expected: useCaseId:vN (e.g., usecase.json.gen:v3)");
-			}
-			String useCaseId = specId.substring(0, colonIndex);
-			int version = Integer.parseInt(specId.substring(colonIndex + 2));
-			return new ParsedSpecId(useCaseId, version);
-		}
-	}
 }
 

@@ -1,13 +1,12 @@
 package org.javai.punit.api;
 
-import org.javai.punit.engine.ProbabilisticTestExtension;
-import org.junit.jupiter.api.TestTemplate;
-import org.junit.jupiter.api.extension.ExtendWith;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.javai.punit.engine.ProbabilisticTestExtension;
+import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * Marks a method as a probabilistic test that will be executed multiple times
@@ -290,7 +289,7 @@ public @interface ProbabilisticTest {
      * <p>When specified, the framework:
      * <ol>
      *   <li>Resolves the use case ID from the class (via {@code @UseCase} or class name)</li>
-     *   <li>Looks up the spec automatically: {@code specs/{useCaseId}/v1.yaml}</li>
+     *   <li>Looks up the spec automatically: {@code punit/specs/{useCaseId}.yaml}</li>
      *   <li>Injects the use case instance via {@link UseCaseProvider}</li>
      *   <li>Uses the spec's {@code minPassRate} as the threshold</li>
      * </ol>

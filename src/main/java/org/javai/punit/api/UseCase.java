@@ -48,7 +48,7 @@ import java.lang.annotation.Target;
  * <p>The resolved ID is used for:
  * <ul>
  *   <li>Baseline file naming: {@code baselines/{id}.yaml}</li>
- *   <li>Spec file location: {@code specs/{id}/v1.yaml}</li>
+ *   <li>Spec file location: {@code punit/specs/{id}.yaml}</li>
  *   <li>Logging and diagnostics</li>
  * </ul>
  *

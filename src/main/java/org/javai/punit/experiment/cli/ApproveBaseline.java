@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.javai.punit.experiment.engine.BaselineLoader;
@@ -131,6 +134,9 @@ public final class ApproveBaseline {
         }
     }
 
+    private static final DateTimeFormatter ARCHIVE_TIMESTAMP_FORMAT = 
+            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+
     private static void processBaseline(Path baselineFile, Path specsDir, String approver,
                                          String notes, boolean dryRun) throws IOException {
         System.out.println("Processing: " + baselineFile.getFileName());
@@ -146,14 +152,17 @@ public final class ApproveBaseline {
         // Generate specification
         ExecutionSpecification spec = SpecificationGenerator.generate(baseline, approver, notes);
 
-        // Determine output path: specs/{useCaseId}/v1.yaml
-        // This matches what SpecificationRegistry.resolveSpecPath expects
+        // Determine output path: specs/{useCaseId}.yaml (flat structure)
         String useCaseId = baseline.getUseCaseId().replace('.', '-');
-        Path useCaseDir = specsDir.resolve(useCaseId);
-        Path specPath = useCaseDir.resolve("v1.yaml");
+        Path specPath = specsDir.resolve(useCaseId + ".yaml");
         
-        // Create use case directory if needed
-        Files.createDirectories(useCaseDir);
+        // Create specs directory if needed
+        Files.createDirectories(specsDir);
+
+        // Archive existing spec if present
+        if (Files.exists(specPath)) {
+            archiveExistingSpec(specsDir, useCaseId, specPath, dryRun);
+        }
 
         System.out.println("  Min success rate (threshold): " +
                 String.format("%.2f%%", spec.getThresholds().getMinSuccessRate() * 100));
@@ -164,6 +173,21 @@ public final class ApproveBaseline {
         } else {
             SpecificationWriter.write(spec, specPath);
             System.out.println("  ✓ Spec written successfully");
+        }
+    }
+
+    private static void archiveExistingSpec(Path specsDir, String useCaseId, Path specPath, 
+            boolean dryRun) throws IOException {
+        Path archiveDir = specsDir.resolve("archive");
+        String timestamp = LocalDateTime.now().format(ARCHIVE_TIMESTAMP_FORMAT);
+        Path archivePath = archiveDir.resolve(useCaseId + "-" + timestamp + ".yaml");
+
+        if (dryRun) {
+            System.out.println("  [DRY RUN] Would archive existing spec to: " + archivePath);
+        } else {
+            Files.createDirectories(archiveDir);
+            Files.copy(specPath, archivePath, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("  Archived existing spec to: " + archivePath);
         }
     }
 

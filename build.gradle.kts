@@ -1,6 +1,7 @@
 plugins {
     id("java-library")
     id("maven-publish")
+    id("jacoco")
     idea
 }
 
@@ -249,7 +250,7 @@ tasks.register("publishLocal") {
 //
 // Output:
 //   Specs are written to: src/test/resources/punit/specs/
-//   These can be used by @ProbabilisticTest with spec="<useCaseId>"
+//   These can be used by @ProbabilisticTest with useCase=MyUseCase.class
 //
 tasks.register<JavaExec>("punitApprove") {
     description = "Approve baselines from punit/pending-approval/ and generate specs"
@@ -308,4 +309,32 @@ tasks.register<Copy>("punitPromote") {
         println("  2. Commit them to version control")
         println("  3. Run: ./gradlew punitApprove")
     }
+}
+
+// ========== Code Coverage (JaCoCo) ==========
+
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco"))
+    }
+    
+    // Exclude example classes from coverage analysis
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) {
+                exclude(
+                    "**/examples/**",
+                    "**/experiment/**"
+                )
+            }
+        })
+    )
 }

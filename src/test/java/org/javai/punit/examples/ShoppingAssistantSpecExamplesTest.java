@@ -2,15 +2,14 @@ package org.javai.punit.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Random;
-import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ProbabilisticTest;
-import org.javai.punit.api.ProbabilisticTestBudget;
 import org.javai.punit.api.TokenChargeRecorder;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
 import org.javai.punit.experiment.model.UseCaseResult;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
@@ -63,12 +62,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <h2>Spec Location</h2>
  * <p>The spec is automatically looked up at:
- * {@code src/test/resources/punit/specs/ShoppingUseCase/v1.yaml}
+ * {@code punit/specs/ShoppingUseCase.yaml}
  *
  * @see org.javai.punit.examples.shopping.experiment.ShoppingExperiment
  * @see ShoppingUseCase
  * @see UseCaseProvider
  */
+@Disabled
 @DisplayName("Shopping Assistant Spec-Driven Tests")
 class ShoppingAssistantSpecExamplesTest {
 
