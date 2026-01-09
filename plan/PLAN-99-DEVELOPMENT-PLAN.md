@@ -212,22 +212,22 @@ These phases extend PUnit with experiment support, baselines, and specifications
 
 ---
 
-### Phase E2c: Adaptive Experiments
+### Phase E2c: EXPLORE Mode (formerly Adaptive Experiments)
 
-**Status**: ✅ Complete
+**Status**: 🔄 Superseded by PLAN-EXECUTION.md
 
-**Goals**: Enable dynamic level generation for adaptive factors
+**Original Goals**: Enable dynamic level generation for adaptive factors
 
-**Deliverables**:
-- `AdaptiveFactor<T>` interface
-- `AdaptiveLevels` builder with `Supplier` support
-- `RefinementStrategy<T>` SPI interface
-- `IterationFeedback` and `FailureObservation` models
-- Adaptive baseline generation with iteration history
+**Superseded By**: The adaptive factors concept has been replaced by a simpler, JUnit-style parameterized approach:
+- **EXPLORE mode**: Experiment mode for comparing multiple configurations
+- **FactorSource**: JUnit-style `@MethodSource` for defining factor combinations
+- **Two-phase workflow**: Quick pass (1 sample/config) → detailed comparison (N samples/config)
+
+See `plan/PLAN-EXECUTION.md` for the current design.
 
 **Dependencies**: Phase E2b
 
-**Estimated Effort**: 5-6 days
+**Estimated Effort**: 3-4 days (simpler than original adaptive approach)
 
 ---
 
@@ -294,7 +294,7 @@ These phases extend PUnit with experiment support, baselines, and specifications
 - `org.javai.punit.llmx` package
 - `LlmExperimentBackend`, `LlmUseCaseContext`
 - Common model/temperature presets
-- `LlmPromptRefinementStrategy` for adaptive experiments
+- EXPLORE mode factor sources for LLM configurations (model, temperature, prompt variants)
 
 **Dependencies**: Phases E5, E2c
 

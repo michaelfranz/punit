@@ -2,10 +2,15 @@ package org.javai.punit.examples.shopping.experiment;
 
 import java.util.Random;
 
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
 import org.javai.punit.experiment.api.Experiment;
-import org.javai.punit.experiment.api.ExperimentContext;
+import org.javai.punit.experiment.api.ResultCaptor;
+import org.javai.punit.experiment.api.UseCaseContext;
+import org.javai.punit.experiment.model.DefaultUseCaseContext;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Experiments for the LLM-powered shopping assistant.
@@ -20,56 +25,80 @@ import org.javai.punit.experiment.api.ExperimentContext;
  *   <li>Inform appropriate pass rate thresholds for probabilistic tests</li>
  * </ul>
  *
+ * <h2>Architecture</h2>
+ * <p>This class demonstrates the recommended pattern for PUnit experiments:
+ * <ul>
+ *   <li>Use {@link UseCaseProvider} to configure use case construction</li>
+ *   <li>Reference use case by class: {@code @Experiment(useCase = ShoppingUseCase.class)}</li>
+ *   <li>Receive use case via method parameter injection</li>
+ * </ul>
+ *
  * <h2>Usage</h2>
- * <p>Experiments use JUnit's {@code @TestTemplate} mechanism under the hood.
- * Run them using the {@code experiment} Gradle task:
  * <pre>{@code
  * ./gradlew experiment --tests "ShoppingExperiment"
- * }</pre>
- *
- * <p>Or run a specific experiment method:
- * <pre>{@code
  * ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
  * }</pre>
  *
  * <h2>Output</h2>
- * <p>Each experiment generates a baseline file in:
- * <pre>
- * build/punit/baselines/
- * </pre>
+ * <p>Baselines are written to {@code build/punit/baselines/}.
+ * These can be approved via {@code ./gradlew punitApprove} to create
+ * execution specifications in {@code src/test/resources/punit/specs/}.
  *
- * <p>These baselines can be reviewed and approved to create execution
- * specifications (specs) in {@code src/test/resources/punit/specs/}.
- *
- * <h2>Implementation Note</h2>
- * <p>The {@code experimentTests} task is a standard JUnit {@code Test} task
- * configured for the {@code src/experiment/java} source set. This provides
- * full IDE integration, debugging support, and familiar Gradle test filtering.
- *
- * @see org.javai.punit.examples.shopping.usecase.ShoppingUseCase
+ * @see ShoppingUseCase
+ * @see UseCaseProvider
  */
-public class ShoppingExperiment extends ShoppingUseCase {
+public class ShoppingExperiment {
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // USE CASE PROVIDER CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Creates a ShoppingExperiment with a mock shopping assistant.
+     * The use case provider handles construction and injection of use cases.
      *
-     * <p>Uses the {@code experimentRealistic()} configuration which simulates
-     * realistic LLM behavior with ~95% success rate and varied failure modes:
+     * <p>Registered as a JUnit extension so it can inject parameters into
+     * experiment methods.
+     */
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
+    /**
+     * Shared context for all experiments.
+     */
+    private UseCaseContext context;
+
+    /**
+     * Configures the use case provider before each experiment sample.
+     *
+     * <p>This is where you configure which implementation to use:
      * <ul>
-     *   <li>2.0% - Malformed JSON (syntax errors)</li>
-     *   <li>1.5% - Hallucinated field names</li>
-     *   <li>1.0% - Invalid field values (wrong types)</li>
-     *   <li>0.5% - Missing required fields</li>
+     *   <li>Mock with specific configuration for experiments</li>
+     *   <li>Real implementation for integration tests</li>
+     *   <li>Spring-injected beans in {@code @SpringBootTest}</li>
      * </ul>
      */
-    public ShoppingExperiment() {
-        super(new MockShoppingAssistant(
-                new Random(),
-                MockShoppingAssistant.MockConfiguration.experimentRealistic()
-        ));
+    @BeforeEach
+    void setUp() {
+        // Configure how ShoppingUseCase instances are created
+        provider.register(ShoppingUseCase.class, () ->
+            new ShoppingUseCase(
+                new MockShoppingAssistant(
+                    new Random(),
+                    MockShoppingAssistant.MockConfiguration.experimentRealistic()
+                )
+            )
+        );
+
+        // Shared context for experiments
+        context = DefaultUseCaseContext.builder()
+            .backend("mock")
+            .parameter("configuration", "experimentRealistic")
+            .build();
     }
 
-    // ========== Primary Experiment (1000 samples) ==========
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PRIMARY EXPERIMENT (1000 samples)
+    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Experiment: Establish realistic baseline for basic product search.
@@ -78,20 +107,18 @@ public class ShoppingExperiment extends ShoppingUseCase {
      * baseline. It runs 1000 samples with the {@code experimentRealistic()}
      * configuration (~95% success rate, varied failure modes).
      *
-     * <h2>Purpose</h2>
-     * <p>Generate an empirical baseline that can be approved and used for
-     * spec-driven probabilistic tests. The large sample size ensures:
+     * <h2>Mock Configuration</h2>
      * <ul>
-     *   <li>Statistically reliable success rate estimate</li>
-     *   <li>Narrow confidence interval (~±1.3%)</li>
-     *   <li>Representative failure mode distribution</li>
+     *   <li>2.0% - Malformed JSON (syntax errors)</li>
+     *   <li>1.5% - Hallucinated field names</li>
+     *   <li>1.0% - Invalid field values (wrong types)</li>
+     *   <li>0.5% - Missing required fields</li>
      * </ul>
      *
      * <h2>Expected Outcome</h2>
      * <ul>
      *   <li>Success rate: ~95% (±2%)</li>
-     *   <li>Failure distribution: ~40% malformed JSON, ~30% hallucinated fields,
-     *       ~20% invalid values, ~10% missing fields</li>
+     *   <li>Confidence interval width: ~2.6%</li>
      * </ul>
      *
      * <h2>Usage</h2>
@@ -99,267 +126,42 @@ public class ShoppingExperiment extends ShoppingUseCase {
      * ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
      * }</pre>
      *
+     * @param useCase the shopping use case (injected by {@link UseCaseProvider})
+     * @param captor the result captor (injected by ExperimentExtension)
      * @see MockShoppingAssistant.MockConfiguration#experimentRealistic()
      */
     @Experiment(
-            useCase = "usecase.shopping.search",
-            samples = 1000,
-            tokenBudget = 500000,
-            timeBudgetMs = 600000,
-            experimentId = "shopping-search-realistic-v1"
+        useCase = ShoppingUseCase.class,
+        samples = 1000,
+        tokenBudget = 500000,
+        timeBudgetMs = 600000,
+        experimentId = "shopping-search-realistic-v1"
     )
-    @ExperimentContext(
-            backend = "mock",
-            parameters = {
-                    "query = wireless headphones"
-            }
-    )
-    void measureRealisticSearchBaseline() {
-        // Method body is optional—execution is driven by the use case
+    void measureRealisticSearchBaseline(ShoppingUseCase useCase, ResultCaptor captor) {
+        // Execute the use case and record the result
+        captor.record(useCase.searchProducts("wireless headphones", context));
     }
 
-    // ========== Legacy Experiments (smaller samples) ==========
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LEGACY EXPERIMENTS (deprecated, kept for reference)
+    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Experiment: Measure basic product search reliability (legacy, 100 samples).
      *
-     * <p>Gathers empirical data about:
-     * <ul>
-     *   <li>JSON validity rate</li>
-     *   <li>Required field presence rate</li>
-     *   <li>Product attribute completeness</li>
-     *   <li>Token consumption per query</li>
-     * </ul>
-     *
-     * <p>Expected outcome: ~95% success rate for valid JSON with all required fields.
-     *
-     * @deprecated Use {@link #measureRealisticSearchBaseline()} for statistically
-     *             reliable baselines (1000 samples).
+     * @param useCase the shopping use case
+     * @param captor the result captor
+     * @deprecated Use {@link #measureRealisticSearchBaseline(ShoppingUseCase, ResultCaptor)} for
+     *             statistically reliable baselines (1000 samples).
      */
-    @Deprecated
     @Experiment(
-        useCase = "usecase.shopping.search",
-        samples = 100,
+        useCase = ShoppingUseCase.class,
+        samples = 1000,
         tokenBudget = 50000,
         timeBudgetMs = 120000,
         experimentId = "shopping-search-baseline"
     )
-    @ExperimentContext(
-        backend = "mock",
-        parameters = {
-            "query = wireless headphones"
-        }
-    )
-    void measureBasicSearchReliability() {
-        // Method body is optional—execution is driven by the use case
-    }
-
-    /**
-     * Experiment: Measure search reliability with high-reliability configuration.
-     *
-     * <p>Uses a more reliable mock configuration to establish an upper bound
-     * on expected success rates.
-     *
-     * @deprecated Legacy experiment. Use {@link #measureRealisticSearchBaseline()}.
-     */
-    @Deprecated
-    @Experiment(
-        useCase = "usecase.shopping.search",
-        samples = 100,
-        tokenBudget = 50000,
-        timeBudgetMs = 120000,
-        experimentId = "shopping-search-high-reliability"
-    )
-    @ExperimentContext(
-        backend = "mock",
-        parameters = {
-            "query = laptop bag"
-        }
-    )
-    void measureSearchWithHighReliability() {
-        // Method body is optional—execution is driven by the use case
-    }
-
-    // ========== Price Constraint Experiments ==========
-
-    /**
-     * Experiment: Measure price constraint compliance.
-     *
-     * <p>Gathers empirical data about how well the assistant respects
-     * maximum price filters. Key metrics:
-     * <ul>
-     *   <li>Rate of responses with all products within price range</li>
-     *   <li>Average number of price violations per response</li>
-     *   <li>Correlation between price limit and violation rate</li>
-     * </ul>
-     *
-     * @deprecated Legacy experiment with smaller sample size.
-     */
-    @Deprecated
-    @Experiment(
-        useCase = "usecase.shopping.search.price-constrained",
-        samples = 100,
-        tokenBudget = 50000,
-        timeBudgetMs = 120000,
-        experimentId = "shopping-price-constraint-baseline"
-    )
-    @ExperimentContext(
-        backend = "mock",
-        parameters = {
-            "query = gift ideas",
-            "maxPrice = 50.00"
-        }
-    )
-    void measurePriceConstraintCompliance() {
-        // Method body is optional—execution is driven by the use case
-    }
-
-    /**
-     * Experiment: Measure price constraint with tight budget.
-     *
-     * <p>Tests behavior with a very low price limit to understand
-     * edge case handling.
-     *
-     * @deprecated Legacy experiment with smaller sample size.
-     */
-    @Deprecated
-    @Experiment(
-        useCase = "usecase.shopping.search.price-constrained",
-        samples = 50,
-        tokenBudget = 25000,
-        timeBudgetMs = 60000,
-        experimentId = "shopping-price-constraint-tight"
-    )
-    @ExperimentContext(
-        backend = "mock",
-        parameters = {
-            "query = budget accessories",
-            "maxPrice = 20.00"
-        }
-    )
-    void measureTightPriceConstraint() {
-        // Method body is optional—execution is driven by the use case
-    }
-
-    // ========== Result Limit Experiments ==========
-
-    /**
-     * Experiment: Measure result count limit compliance.
-     *
-     * <p>Gathers empirical data about how well the assistant respects
-     * the requested maximum number of results. Key metrics:
-     * <ul>
-     *   <li>Rate of responses respecting the limit</li>
-     *   <li>Consistency between totalResults field and actual count</li>
-     * </ul>
-     *
-     * @deprecated Legacy experiment with smaller sample size.
-     */
-    @Deprecated
-    @Experiment(
-        useCase = "usecase.shopping.search.limited-results",
-        samples = 100,
-        tokenBudget = 50000,
-        timeBudgetMs = 120000,
-        experimentId = "shopping-result-limit-baseline"
-    )
-    @ExperimentContext(
-        backend = "mock",
-        parameters = {
-            "query = coffee makers",
-            "maxResults = 5"
-        }
-    )
-    void measureResultLimitCompliance() {
-        // Method body is optional—execution is driven by the use case
-    }
-
-    // ========== Relevance Experiments ==========
-
-    /**
-     * Experiment: Measure product relevance quality.
-     *
-     * <p>Gathers empirical data about the relevance of returned products.
-     * Key metrics:
-     * <ul>
-     *   <li>Rate of responses where all products meet minimum relevance</li>
-     *   <li>Average relevance score across all responses</li>
-     *   <li>Distribution of low-relevance product counts</li>
-     * </ul>
-     *
-     * @deprecated Legacy experiment with smaller sample size.
-     */
-    @Deprecated
-    @Experiment(
-        useCase = "usecase.shopping.search.relevance",
-        samples = 100,
-        tokenBudget = 50000,
-        timeBudgetMs = 120000,
-        experimentId = "shopping-relevance-baseline"
-    )
-    @ExperimentContext(
-        backend = "mock",
-        parameters = {
-            "query = bluetooth speaker waterproof",
-            "minRelevanceScore = 0.7"
-        }
-    )
-    void measureProductRelevance() {
-        // Method body is optional—execution is driven by the use case
-    }
-
-    /**
-     * Experiment: Measure relevance with stricter threshold.
-     *
-     * <p>Uses a higher minimum relevance score to understand
-     * the upper bound of relevance quality.
-     *
-     * @deprecated Legacy experiment with smaller sample size.
-     */
-    @Deprecated
-    @Experiment(
-        useCase = "usecase.shopping.search.relevance",
-        samples = 50,
-        tokenBudget = 25000,
-        timeBudgetMs = 60000,
-        experimentId = "shopping-relevance-strict"
-    )
-    @ExperimentContext(
-        backend = "mock",
-        parameters = {
-            "query = premium headphones noise cancelling",
-            "minRelevanceScore = 0.85"
-        }
-    )
-    void measureStrictRelevanceThreshold() {
-        // Method body is optional—execution is driven by the use case
-    }
-
-    // ========== Comparative Experiments ==========
-
-    /**
-     * Experiment: Compare reliability across different mock configurations.
-     *
-     * <p>Uses low reliability configuration to establish a lower bound
-     * and understand degraded behavior patterns.
-     *
-     * @deprecated Legacy experiment with smaller sample size.
-     */
-    @Deprecated
-    @Experiment(
-        useCase = "usecase.shopping.search",
-        samples = 100,
-        tokenBudget = 50000,
-        timeBudgetMs = 120000,
-        experimentId = "shopping-search-low-reliability"
-    )
-    @ExperimentContext(
-        backend = "mock",
-        parameters = {
-            "query = electronics sale"
-        }
-    )
-    void measureSearchWithLowReliability() {
-        // Method body is optional—execution is driven by the use case
+    void measureBasicSearchReliability(ShoppingUseCase useCase, ResultCaptor captor) {
+        captor.record(useCase.searchProducts("wireless headphones", context));
     }
 }

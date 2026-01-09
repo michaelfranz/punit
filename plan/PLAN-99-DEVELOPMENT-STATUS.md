@@ -41,7 +41,7 @@ This document tracks the current implementation status of PUnit's development ph
 | E1    | Use Case Abstractions            | ✅      | `@UseCase`, `UseCaseResult`, `UseCaseContext`             |
 | E2    | Single-Config Experiments        | ✅      | `@Experiment`, `ExperimentResultAggregator`               |
 | E2b   | Multi-Config Experiments         | ✅      | `@ExperimentDesign`, `@Config`, `@ExperimentGoal`         |
-| E2c   | Adaptive Experiments             | ✅      | `AdaptiveFactor`, `RefinementStrategy`                    |
+| E2c   | EXPLORE Mode (was Adaptive)      | 🔄      | Superseded by PLAN-EXECUTION.md (JUnit-style factors)     |
 | E3    | Specification Registry           | ✅      | `ExecutionSpecification`, `SpecificationRegistry`         |
 | E4    | Spec-Driven Tests                | ✅      | `@ProbabilisticTest(spec=...)`, `SuccessCriteria`         |
 | E5    | Backend Infrastructure           | ✅      | `ExperimentBackend` SPI, `ExperimentBackendRegistry`      |

@@ -12,14 +12,17 @@ import org.javai.punit.experiment.spi.ExperimentBackend;
  *
  * <h2>Example Usage</h2>
  * <pre>{@code
- * @Experiment(useCase = "usecase.json.generation", samples = 100)
- * @ExperimentContext(backend = "llm", parameters = {
- *     "model = gpt-4",
- *     "temperature = 0.7",
- *     "maxTokens = 1000"
- * })
- * void measureJsonGeneration() {
- *     // ...
+ * // Configure LLM parameters in @BeforeEach
+ * context = DefaultUseCaseContext.builder()
+ *     .backend("llm")
+ *     .parameter("model", "gpt-4")
+ *     .parameter("temperature", 0.7)
+ *     .parameter("maxTokens", 1000)
+ *     .build();
+ *
+ * @Experiment(useCase = JsonGenerationUseCase.class, samples = 100)
+ * void measureJsonGeneration(JsonGenerationUseCase useCase, ResultCaptor captor) {
+ *     captor.record(useCase.generate(prompt, context));
  * }
  * }</pre>
  *

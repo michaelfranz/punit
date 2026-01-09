@@ -4,6 +4,8 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.javai.punit.api.UseCase;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.experiment.engine.ExperimentExtension;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,18 +18,34 @@ import org.junit.jupiter.api.extension.ExtendWith;
  *
  * <h2>Example Usage</h2>
  * <pre>{@code
- * @Experiment(
- *     useCase = "usecase.json.generation",
- *     samples = 200,
- *     timeBudgetMs = 120_000,
- *     tokenBudget = 100_000
- * )
- * @ExperimentContext(backend = "llm", parameters = {
- *     "model = gpt-4",
- *     "temperature = 0.7"
- * })
- * void measureJsonGenerationPerformance() {
- *     // Method body is optional—execution is driven by the use case
+ * class ShoppingExperiment {
+ *
+ *     @RegisterExtension
+ *     UseCaseProvider provider = new UseCaseProvider();
+ *
+ *     private UseCaseContext context;
+ *
+ *     @BeforeEach
+ *     void setUp() {
+ *         provider.register(ShoppingUseCase.class, () ->
+ *             new ShoppingUseCase(new MockShoppingAssistant(
+ *                 MockConfiguration.experimentRealistic()
+ *             ))
+ *         );
+ *         context = DefaultUseCaseContext.builder()
+ *             .backend("mock")
+ *             .build();
+ *     }
+ *
+ *     @Experiment(
+ *         useCase = ShoppingUseCase.class,
+ *         samples = 1000,
+ *         timeBudgetMs = 600_000,
+ *         tokenBudget = 500_000
+ *     )
+ *     void measureProductSearchBaseline(ShoppingUseCase useCase, ResultCaptor captor) {
+ *         captor.record(useCase.searchProducts("wireless headphones", context));
+ *     }
  * }
  * }</pre>
  *
@@ -36,10 +54,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
  *   <li><strong>No pass/fail</strong>: Experiments never fail (except for infrastructure errors)</li>
  *   <li><strong>Produces empirical baseline</strong>: After execution, generates a baseline file</li>
  *   <li><strong>Never gates CI</strong>: Results are informational only</li>
+ *   <li><strong>Use case injection</strong>: Configure via {@link UseCaseProvider} in {@code @BeforeEach}</li>
+ *   <li><strong>Result capture</strong>: Use {@link ResultCaptor} to record results for aggregation</li>
  * </ul>
  *
- * @see ExperimentContext
  * @see UseCase
+ * @see UseCaseProvider
+ * @see ResultCaptor
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
@@ -48,13 +69,32 @@ import org.junit.jupiter.api.extension.ExtendWith;
 public @interface Experiment {
     
     /**
-     * The use case ID to execute.
+     * The use case class to execute.
      *
-     * <p>Must reference a method annotated with {@link UseCase}.
+     * <p>The use case ID is resolved from the class:
+     * <ol>
+     *   <li>If {@code @UseCase} annotation is present with a value, use that</li>
+     *   <li>Otherwise, use the simple class name</li>
+     * </ol>
+     *
+     * <p>The use case instance is obtained from a {@link UseCaseProvider} registered
+     * as a JUnit extension. Configure the provider in {@code @BeforeEach}.
+     *
+     * @return the use case class
+     */
+    Class<?> useCase() default Void.class;
+    
+    /**
+     * The use case ID to execute (legacy, prefer {@link #useCase()} class reference).
+     *
+     * <p>If both {@code useCaseId} and {@code useCase} are specified, the class reference
+     * takes precedence.
      *
      * @return the use case ID
+     * @deprecated Use {@link #useCase()} with class reference for type safety
      */
-    String useCase();
+    @Deprecated
+    String useCaseId() default "";
     
     /**
      * Number of sample invocations to execute (for single-config experiments).

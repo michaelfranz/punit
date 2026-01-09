@@ -281,41 +281,68 @@ public @interface ProbabilisticTest {
     int maxExampleFailures() default 5;
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // SPEC-DRIVEN TEST SUPPORT
+    // USE CASE AND SPEC-DRIVEN TEST SUPPORT
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Reference to an execution specification.
+     * The use case class to test.
+     *
+     * <p>When specified, the framework:
+     * <ol>
+     *   <li>Resolves the use case ID from the class (via {@code @UseCase} or class name)</li>
+     *   <li>Looks up the spec automatically: {@code specs/{useCaseId}/v1.yaml}</li>
+     *   <li>Injects the use case instance via {@link UseCaseProvider}</li>
+     *   <li>Uses the spec's {@code minPassRate} as the threshold</li>
+     * </ol>
+     *
+     * <h3>Example</h3>
+     * <pre>{@code
+     * @RegisterExtension
+     * UseCaseProvider provider = new UseCaseProvider();
+     *
+     * @BeforeEach
+     * void setUp() {
+     *     provider.register(ShoppingUseCase.class, () ->
+     *         new ShoppingUseCase(new MockShoppingAssistant())
+     *     );
+     * }
+     *
+     * @ProbabilisticTest(useCase = ShoppingUseCase.class, samples = 30)
+     * void testJsonValidity(ShoppingUseCase useCase) {
+     *     UseCaseResult result = useCase.searchProducts("query", context);
+     *     assertThat(result.getBoolean("isValidJson")).isTrue();
+     * }
+     * }</pre>
+     *
+     * @return the use case class, or {@code Void.class} for legacy inline mode
+     * @see UseCaseProvider
+     * @see UseCase
+     */
+    Class<?> useCase() default Void.class;
+
+    /**
+     * Reference to an execution specification (legacy, prefer {@link #useCase()}).
      *
      * <p>Format: {@code "useCaseId:version"} (e.g., "usecase.json.generation:v3")
      *
      * <p>When provided, the spec supplies the baseline data (samples, successes, observed rate)
-     * needed to derive thresholds statistically. The operational approach is determined by
-     * which other annotation parameters are set:
+     * needed to derive thresholds statistically.
      *
-     * <ul>
-     *   <li>{@code thresholdConfidence} set → Approach 1 (Sample-Size-First)</li>
-     *   <li>{@code confidence + minDetectableEffect + power} set → Approach 2 (Confidence-First)</li>
-     *   <li>{@code minPassRate} set → Approach 3 (Threshold-First)</li>
-     * </ul>
+     * <p>When empty and {@link #useCase()} is specified, the spec is looked up automatically
+     * based on the use case ID.
      *
-     * <p>When empty (default):
-     * <ul>
-     *   <li>Test runs in legacy mode using inline {@code samples} and {@code minPassRate}</li>
-     *   <li>Success is determined by absence of AssertionError</li>
-     * </ul>
-     *
-     * @return the specification ID, or empty string for inline mode
+     * @return the specification ID, or empty string for automatic lookup
+     * @deprecated Prefer {@link #useCase()} with class reference; spec is derived automatically
      */
+    @Deprecated
     String spec() default "";
 
     /**
-     * The use case ID to execute (alternative to spec).
+     * The use case ID (legacy, prefer {@link #useCase()} class reference).
      *
-     * <p>When provided without spec, the use case is executed with inline parameters.
-     * Success criteria must be defined via method assertions.
-     *
-     * @return the use case ID, or empty string if not using use case mode
+     * @return the use case ID
+     * @deprecated Use {@link #useCase()} with class reference for type safety
      */
-    String useCase() default "";
+    @Deprecated
+    String useCaseId() default "";
 }

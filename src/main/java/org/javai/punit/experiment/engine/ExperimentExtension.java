@@ -2,18 +2,15 @@ package org.javai.punit.experiment.engine;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.experiment.api.Experiment;
-import org.javai.punit.experiment.api.ExperimentContext;
+import org.javai.punit.experiment.api.ResultCaptor;
 import org.javai.punit.experiment.api.UseCaseContext;
 import org.javai.punit.experiment.model.DefaultUseCaseContext;
 import org.javai.punit.experiment.model.EmpiricalBaseline;
@@ -22,6 +19,9 @@ import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionConfigurationException;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.ParameterContext;
+import org.junit.jupiter.api.extension.ParameterResolutionException;
+import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
@@ -31,13 +31,31 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
  *
  * <p>This extension:
  * <ul>
- *   <li>Discovers use cases from the test class</li>
- *   <li>Executes use cases repeatedly as samples</li>
- *   <li>Aggregates results</li>
+ *   <li>Injects {@link ResultCaptor} into experiment methods</li>
+ *   <li>Executes experiment methods repeatedly as samples</li>
+ *   <li>Aggregates results from the captor</li>
  *   <li>Generates empirical baselines</li>
  * </ul>
+ *
+ * <h2>Architecture</h2>
+ * <p>The new architecture uses a method-execution model:
+ * <ol>
+ *   <li>The experiment method receives a {@link ResultCaptor} parameter</li>
+ *   <li>The method executes and calls the use case</li>
+ *   <li>The method records the result via {@code captor.record(result)}</li>
+ *   <li>The extension aggregates results after each method execution</li>
+ * </ol>
+ *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * @Experiment(useCase = ShoppingUseCase.class, samples = 1000)
+ * void measureSearchBaseline(ShoppingUseCase useCase, ResultCaptor captor) {
+ *     captor.record(useCase.searchProducts("headphones", context));
+ * }
+ * }</pre>
  */
-public class ExperimentExtension implements TestTemplateInvocationContextProvider, InvocationInterceptor {
+public class ExperimentExtension implements TestTemplateInvocationContextProvider, 
+        InvocationInterceptor {
     
     private static final ExtensionContext.Namespace NAMESPACE = 
         ExtensionContext.Namespace.create(ExperimentExtension.class);
@@ -54,14 +72,15 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         Method testMethod = context.getRequiredTestMethod();
         Experiment annotation = testMethod.getAnnotation(Experiment.class);
         
-        String useCaseId = annotation.useCase();
+        // Resolve use case ID from class reference or legacy string
+        String useCaseId = resolveUseCaseId(annotation);
         int samples = annotation.samples();
         
-        // Store annotation and metadata for later - use case discovery happens in interceptor
-        // because test instance isn't available yet in provideTestTemplateInvocationContexts
+        // Store annotation and metadata for later
         ExtensionContext.Store store = context.getStore(NAMESPACE);
         store.put("annotation", annotation);
         store.put("useCaseId", useCaseId);
+        store.put("useCaseClass", annotation.useCase());
         store.put("testMethod", testMethod);
         
         // Create aggregator
@@ -73,14 +92,18 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         store.put("terminated", terminated);
         store.put("currentSample", currentSample);
         store.put("startTimeMs", System.currentTimeMillis());
-        store.put("useCaseResolved", new AtomicBoolean(false));
+        store.put("contextBuilt", new AtomicBoolean(false));
         
-        // Generate sample stream
+        // Generate sample stream - each invocation gets its own captor
         return Stream.iterate(1, i -> i + 1)
             .limit(samples)
             .takeWhile(i -> !terminated.get())
-            .map(i -> new ExperimentInvocationContext(i, samples, useCaseId));
+            .map(i -> new ExperimentInvocationContext(i, samples, useCaseId, new ResultCaptor()));
     }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // INVOCATION INTERCEPTOR - Executes experiment and captures results
+    // ═══════════════════════════════════════════════════════════════════════════
     
     @Override
     public void interceptTestTemplateMethod(
@@ -92,16 +115,16 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         ExtensionContext parentContext = extensionContext.getParent().orElse(extensionContext);
         ExtensionContext.Store store = parentContext.getStore(NAMESPACE);
         
-        // Resolve use case on first invocation (when test instance is available)
-        AtomicBoolean useCaseResolved = store.get("useCaseResolved", AtomicBoolean.class);
-        if (useCaseResolved != null && !useCaseResolved.get()) {
-            resolveUseCaseOnFirstInvocation(extensionContext, store);
-            useCaseResolved.set(true);
+        // Build context on first invocation
+        AtomicBoolean contextBuilt = store.get("contextBuilt", AtomicBoolean.class);
+        if (contextBuilt != null && !contextBuilt.get()) {
+            Method testMethod = store.get("testMethod", Method.class);
+            UseCaseContext useCaseContext = buildContext(testMethod);
+            store.put("useCaseContext", useCaseContext);
+            contextBuilt.set(true);
         }
         
         ExperimentResultAggregator aggregator = store.get("aggregator", ExperimentResultAggregator.class);
-        UseCaseDefinition useCase = store.get("useCase", UseCaseDefinition.class);
-        UseCaseContext useCaseContext = store.get("useCaseContext", UseCaseContext.class);
         Experiment annotation = store.get("annotation", Experiment.class);
         AtomicBoolean terminated = store.get("terminated", AtomicBoolean.class);
         AtomicInteger currentSample = store.get("currentSample", AtomicInteger.class);
@@ -132,24 +155,38 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
             return;
         }
         
-        // Execute use case
+        // Get captor from the current invocation context's store
+        ExtensionContext.Store invocationStore = extensionContext.getStore(NAMESPACE);
+        ResultCaptor captor = invocationStore.get("captor", ResultCaptor.class);
+        
         try {
-            // Extract input arguments from context parameters
-            Object[] inputArgs = extractInputArguments(useCase, useCaseContext);
-            UseCaseResult result = useCase.invoke(useCaseContext, inputArgs);
+            // Actually execute the experiment method
+            // The method will:
+            // 1. Receive the use case (injected by UseCaseProvider)
+            // 2. Receive the captor (injected by CaptorParameterResolver)
+            // 3. Execute the use case and call captor.record(result)
+            invocation.proceed();
             
-            // Determine success/failure based on result values
-            // Default: look for common success indicators
-            boolean success = determineSuccess(result);
-            
-            if (success) {
-                aggregator.recordSuccess(result);
+            // Read result from the captor and aggregate
+            if (captor != null && captor.hasResult()) {
+                UseCaseResult result = captor.getResult();
+                boolean success = determineSuccess(result);
+                
+                if (success) {
+                    aggregator.recordSuccess(result);
+                } else {
+                    String failureCategory = determineFailureCategory(result);
+                    aggregator.recordFailure(result, failureCategory);
+                }
+            } else if (captor != null && captor.hasException()) {
+                aggregator.recordException(captor.getException());
             } else {
-                String failureCategory = determineFailureCategory(result);
-                aggregator.recordFailure(result, failureCategory);
+                // No result recorded - treat as success with no data
+                // (The method ran but didn't use the captor)
+                aggregator.recordSuccess(UseCaseResult.builder().value("recorded", false).build());
             }
             
-        } catch (Exception e) {
+        } catch (Throwable e) {
             aggregator.recordException(e);
         }
         
@@ -163,205 +200,22 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
             }
             generateBaseline(extensionContext, store);
         }
-        
-        // Skip the actual test method body - experiment execution is use-case driven
-        invocation.skip();
     }
     
-    private UseCaseRegistry getOrCreateRegistry(ExtensionContext context) {
-        ExtensionContext.Store store = context.getRoot().getStore(NAMESPACE);
-        return store.getOrComputeIfAbsent("registry", k -> new UseCaseRegistry(), UseCaseRegistry.class);
-    }
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONTEXT BUILDING
+    // ═══════════════════════════════════════════════════════════════════════════
     
-    /**
-     * Resolves the use case on the first invocation when the test instance is available.
-     *
-     * <p>This is necessary because {@code provideTestTemplateInvocationContexts} is called
-     * before the test instance is created by JUnit.
-     */
-    private void resolveUseCaseOnFirstInvocation(ExtensionContext context, ExtensionContext.Store store) {
-        String useCaseId = store.get("useCaseId", String.class);
-        Method testMethod = store.get("testMethod", Method.class);
-        
-        UseCaseRegistry registry = getOrCreateRegistry(context);
-        
-        // Now the test instance should be available - register use cases from it
-        context.getTestInstance().ifPresent(registry::registerAll);
-        
-        UseCaseDefinition useCase = registry.resolve(useCaseId)
-            .orElseThrow(() -> new ExtensionConfigurationException(
-                "Use case not found: " + useCaseId + ". " +
-                "Ensure a method annotated with @UseCase(\"" + useCaseId + "\") exists in the test class or its superclasses."));
-        
-        // Build context from @ExperimentContext annotation
-        UseCaseContext useCaseContext = buildContext(testMethod);
-        
-        store.put("useCase", useCase);
-        store.put("useCaseContext", useCaseContext);
-    }
-    
+    @SuppressWarnings("unused")
     private UseCaseContext buildContext(Method method) {
-        DefaultUseCaseContext.Builder builder = DefaultUseCaseContext.builder();
-        
-        ExperimentContext contextAnnotation = method.getAnnotation(ExperimentContext.class);
-        if (contextAnnotation != null) {
-            builder.backend(contextAnnotation.backend());
-            
-            // Parse parameters
-            String[] params = contextAnnotation.parameters().length > 0 
-                ? contextAnnotation.parameters() 
-                : contextAnnotation.template();
-            
-            for (String param : params) {
-                int eqIdx = param.indexOf('=');
-                if (eqIdx > 0) {
-                    String key = param.substring(0, eqIdx).trim();
-                    String value = param.substring(eqIdx + 1).trim();
-                    builder.parameter(key, parseValue(value));
-                }
-            }
-        }
-        
-        return builder.build();
+        // Context is now managed by the experiment method body and UseCaseProvider
+        // This method returns an empty context for baseline metadata purposes
+        return DefaultUseCaseContext.builder().build();
     }
     
-    private Object parseValue(String value) {
-        // Try to parse as number or boolean
-        if ("true".equalsIgnoreCase(value)) return true;
-        if ("false".equalsIgnoreCase(value)) return false;
-        
-        try {
-            if (value.contains(".")) {
-                return Double.parseDouble(value);
-            }
-            return Long.parseLong(value);
-        } catch (NumberFormatException e) {
-            return value;
-        }
-    }
-    
-    /**
-     * Extracts input arguments for the use case method from context parameters.
-     *
-     * <p>This method examines the use case method's parameters and attempts to
-     * match them with context parameters by name. Parameters of type
-     * {@link UseCaseContext} are skipped (they are handled separately).
-     *
-     * <p>Parameter matching is done by name when available (with -parameters compiler flag),
-     * and falls back to positional matching when names are not preserved.
-     *
-     * @param useCase the use case definition
-     * @param context the use case context containing parameters
-     * @return an array of input arguments for the use case method
-     */
-    private Object[] extractInputArguments(UseCaseDefinition useCase, UseCaseContext context) {
-        Method method = useCase.method();
-        Parameter[] parameters = method.getParameters();
-        List<Object> inputArgs = new ArrayList<>();
-        Map<String, Object> contextParams = context.getAllParameters();
-        
-        for (Parameter param : parameters) {
-            // Skip UseCaseContext parameters - they're handled separately
-            if (UseCaseContext.class.isAssignableFrom(param.getType())) {
-                continue;
-            }
-            
-            String paramName = param.getName();
-            Class<?> paramType = param.getType();
-            
-            // Try to find a matching parameter in the context by name
-            Object value = contextParams.get(paramName);
-            
-            // If name-based lookup failed and parameter name is synthetic (arg0, arg1, etc.),
-            // try positional matching based on non-context parameter order
-            if (value == null && paramName.startsWith("arg")) {
-                // Fall back: use first string parameter for String type, etc.
-                value = findMatchingParameter(paramType, contextParams);
-            }
-            
-            if (value != null) {
-                // Convert value to the expected type if necessary
-                inputArgs.add(convertValue(value, paramType));
-            } else {
-                // Use null or default values for missing parameters
-                inputArgs.add(getDefaultValue(paramType));
-            }
-        }
-        
-        return inputArgs.toArray();
-    }
-    
-    /**
-     * Finds a parameter value matching the target type when name-based lookup fails.
-     */
-    private Object findMatchingParameter(Class<?> targetType, Map<String, Object> params) {
-        for (Object value : params.values()) {
-            if (value != null && targetType.isInstance(value)) {
-                return value;
-            }
-            // Try converting string values
-            if (value instanceof String && targetType == String.class) {
-                return value;
-            }
-        }
-        return null;
-    }
-    
-    /**
-     * Converts a value to the target type.
-     */
-    private Object convertValue(Object value, Class<?> targetType) {
-        if (value == null) {
-            return getDefaultValue(targetType);
-        }
-        
-        // Already the right type
-        if (targetType.isInstance(value)) {
-            return value;
-        }
-        
-        String stringValue = value.toString();
-        
-        // Handle primitive types and their wrappers
-        if (targetType == String.class) {
-            return stringValue;
-        }
-        if (targetType == int.class || targetType == Integer.class) {
-            return Integer.parseInt(stringValue);
-        }
-        if (targetType == long.class || targetType == Long.class) {
-            return Long.parseLong(stringValue);
-        }
-        if (targetType == double.class || targetType == Double.class) {
-            return Double.parseDouble(stringValue);
-        }
-        if (targetType == float.class || targetType == Float.class) {
-            return Float.parseFloat(stringValue);
-        }
-        if (targetType == boolean.class || targetType == Boolean.class) {
-            return Boolean.parseBoolean(stringValue);
-        }
-        
-        // Default: return the value as-is and hope for the best
-        return value;
-    }
-    
-    /**
-     * Returns the default value for a type.
-     */
-    private Object getDefaultValue(Class<?> type) {
-        if (type.isPrimitive()) {
-            if (type == boolean.class) return false;
-            if (type == char.class) return '\0';
-            if (type == byte.class) return (byte) 0;
-            if (type == short.class) return (short) 0;
-            if (type == int.class) return 0;
-            if (type == long.class) return 0L;
-            if (type == float.class) return 0.0f;
-            if (type == double.class) return 0.0;
-        }
-        return null;
-    }
+    // ═══════════════════════════════════════════════════════════════════════════
+    // RESULT DETERMINATION
+    // ═══════════════════════════════════════════════════════════════════════════
     
     private boolean determineSuccess(UseCaseResult result) {
         // Check for common success indicators (in priority order)
@@ -401,6 +255,10 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         }
         return "unknown";
     }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PROGRESS & BASELINE GENERATION
+    // ═══════════════════════════════════════════════════════════════════════════
     
     private void reportProgress(ExtensionContext context, ExperimentResultAggregator aggregator, 
                                int currentSample, int totalSamples) {
@@ -477,21 +335,74 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
             String.valueOf(aggregator.getTotalTokens()));
     }
 
-	/**
-	 * Invocation context for a single experiment sample.
-	 */
-	private record ExperimentInvocationContext(int sampleNumber, int totalSamples,
-											   String useCaseId) implements TestTemplateInvocationContext {
+    /**
+     * Resolves the use case ID from the annotation.
+     *
+     * <p>Priority:
+     * <ol>
+     *   <li>If {@code useCase} class is specified (not Void.class), use {@link UseCaseProvider#resolveId}</li>
+     *   <li>Otherwise, use the legacy {@code useCaseId} string</li>
+     * </ol>
+     */
+    private String resolveUseCaseId(Experiment annotation) {
+        Class<?> useCaseClass = annotation.useCase();
+        
+        // New pattern: use case class reference
+        if (useCaseClass != null && useCaseClass != Void.class) {
+            return UseCaseProvider.resolveId(useCaseClass);
+        }
+        
+        // Legacy pattern: string ID
+        String legacyId = annotation.useCaseId();
+        if (legacyId != null && !legacyId.isEmpty()) {
+            return legacyId;
+        }
+        
+        throw new ExtensionConfigurationException(
+            "Experiment must specify either useCase class or useCaseId. " +
+            "Recommended: @Experiment(useCase = MyUseCase.class, ...)");
+    }
 
-		@Override
-		public String getDisplayName(int invocationIndex) {
-			return String.format("[%s] sample %d/%d", useCaseId, sampleNumber, totalSamples);
-		}
+    /**
+     * Invocation context for a single experiment sample.
+     */
+    private record ExperimentInvocationContext(int sampleNumber, int totalSamples,
+                                               String useCaseId, ResultCaptor captor) 
+            implements TestTemplateInvocationContext {
 
-		@Override
-		public List<Extension> getAdditionalExtensions() {
-			return Collections.emptyList();
-		}
-	}
+        @Override
+        public String getDisplayName(int invocationIndex) {
+            return String.format("[%s] sample %d/%d", useCaseId, sampleNumber, totalSamples);
+        }
+
+        @Override
+        public List<Extension> getAdditionalExtensions() {
+            return List.of(new CaptorParameterResolver(captor));
+        }
+    }
+    
+    /**
+     * Parameter resolver that provides the ResultCaptor for the current invocation.
+     */
+    private static class CaptorParameterResolver implements ParameterResolver {
+        private final ResultCaptor captor;
+        
+        CaptorParameterResolver(ResultCaptor captor) {
+            this.captor = captor;
+        }
+        
+        @Override
+        public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext extensionContext) 
+                throws ParameterResolutionException {
+            return parameterContext.getParameter().getType() == ResultCaptor.class;
+        }
+        
+        @Override
+        public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext) 
+                throws ParameterResolutionException {
+            // Also store in the extension context so the interceptor can access it
+            extensionContext.getStore(NAMESPACE).put("captor", captor);
+            return captor;
+        }
+    }
 }
-

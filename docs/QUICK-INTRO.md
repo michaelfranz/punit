@@ -82,28 +82,32 @@ An **Experiment** executes a use case repeatedly to gather empirical data. Exper
 ```java
 package com.example.experiments;
 
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.experiment.api.Experiment;
-import org.javai.punit.experiment.api.ExperimentContext;
-import org.junit.jupiter.api.Disabled;
+import org.javai.punit.experiment.api.ResultCaptor;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
-@Disabled("Run manually to generate baselines")
 public class JsonGenerationExperiment {
 
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
+    @BeforeEach
+    void setUp() {
+        provider.register(JsonGenerationUseCase.class, () ->
+            new JsonGenerationUseCase(new OpenAIClient("gpt-4", 0.7))
+        );
+    }
+
     @Experiment(
-        useCase = "usecase.json.generation",
+        useCase = JsonGenerationUseCase.class,
         samples = 100,                    // Run 100 times
         tokenBudget = 50000,              // Stop if tokens exceed 50k
         timeBudgetMs = 120000             // Stop after 2 minutes
     )
-    @ExperimentContext(
-        backend = "llm",
-        parameters = {
-            "model = gpt-4",
-            "temperature = 0.7"
-        }
-    )
-    void measureJsonGenerationPerformance() {
-        // Method body is optional—execution is driven by the use case
+    void measureJsonGenerationPerformance(JsonGenerationUseCase useCase, ResultCaptor captor) {
+        captor.record(useCase.generateJson("Create a user profile"));
     }
 }
 ```
@@ -166,7 +170,8 @@ cost:
 
 - **`samples`**: How many times to run the use case
 - **`tokenBudget` / `timeBudgetMs`**: Resource limits
-- **`@ExperimentContext`**: Specifies backend and configuration parameters
+- **`UseCaseProvider`**: Configures how use cases are instantiated (mock vs real)
+- **`ResultCaptor`**: Records results for aggregation into baselines
 - **Baselines are descriptive**: They record what happened, not what should happen
 
 ---
@@ -303,8 +308,8 @@ Probabilistic test failed: observed pass rate 72.00% < required 90.00%
 
 | Step | Artifact | Purpose |
 |------|----------|---------|
-| 1. Use Case | `@UseCase` method | Define what to observe |
-| 2. Experiment | `@Experiment` + `@ExperimentContext` | Gather empirical data |
+| 1. Use Case | Use case class | Define what to observe |
+| 2. Experiment | `@Experiment` + `UseCaseProvider` + `ResultCaptor` | Gather empirical data |
 | 3. Baseline | YAML file (auto-generated) | Record observations |
 | 4. Test | `@ProbabilisticTest` | Gate CI with derived threshold |
 

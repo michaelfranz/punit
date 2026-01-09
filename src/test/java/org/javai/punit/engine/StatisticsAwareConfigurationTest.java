@@ -269,7 +269,8 @@ class StatisticsAwareConfigurationTest {
         return new ProbabilisticTest() {
             @Override public Class<? extends Annotation> annotationType() { return ProbabilisticTest.class; }
             @Override public String spec() { return spec; }
-            @Override public String useCase() { return ""; }
+            @Override public Class<?> useCase() { return Void.class; }
+            @Override public String useCaseId() { return ""; }
             @Override public int samples() { return samples; }
             @Override public double minPassRate() { return minPassRate; }
             @Override public double thresholdConfidence() { return thresholdConfidence; }

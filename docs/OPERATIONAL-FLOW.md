@@ -105,7 +105,7 @@ LLM integrations typically offer many configuration choices:
 | Temperature    | 0.0, 0.2, 0.5, 0.7              |
 | System Prompt  | Variant A, Variant B, Variant C |
 
-The experiment systematically (or adaptively) explores combinations until it finds configurations that meet your goals.
+The experiment explores these combinations using a familiar JUnit-style parameterized approach (see `plan/PLAN-EXECUTION.md` for details on EXPLORE mode).
 
 #### Example: Given Systems
 

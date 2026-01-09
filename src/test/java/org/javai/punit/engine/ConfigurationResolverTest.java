@@ -258,7 +258,12 @@ class ConfigurationResolverTest {
             }
 
             @Override
-            public String useCase() {
+            public Class<?> useCase() {
+                return Void.class;
+            }
+
+            @Override
+            public String useCaseId() {
                 return "";
             }
 
@@ -295,13 +300,15 @@ class ConfigurationResolverTest {
     }
 
     @Test
-    void keepsNaNMinPassRateWhenSpecIsProvided() {
-        // When minPassRate is NaN but spec is provided, keep NaN (will be derived from spec)
-        ProbabilisticTest annotation = createAnnotationWithNaNMinPassRate(100, "some.spec:v1");
+    void loadsMinPassRateFromSpecWhenProvided() {
+        // When minPassRate is NaN but spec is provided, try to load from spec
+        // If spec doesn't exist, falls back to default
+        ProbabilisticTest annotation = createAnnotationWithNaNMinPassRate(100, "nonexistent.spec:v1");
         
         ConfigurationResolver.ResolvedConfiguration config = resolver.resolve(annotation, "testMethod");
         
-        assertThat(config.minPassRate()).isNaN();
+        // Since the spec doesn't exist, falls back to default
+        assertThat(config.minPassRate()).isEqualTo(ConfigurationResolver.DEFAULT_MIN_PASS_RATE);
     }
 
     /**
@@ -360,7 +367,12 @@ class ConfigurationResolverTest {
             }
 
             @Override
-            public String useCase() {
+            public Class<?> useCase() {
+                return Void.class;
+            }
+
+            @Override
+            public String useCaseId() {
                 return "";
             }
 

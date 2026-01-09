@@ -11,10 +11,10 @@
 | **ExperimentLevel**                | One setting of a factor (categorical or numeric).                                           |
 | **ExperimentConfig**               | One concrete combination of levels—the unit of execution.                                   |
 | **ExperimentGoal**                 | Optional criteria for early termination.                                                    |
-| **StaticFactor**                   | Factor with levels enumerated up front.                                                     |
-| **AdaptiveFactor**                 | Factor with levels generated dynamically through iterative refinement.                      |
-| **RefinementStrategy**             | SPI for generating refined levels in adaptive experiments.                                  |
-| **IterationFeedback**              | Structured feedback from one adaptive iteration.                                            |
+| **Factor**                         | One independently varied dimension in EXPLORE mode (e.g., `model`, `temperature`).         |
+| **FactorSource**                   | JUnit-style source of factor combinations (e.g., `@MethodSource`, `@CsvFactorSource`).      |
+| **BASELINE Mode**                  | Default experiment mode: precise estimation of one configuration with many samples.         |
+| **EXPLORE Mode**                   | Experiment mode for comparing multiple configurations with fewer samples each.              |
 | **Empirical Baseline**             | Machine-generated record of observed behavior.                                              |
 | **Execution Specification**        | Human-approved contract derived from baselines.                                             |
 | **Conformance Test**               | A probabilistic test that validates behavior against a specification.                       |

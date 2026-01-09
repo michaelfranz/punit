@@ -77,34 +77,35 @@ public boolean isExceptional() { return exception != null; }
 
 ## 3.3 Experiment
 
-An experiment repeatedly executes a use case in **exploratory mode** to gather empirical data.
+An experiment repeatedly executes a use case to gather empirical data.
 
 ### Experiment Modes
 
-1. **Single-config experiments**: One `ExperimentConfig`, one baseline output
-2. **Multi-config experiments**: Multiple `ExperimentConfig`s, one baseline per config
-3. **Adaptive experiments**: Configs discovered incrementally via feedback-driven refinement
+Experiments operate in one of two modes (see `plan/PLAN-EXECUTION.md` for details):
+
+| Mode | Purpose | Configurations | Samples | Output |
+|------|---------|----------------|---------|--------|
+| **BASELINE** (default) | Precise estimation of one configuration | 1 | 1000+ | Single baseline file |
+| **EXPLORE** | Compare multiple configurations | N | 1 per config (default) | N baseline files |
 
 ### Experiment Vocabulary
 
 | Term                       | Definition                                                                     |
 |----------------------------|--------------------------------------------------------------------------------|
-| **ExperimentDesign**       | Declarative description of what is explored (factors + levels)                 |
-| **ExperimentFactor**       | One independently varied dimension (e.g., `model`, `temperature`)              |
-| **ExperimentLevel**        | One setting of a factor (categorical or numeric)                               |
-| **StaticFactor**           | Factor with levels enumerated up front                                         |
-| **AdaptiveFactor**         | Factor with levels generated dynamically through iterative refinement          |
-| **ExperimentConfig**       | One concrete combination of levels—the unit of execution                       |
-| **ExperimentGoal**         | Optional criteria for early termination                                        |
-| **RefinementStrategy**     | SPI for generating refined levels in adaptive experiments                      |
+| **BASELINE Mode**          | Default mode: precise estimation with many samples, one configuration          |
+| **EXPLORE Mode**           | Comparison mode: multiple configurations, fewer samples each                   |
+| **Factor**                 | One independently varied dimension in EXPLORE mode (e.g., `model`, `temperature`) |
+| **FactorSource**           | JUnit-style source of factor combinations (e.g., `@MethodSource`)              |
+| **ExperimentConfig**       | One concrete combination of factor values—the unit of execution                |
 
 ### Key Characteristics
 
 - **No pass/fail**: Experiments never fail (except for infrastructure errors)
-- **Produces empirical baseline**: One baseline file per `ExperimentConfig`
+- **Produces empirical baseline**: One baseline file per configuration
 - **Never gates CI**: Experiment results are informational only
+- **EXPLORE uses familiar JUnit patterns**: `@FactorSource`, `@MethodSource` for defining configurations
 
-*For complete details on multi-config experiments, adaptive experiments, and baseline structure, see the full plan document.*
+*For complete details on experiment modes and execution configuration, see `plan/PLAN-EXECUTION.md`.*
 
 ## 3.4 Empirical Baseline
 

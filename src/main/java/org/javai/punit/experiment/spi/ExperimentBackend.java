@@ -39,7 +39,7 @@ public interface ExperimentBackend {
 	/**
 	 * Returns the backend identifier (e.g., "llm", "sensor", "distributed").
 	 *
-	 * <p>This identifier is used in {@code @ExperimentContext(backend = "...")} annotations.
+	 * <p>This identifier is used in {@code UseCaseContext.getBackend()}.
 	 *
 	 * @return the unique backend identifier
 	 */

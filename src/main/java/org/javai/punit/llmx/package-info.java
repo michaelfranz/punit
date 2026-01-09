@@ -16,14 +16,15 @@
  *
  * <h2>Example Usage</h2>
  * <pre>{@code
- * @Experiment(useCase = "usecase.json.generation", samples = 100)
- * @ExperimentContext(backend = "llm", parameters = {
- *     "model = gpt-4",
- *     "temperature = 0.7"
- * })
- * void measureJsonGeneration(UseCaseContext context) {
- *     LlmUseCaseContext llmContext = (LlmUseCaseContext) context;
- *     // Use llmContext.getModel(), llmContext.getTemperature(), etc.
+ * // Configure LLM context in @BeforeEach
+ * LlmUseCaseContext llmContext = LlmUseCaseContext.builder()
+ *     .model("gpt-4")
+ *     .temperature(0.7)
+ *     .build();
+ *
+ * @Experiment(useCase = JsonGenerationUseCase.class, samples = 100)
+ * void measureJsonGeneration(JsonGenerationUseCase useCase, ResultCaptor captor) {
+ *     captor.record(useCase.generate(prompt, llmContext));
  * }
  * }</pre>
  */

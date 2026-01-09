@@ -3,6 +3,10 @@ package org.javai.punit.engine;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.UseCaseProvider;
+import org.javai.punit.spec.model.ExecutionSpecification;
+import org.javai.punit.spec.registry.SpecificationNotFoundException;
+import org.javai.punit.spec.registry.SpecificationRegistry;
 
 import java.lang.reflect.Method;
 
@@ -98,14 +102,26 @@ public class ConfigurationResolver {
         effectiveSamples = Math.max(1, effectiveSamples);
 
         // Resolve minPassRate
-        // Note: minPassRate can be NaN when using statistical approaches (Sample-Size-First or Confidence-First)
-        // In those cases, the threshold is derived at runtime from baseline data.
-        // However, for legacy mode (no spec), NaN must fall back to the default.
+        // Priority:
+        // 1. Explicit annotation value (not NaN)
+        // 2. System property or env var override
+        // 3. Spec lookup (via useCase class or explicit spec ID)
+        // 4. Framework default
         double annotationMinPassRate = annotation.minPassRate();
-        boolean hasSpec = annotation.spec() != null && !annotation.spec().isEmpty();
+        
+        // Determine if we have a spec reference (either via useCase class or explicit spec ID)
+        String specId = resolveSpecId(annotation);
+        boolean hasSpec = specId != null && !specId.isEmpty();
+        
         double minPassRate;
         
-        if (Double.isNaN(annotationMinPassRate)) {
+        if (!Double.isNaN(annotationMinPassRate)) {
+            // Explicit minPassRate takes precedence
+            minPassRate = resolveDouble(
+                    PROP_MIN_PASS_RATE, ENV_MIN_PASS_RATE,
+                    annotationMinPassRate,
+                    DEFAULT_MIN_PASS_RATE);
+        } else {
             // Check for system property or env var override
             String sysPropValue = System.getProperty(PROP_MIN_PASS_RATE);
             String envValue = getEnvironmentVariable(ENV_MIN_PASS_RATE);
@@ -115,17 +131,12 @@ public class ConfigurationResolver {
             } else if (envValue != null && !envValue.isEmpty()) {
                 minPassRate = Double.parseDouble(envValue.trim());
             } else if (hasSpec) {
-                // Keep NaN to indicate it should be derived from spec
-                minPassRate = Double.NaN;
+                // Try to load minPassRate from spec
+                minPassRate = loadMinPassRateFromSpec(specId);
             } else {
                 // Legacy mode (no spec): use default
                 minPassRate = DEFAULT_MIN_PASS_RATE;
             }
-        } else {
-            minPassRate = resolveDouble(
-                    PROP_MIN_PASS_RATE, ENV_MIN_PASS_RATE,
-                    annotationMinPassRate,
-                    DEFAULT_MIN_PASS_RATE);
         }
 
         // Validate minPassRate (only if set)
@@ -370,5 +381,63 @@ public class ConfigurationResolver {
         public boolean hasStatisticalContext() {
             return confidence != null && baselineRate != null && baselineSamples != null && specId != null;
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SPEC RESOLUTION HELPERS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Resolves the spec ID from the annotation.
+     *
+     * <p>Priority:
+     * <ol>
+     *   <li>If useCase class is specified (not Void.class), derive ID from class</li>
+     *   <li>Otherwise, use explicit spec ID if provided</li>
+     * </ol>
+     *
+     * @param annotation the test annotation
+     * @return the spec ID, or null if none specified
+     */
+    private String resolveSpecId(ProbabilisticTest annotation) {
+        // New pattern: use case class reference
+        Class<?> useCaseClass = annotation.useCase();
+        if (useCaseClass != null && useCaseClass != Void.class) {
+            String useCaseId = UseCaseProvider.resolveId(useCaseClass);
+            // Spec ID format: useCaseId:v1 (default to v1)
+            return useCaseId + ":v1";
+        }
+
+        // Legacy pattern: explicit spec ID
+        String explicitSpec = annotation.spec();
+        if (explicitSpec != null && !explicitSpec.isEmpty()) {
+            return explicitSpec;
+        }
+
+        return null;
+    }
+
+    /**
+     * Loads the minPassRate from a specification file.
+     *
+     * @param specId the specification ID (format: useCaseId:vN)
+     * @return the minPassRate from the spec, or default if spec not found
+     */
+    private double loadMinPassRateFromSpec(String specId) {
+        try {
+            SpecificationRegistry registry = new SpecificationRegistry();
+            ExecutionSpecification spec = registry.resolve(specId);
+            double minPassRate = spec.getMinPassRate();
+            if (minPassRate > 0 && minPassRate <= 1.0) {
+                return minPassRate;
+            }
+        } catch (SpecificationNotFoundException e) {
+            // Spec not found - fall through to default
+            // This is not an error - the test can still run with default threshold
+        } catch (Exception e) {
+            // Log warning but don't fail - use default
+            System.err.println("Warning: Failed to load spec " + specId + ": " + e.getMessage());
+        }
+        return DEFAULT_MIN_PASS_RATE;
     }
 }
