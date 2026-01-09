@@ -125,7 +125,7 @@ tasks.test {
 //   These can be approved to create specs in: src/test/resources/punit/specs/
 //
 val experiment by tasks.registering(Test::class) {
-    description = "Runs experiments from src/experiment/java to generate empirical baselines"
+    description = "Runs named experiments to either explore alternative configurations or to generate empirical baselines"
     group = "verification"
     
     // Use the experiment source set

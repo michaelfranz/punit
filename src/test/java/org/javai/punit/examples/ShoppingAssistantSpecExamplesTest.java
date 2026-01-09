@@ -1,9 +1,7 @@
 package org.javai.punit.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import java.util.Random;
-
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.ProbabilisticTestBudget;
@@ -11,8 +9,6 @@ import org.javai.punit.api.TokenChargeRecorder;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
-import org.javai.punit.experiment.api.UseCaseContext;
-import org.javai.punit.experiment.model.DefaultUseCaseContext;
 import org.javai.punit.experiment.model.UseCaseResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -73,11 +69,6 @@ class ShoppingAssistantSpecExamplesTest {
     UseCaseProvider provider = new UseCaseProvider();
 
     /**
-     * Shared context for all tests.
-     */
-    private UseCaseContext context;
-
-    /**
      * Configures the use case provider before each test sample.
      *
      * <p>Uses the same mock configuration as the experiment to ensure
@@ -85,8 +76,13 @@ class ShoppingAssistantSpecExamplesTest {
      */
     @BeforeEach
     void setUp() {
-        // Configure how ShoppingUseCase instances are created
-        // Use the same configuration as the experiment for consistency
+        // Configure how ShoppingUseCase instances are created.
+        // By registering the same use case as was used in the long-running "BASELINE" experiment,
+        // we ensure that probability tests are statistically grounded in the data captured in the baseline.
+        // This is what PUnit is all about: Probability tests for non-deterministic use cases, where
+        // we can make data-informed decisions about whether to act on test failure. Without PUnit,
+        // we would be flying blind, taking guesses, chasing false flags, or simply labeling certain FAILS
+        // as "flaky" - and then ignoring them.
         provider.register(ShoppingUseCase.class, () ->
             new ShoppingUseCase(
                 new MockShoppingAssistant(
@@ -95,11 +91,6 @@ class ShoppingAssistantSpecExamplesTest {
                 )
             )
         );
-
-        context = DefaultUseCaseContext.builder()
-            .backend("mock")
-            .parameter("query", "wireless headphones")
-            .build();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -132,7 +123,7 @@ class ShoppingAssistantSpecExamplesTest {
     )
     @DisplayName("Should return valid JSON (spec-driven)")
     void shouldReturnValidJson(ShoppingUseCase useCase, TokenChargeRecorder tokenRecorder) {
-        UseCaseResult result = useCase.searchProducts("wireless headphones", context);
+        UseCaseResult result = useCase.searchProducts("wireless headphones");
 
         tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
 
@@ -158,7 +149,7 @@ class ShoppingAssistantSpecExamplesTest {
     )
     @DisplayName("Should return valid JSON (explicit threshold)")
     void shouldReturnValidJsonExplicit(ShoppingUseCase useCase, TokenChargeRecorder tokenRecorder) {
-        UseCaseResult result = useCase.searchProducts("laptop accessories", context);
+        UseCaseResult result = useCase.searchProducts("laptop accessories");
 
         tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
 

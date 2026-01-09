@@ -7,8 +7,6 @@ import org.javai.punit.api.ProbabilisticTestBudget;
 import org.javai.punit.api.TokenChargeRecorder;
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
-import org.javai.punit.experiment.api.UseCaseContext;
-import org.javai.punit.experiment.model.DefaultUseCaseContext;
 import org.javai.punit.experiment.model.UseCaseResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -64,16 +62,11 @@ import org.junit.jupiter.api.Disabled;
 class ShoppingAssistantExamplesTest {
 
 	private ShoppingUseCase useCase;
-	private UseCaseContext context;
 
 	@BeforeEach
 	void setUp() {
 		// Create use case with mock shopping assistant
 		useCase = new ShoppingUseCase(new MockShoppingAssistant());
-		context = DefaultUseCaseContext.builder()
-				.backend("mock")
-				.parameter("simulatedReliability", "default")
-				.build();
 	}
 
 	// ========== Response Format Validation ==========
@@ -93,7 +86,7 @@ class ShoppingAssistantExamplesTest {
 	void shouldReturnValidJsonFormat(TokenChargeRecorder tokenRecorder) {
 		String query = "wireless headphones under $100";
 
-		UseCaseResult result = useCase.searchProducts(query, context);
+		UseCaseResult result = useCase.searchProducts(query);
 
 		// Record tokens from the use case result
 		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
@@ -123,7 +116,7 @@ class ShoppingAssistantExamplesTest {
 	void shouldIncludeAllRequiredFields(TokenChargeRecorder tokenRecorder) {
 		String query = "laptop bag";
 
-		UseCaseResult result = useCase.searchProducts(query, context);
+		UseCaseResult result = useCase.searchProducts(query);
 
 		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
 
@@ -160,7 +153,7 @@ class ShoppingAssistantExamplesTest {
 	void shouldReturnProductsWithRequiredAttributes(TokenChargeRecorder tokenRecorder) {
 		String query = "running shoes";
 
-		UseCaseResult result = useCase.searchProducts(query, context);
+		UseCaseResult result = useCase.searchProducts(query);
 
 		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
 
@@ -189,7 +182,7 @@ class ShoppingAssistantExamplesTest {
 		String query = "bluetooth speaker waterproof";
 		double minRelevanceScore = 0.7;
 
-		UseCaseResult result = useCase.searchProductsWithRelevanceCheck(query, minRelevanceScore, context);
+		UseCaseResult result = useCase.searchProductsWithRelevanceCheck(query, minRelevanceScore);
 
 		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
 
@@ -219,7 +212,7 @@ class ShoppingAssistantExamplesTest {
 		String query = "gift ideas under $50";
 		double maxPrice = 50.00;
 
-		UseCaseResult result = useCase.searchProductsWithPriceConstraint(query, maxPrice, context);
+		UseCaseResult result = useCase.searchProductsWithPriceConstraint(query, maxPrice);
 
 		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
 
@@ -248,7 +241,7 @@ class ShoppingAssistantExamplesTest {
 		String query = "coffee makers";
 		int maxResults = 5;
 
-		UseCaseResult result = useCase.searchProductsWithLimit(query, maxResults, context);
+		UseCaseResult result = useCase.searchProductsWithLimit(query, maxResults);
 
 		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
 
@@ -272,7 +265,7 @@ class ShoppingAssistantExamplesTest {
 		String query = "office supplies";
 		int maxResults = 5;
 
-		UseCaseResult result = useCase.searchProductsWithLimit(query, maxResults, context);
+		UseCaseResult result = useCase.searchProductsWithLimit(query, maxResults);
 
 		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
 
@@ -298,7 +291,7 @@ class ShoppingAssistantExamplesTest {
 	void shouldReturnCompleteValidResponse(TokenChargeRecorder tokenRecorder) {
 		String query = "smartphone accessories";
 
-		UseCaseResult result = useCase.searchProducts(query, context);
+		UseCaseResult result = useCase.searchProducts(query);
 
 		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
 

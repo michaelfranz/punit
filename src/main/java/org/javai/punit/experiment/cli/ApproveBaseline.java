@@ -6,7 +6,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
-
 import org.javai.punit.experiment.engine.BaselineLoader;
 import org.javai.punit.experiment.engine.SpecificationGenerator;
 import org.javai.punit.experiment.engine.SpecificationWriter;
@@ -147,9 +146,14 @@ public final class ApproveBaseline {
         // Generate specification
         ExecutionSpecification spec = SpecificationGenerator.generate(baseline, approver, notes);
 
-        // Determine output path
-        String specFilename = baseline.getUseCaseId().replace('.', '-') + "-spec.yaml";
-        Path specPath = specsDir.resolve(specFilename);
+        // Determine output path: specs/{useCaseId}/v1.yaml
+        // This matches what SpecificationRegistry.resolveSpecPath expects
+        String useCaseId = baseline.getUseCaseId().replace('.', '-');
+        Path useCaseDir = specsDir.resolve(useCaseId);
+        Path specPath = useCaseDir.resolve("v1.yaml");
+        
+        // Create use case directory if needed
+        Files.createDirectories(useCaseDir);
 
         System.out.println("  Min success rate (threshold): " +
                 String.format("%.2f%%", spec.getThresholds().getMinSuccessRate() * 100));
