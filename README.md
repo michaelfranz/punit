@@ -41,18 +41,35 @@ void llmReturnsValidJson() {
 }
 ```
 
+Don't let the simplicity of this snippet fool you. Behind this clean API lies rigorous statistical machinery—thresholds derived from empirical experiments, confidence intervals, and early termination bounds. Read on to see how it works.
+
 ## Features
+
+### Experimentation
 
 | Feature | Description |
 |---------|-------------|
-| ✅ **Statistical Pass/Fail** | Test passes if observed success rate ≥ minimum threshold |
-| ✅ **Smart Early Termination** | Stops early when failure is inevitable OR success is guaranteed |
-| ✅ **Budget Control** | Time and token budgets at method, class, or suite level |
-| ✅ **Dynamic Token Tracking** | Record actual API consumption per invocation |
-| ✅ **Configuration Overrides** | System properties and environment variables for CI/CD |
-| ✅ **Accurate IDE Display** | Failed samples show as ❌, passed samples show as ✅ |
-| ✅ **Thread-Safe** | Safe for parallel test execution |
-| ✅ **Rich Reporting** | Detailed statistics via JUnit TestReporter |
+| 🔬 **EXPLORE Mode** | Compare configurations (models, prompts, parameters) with minimal samples |
+| 📊 **MEASURE Mode** | Run large-scale experiments to establish empirical baselines |
+| 📁 **Spec Generation** | Auto-generate version-controlled specs from experimental data |
+
+### Testing
+
+| Feature                       | Description                                                    |
+|-------------------------------|----------------------------------------------------------------|
+| 🎯 **Spec-Driven Thresholds** | Derive pass/fail thresholds from empirical data—not guesswork  |
+| ⚡ **Smart Early Termination** | Stop early when failure is inevitable OR success is guaranteed |
+| 💰 **Budget Control**         | Time and token budgets at method, class, or suite level        |
+| 📈 **Dynamic Token Tracking** | Record actual API consumption per invocation                   |
+
+### Operations
+
+| Feature                | Description                                                            |
+|------------------------|------------------------------------------------------------------------|
+| 🔧 **CI/CD Overrides** | System properties and environment variables for flexible configuration |
+| ✅ **JUnit 5 Native**   | First-class IDE support, familiar annotations, standard reporting      |
+| 🧵 **Thread-Safe**     | Safe for parallel test execution                                       |
+| 📋 **Rich Reporting**  | Detailed statistics and qualified verdicts via JUnit TestReporter      |
 
 ## Quick Start
 
@@ -94,6 +111,7 @@ dependencies {
 
 ### Step 2: Write Your First Probabilistic Test
 
+We'll start slow. The really powerful stuff comes later.
 ```java
 import org.javai.punit.api.ProbabilisticTest;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -131,30 +149,22 @@ You'll see output like:
         ✅ Sample 95/100  ← SUCCESS_GUARANTEED, remaining samples skipped
 ```
 
-### (Recommended) Spec-Driven Workflow
+That's it for the quick start. You're using PUnit... but only a fraction of it.
 
-For production use, derive thresholds from empirical data:
+### What's Next?
 
-```bash
-# 1. Run a MEASURE experiment (1000 samples)
-./gradlew measure --tests "MyExperiment.measureSomething"
-# → Generates: src/test/resources/punit/specs/MyUseCase.yaml
+The real power of PUnit lies in its **spec-driven workflow**:
 
-# 2. Review and commit the spec
-git add src/test/resources/punit/specs/
-git commit -m "Add spec for MyUseCase"
+1. **EXPLORE** – Compare configurations to find optimal settings
+2. **MEASURE** – Run experiments to establish empirical baselines
+3. **TEST** – Run probabilistic tests with statistically-derived thresholds
 
-# 3. Reference in your test (threshold derived from spec)
-```
+This workflow ensures your pass/fail thresholds come from real data, not guesswork.
+In practice *not guessing* means you stop chasing false positives because PUnit will tell you if a fail is statistically significant. With PUnit false positives become rare, and that means you can focus more of your attention on what
+matters. This has long been understood by quality experts, but now PUnit can enable you to apply the same rigor to
+software testing.
 
-```java
-@ProbabilisticTest(useCase = MyUseCase.class, samples = 50)
-void serviceReturnsValidResponse() {
-    // minPassRate derived from spec's empirical data
-    Response response = myService.call();
-    assertThat(response.isValid()).isTrue();
-}
-```
+👉 **[Read the User Guide](docs/USER-GUIDE.md)** for the complete walkthrough.
 
 ## Core Concepts
 

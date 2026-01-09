@@ -1,6 +1,8 @@
-# PUnit Quick Introduction
+# PUnit User Guide
 
-A step-by-step guide for getting started with probabilistic testing using PUnit.
+The complete guide to probabilistic testing with PUnit.
+
+This document walks you through the canonical operational flow—from defining use cases, through experimentation, to running statistically-grounded tests in CI.
 
 ---
 
