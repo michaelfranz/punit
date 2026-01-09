@@ -94,51 +94,50 @@ Confidence refers to statistical evidence, not business impact or SLA violation.
 
 ### 3.1 Design Principle
 
-The first invocation of a service is often slower due to JIT compilation, connection establishment, cache population, and resource pool initialization. While operationally important, a single observation cannot support statistical testing.
+The first invocations of a service are often slower due to JIT compilation, connection establishment, cache population, and resource pool initialization. For complex code paths, JIT optimization may not fully stabilize until after several invocations. Similarly, connection pools and caches may require multiple calls to reach steady state.
 
-**Therefore:** `@ServiceLatencyTest` does not perform statistical inference on a single cold invocation. This preserves statistical integrity and implementation simplicity.
+**Therefore:** `@ServiceLatencyTest` allows users to specify a configurable number of warmup iterations that run before any data is collected. This ensures that all measured samples reflect steady-state behavior.
 
-### 3.2 Definitions
+### 3.2 Warmup Sample Size
 
-| Term           | Definition                                                          |
-|----------------|---------------------------------------------------------------------|
-| **Cold call**  | The first invocation of the use case within the experiment/test run |
-| **Warm calls** | All subsequent invocations (2..N)                                   |
+PUnit provides an optional `warmupSampleSize` parameter with a default of 0. When specified:
 
-### 3.3 WarmupPolicy Enum
+1. The framework first executes the use case `warmupSampleSize` times
+2. No latency data is collected during warmup iterations
+3. The framework then executes the main run of exactly `samples` invocations
+4. All `samples` invocations are measured and analyzed
 
-```java
-public enum WarmupPolicy {
-    
-    /**
-     * Exclude the first invocation from statistical analysis.
-     * Analyzes samples {X₂, X₃, ..., Xₙ}.
-     * Effective sample size = N - 1.
-     * 
-     * Interpretation: "Steady-state latency has not regressed."
-     */
-    WARM_ONLY,
-    
-    /**
-     * Include all invocations in statistical analysis.
-     * Analyzes samples {X₁, X₂, ..., Xₙ}.
-     * 
-     * Interpretation: "Overall latency including warm-up has not regressed."
-     */
-    INCLUDE_WARMUP
-}
-```
+**Total invocations = `warmupSampleSize` + `samples`**
 
-**Default:** `WARM_ONLY`
+### 3.3 Behavior
 
-### 3.4 Behavior
+| warmupSampleSize | Total Invocations | Samples Analyzed | Use When                                              |
+|------------------|-------------------|------------------|-------------------------------------------------------|
+| 0 (default)      | N                 | All N            | Cold-start matters; first impressions are user-visible|
+| 5                | N + 5             | N                | Need JIT stabilization before measuring               |
+| 10+              | N + 10+           | N                | Complex code paths requiring extended warm-up         |
 
-| WarmupPolicy     | Samples Analyzed | Use When                                              |
-|------------------|------------------|-------------------------------------------------------|
-| `WARM_ONLY`      | {X₂, ..., Xₙ}    | Steady-state performance matters; cold-start is noise |
-| `INCLUDE_WARMUP` | {X₁, ..., Xₙ}    | First impressions matter; cold-start is user-visible  |
+### 3.4 Why Multiple Warmup Iterations?
 
-Cold-start latency may still be measured and reported for informational purposes, but it is not gated under `WARM_ONLY`.
+A single warmup invocation may be insufficient for:
+
+- **JIT compilation**: Complex methods may require several invocations before the JIT compiler fully optimizes the code path
+- **Tiered compilation**: The JVM's tiered compilation (C1 → C2) may not reach peak optimization until after multiple calls
+- **Connection pool warming**: Establishing a full pool of database or HTTP connections may require multiple concurrent-style invocations
+- **Cache priming**: Multi-level caches (L1, L2, distributed) may need several access patterns before reaching steady state
+- **Class loading**: Lazy-loaded classes along the code path may not all load on the first invocation
+
+### 3.5 Cold-Start Testing
+
+To test cold-start behavior (where the first invocation matters), simply use the default `warmupSampleSize=0`. The first invocation will be included in the measured samples.
+
+### 3.6 Validation
+
+- `warmupSampleSize` must be ≥ 0
+
+### 3.7 Baseline Consistency
+
+The same `warmupSampleSize` parameter applies during both baseline generation (experiment phase) and test execution. The baseline records the warmup configuration used during its generation, ensuring that baseline and test runs follow consistent warmup behavior.
 
 ---
 
@@ -209,12 +208,13 @@ experiment:
   class: com.example.experiments.CheckoutLatencyExperiment
   method: measureCheckoutLatency
 
-warmupPolicy: WARM_ONLY
+warmup:
+  sampleSize: 5
+  invocationsExecuted: 5
 
 execution:
   samplesPlanned: 1000
   samplesExecuted: 1000
-  effectiveSamples: 999
   timeouts: 2
   invocationTimeoutMs: 5000
 
@@ -266,8 +266,8 @@ approval:
 
 baseline:
   reference: checkout.service/baseline.peak_weekday.yaml
-  warmupPolicy: WARM_ONLY
-  effectiveSamples: 999
+  warmupSampleSize: 5
+  samplesExecuted: 1000
   p95Nanos: 45200000
 ```
 
@@ -412,10 +412,12 @@ public @interface ServiceLatencyTest {
     double thresholdQuantile() default 0.95;
     
     /**
-     * Warm-up handling policy.
-     * Default: WARM_ONLY
+     * Number of warmup iterations to execute before data collection.
+     * Warmup invocations are not measured or included in analysis.
+     * Total invocations = warmupSampleSize + samples.
+     * Default: 0
      */
-    WarmupPolicy warmupPolicy() default WarmupPolicy.WARM_ONLY;
+    int warmupSampleSize() default 0;
     
     /**
      * Timeout for individual invocation (milliseconds).
@@ -475,7 +477,8 @@ The framework rejects annotations missing required parameters:
     spec = "checkout.service:v1",
     samples = 100,
     confidence = 0.95,
-    maxExceedanceIncrease = 0.03
+    maxExceedanceIncrease = 0.03,
+    warmupSampleSize = 5
 )
 void checkoutLatency() {
     checkoutService.process(order);
@@ -483,7 +486,8 @@ void checkoutLatency() {
 ```
 
 **Behavior:**
-- 100 invocations, exclude first (warm-up) → 99 analyzed
+- 5 warmup invocations (not measured) + 100 measured invocations = 105 total
+- All 100 measured samples are analyzed
 - Threshold = baseline p95
 - 95% confidence
 - Fail if exceedance rate > 8% (5% baseline + 3% margin)
@@ -497,6 +501,7 @@ void checkoutLatency() {
     confidence = 0.99,
     maxExceedanceIncrease = 0.01,
     thresholdQuantile = 0.99,
+    warmupSampleSize = 10,
     invocationTimeoutMs = 5000,
     maxAllowedTimeouts = 3
 )
@@ -506,21 +511,22 @@ void checkoutLatencyStrict() {
 ```
 
 **Behavior:**
-- 200 invocations → 199 analyzed
+- 10 warmup + 200 measured = 210 total invocations
+- All 200 samples analyzed
 - Threshold = baseline p99
 - 99% confidence
 - Fail if exceedance rate > 2% (1% baseline + 1% margin)
 - Fail immediately if 3+ timeouts
 
-### 8.3 Include Warm-up
+### 8.3 Cold-Start Testing
 
 ```java
 @ServiceLatencyTest(
     spec = "checkout.service:v1",
     samples = 100,
     confidence = 0.95,
-    maxExceedanceIncrease = 0.03,
-    warmupPolicy = WarmupPolicy.INCLUDE_WARMUP
+    maxExceedanceIncrease = 0.03
+    // warmupSampleSize defaults to 0
 )
 void checkoutLatencyIncludingColdStart() {
     checkoutService.process(order);
@@ -528,7 +534,8 @@ void checkoutLatencyIncludingColdStart() {
 ```
 
 **Behavior:**
-- 100 invocations, all included → 100 analyzed
+- 0 warmup + 100 measured = 100 total invocations
+- First (cold) invocation is included in analysis
 - Cold-start contributes to exceedance calculation
 
 ### 8.4 Time-Budgeted Test
@@ -555,9 +562,9 @@ void checkoutLatencyHighVolume() {
 
 1. Load specification and resolve baseline (applying profile if `PUNIT_PERIOD_PROFILE` is set)
 2. Extract threshold T from baseline (quantile specified by `thresholdQuantile`)
-3. Execute use case `samples` times, measuring latency with monotonic clock (`System.nanoTime()`)
-4. Apply warm-up policy to determine effective sample set
-5. For each effective sample, classify as success (≤ T) or exceedance (> T)
+3. Execute use case `warmupSampleSize` times without measuring (warmup phase)
+4. Execute use case `samples` times, measuring latency with monotonic clock (`System.nanoTime()`)
+5. For each measured sample, classify as success (≤ T) or exceedance (> T)
 6. Compute exceedance rate and confidence interval
 7. Compare against baseline exceedance rate + allowed margin
 8. Report result with confidence qualification
@@ -579,13 +586,13 @@ The test terminates early if:
 LATENCY TEST PASSED (95% confidence)
 
 Spec: checkout.service:v1
-Warmup Policy: WARM_ONLY
-Samples: 99 (1 excluded for warm-up)
+Warmup: 5 iterations
+Samples: 100 (measured)
 Timeouts: 0
 
 Threshold: 45.2 ms (baseline p95)
 Baseline exceedance rate: 5.0%
-Observed exceedance rate: 4.0% (4 of 99 samples)
+Observed exceedance rate: 4.0% (4 of 100 samples)
 Maximum allowed: 8.0%
 
 Decision: PASS — exceedance rate within acceptable margin.
@@ -597,16 +604,16 @@ Decision: PASS — exceedance rate within acceptable margin.
 LATENCY REGRESSION DETECTED (95% confidence)
 
 Spec: checkout.service:v1
-Warmup Policy: WARM_ONLY
-Samples: 99 (1 excluded for warm-up)
+Warmup: 5 iterations
+Samples: 100 (measured)
 Timeouts: 1
 
 Threshold: 45.2 ms (baseline p95)
 Baseline exceedance rate: 5.0%
-Observed exceedance rate: 12.1% (12 of 99 samples)
+Observed exceedance rate: 12.0% (12 of 100 samples)
 Maximum allowed: 8.0%
 
-Decision: FAIL — exceedance rate 12.1% exceeds maximum 8.0% with 95% confidence.
+Decision: FAIL — exceedance rate 12.0% exceeds maximum 8.0% with 95% confidence.
 
 Observed latency summary:
     p50:  14.2 ms  (baseline: 12.3 ms, +15.4%)
@@ -620,7 +627,7 @@ Observed latency summary:
 TIMEOUT THRESHOLD EXCEEDED
 
 Spec: checkout.service:v1
-Warmup Policy: WARM_ONLY
+Warmup: 5 iterations (completed)
 Samples attempted: 47 of 100
 Timeouts: 5 (threshold: 5)
 
@@ -658,7 +665,7 @@ public final class LatencyBaseline {
     private final String experimentMethod;
     private final String profile;  // nullable
     
-    private final WarmupPolicy warmupPolicy;
+    private final WarmupSummary warmup;
     private final LatencyExecutionSummary execution;
     private final LatencyStatistics statistics;
     private final DistributionDigest distribution;
@@ -666,10 +673,14 @@ public final class LatencyBaseline {
     private final Provenance provenance;
 }
 
+public record WarmupSummary(
+    int sampleSize,
+    int invocationsExecuted
+) {}
+
 public record LatencyExecutionSummary(
     int samplesPlanned,
     int samplesExecuted,
-    int effectiveSamples,
     int timeouts,
     long invocationTimeoutMs
 ) {}
@@ -730,8 +741,8 @@ public record Approval(
 
 public record BaselineReference(
     String reference,
-    WarmupPolicy warmupPolicy,
-    int effectiveSamples,
+    int warmupSampleSize,
+    int samplesExecuted,
     long p95Nanos
 ) {}
 ```
@@ -748,9 +759,10 @@ public record BaselineReference(
 @Test void shouldHandleZeroExceedances()
 @Test void shouldHandleAllExceedances()
 
-// Warm-up policy
-@Test void warmOnlyShouldExcludeFirstSample()
-@Test void includeWarmupShouldIncludeAllSamples()
+// Warm-up sample size
+@Test void shouldExecuteWarmupIterationsWithoutMeasuring()
+@Test void shouldMeasureAllSamplesAfterWarmup()
+@Test void zeroWarmupShouldIncludeFirstSample()
 
 // Threshold derivation
 @Test void shouldUseBaselineP95AsDefaultThreshold()
@@ -772,7 +784,7 @@ public record BaselineReference(
 ```java
 // Baseline generation
 @Test void shouldGenerateBaselineWithCorrectStructure()
-@Test void shouldApplyWarmupPolicyDuringExperiment()
+@Test void shouldExecuteWarmupBeforeBaselineMeasurement()
 @Test void shouldStoreTDigestRepresentation()
 @Test void shouldIncludeProfileInBaseline()
 
@@ -800,7 +812,7 @@ public record BaselineReference(
 @Test void shouldWarnOnInsufficientSamplesForP99()
 @Test void shouldHandleBimodalDistribution()
 @Test void shouldHandleAllSamplesAsTimeouts()
-@Test void shouldHandleSingleSampleAfterWarmupExclusion()
+@Test void shouldHandleSingleMeasuredSample()
 ```
 
 ---
@@ -810,7 +822,7 @@ public record BaselineReference(
 | Aspect                   | Decision                                                           |
 |--------------------------|--------------------------------------------------------------------|
 | **Statistical model**    | Tail exceedance regression (binomial)                              |
-| **Warm-up handling**     | `WarmupPolicy` enum: `WARM_ONLY` (default), `INCLUDE_WARMUP`       |
+| **Warm-up handling**     | `warmupSampleSize` parameter (default 0); runs before measurement  |
 | **Threshold**            | Baseline quantile (default p95, configurable)                      |
 | **Margin**               | Absolute exceedance increase (required, no default)                |
 | **Timeouts**             | Recorded as samples; count reported; optional `maxAllowedTimeouts` |
@@ -823,4 +835,4 @@ public record BaselineReference(
 
 ## 14. One-Sentence Summary
 
-> `@ServiceLatencyTest` performs statistically principled regression detection on empirically derived latency distributions, using tail exceedance analysis with configurable warm-up exclusion, profile-aware baseline selection, and confidence-qualified deviation reporting.
+> `@ServiceLatencyTest` performs statistically principled regression detection on empirically derived latency distributions, using tail exceedance analysis with configurable warmup iterations, profile-aware baseline selection, and confidence-qualified deviation reporting.
