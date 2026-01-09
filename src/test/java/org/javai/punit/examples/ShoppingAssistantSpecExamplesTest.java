@@ -69,11 +69,6 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * @see ShoppingUseCase
  * @see UseCaseProvider
  */
-@ProbabilisticTestBudget(
-    tokenBudget = 15000,
-    timeBudgetMs = 30000,
-    onBudgetExhausted = BudgetExhaustedBehavior.EVALUATE_PARTIAL
-)
 @DisplayName("Shopping Assistant Spec-Driven Tests")
 class ShoppingAssistantSpecExamplesTest {
 

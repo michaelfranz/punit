@@ -307,13 +307,28 @@ public class ProbabilisticTestExtension implements
 		// When the user clicks on a failed sample, they'll see the failure reason.
 		// We extract just the message (not the full exception) for cleaner output.
 		//
-		// NOTE: This causes the class to appear as "failed" in the IDE even if PUnit
-		// statistically passes. This is a known limitation of JUnit's result aggregation
-		// model. The PUnit console summary (printed at the end) shows the true verdict.
+		// The exception message includes a verdict hint so users don't panic before
+		// checking the PUnit statistical verdict in the console summary.
 		if (sampleFailure != null && !terminated.get()) {
 			String reason = extractFailureReason(sampleFailure);
-			throw new AssertionError(reason);
+			String verdictHint = formatVerdictHint(aggregator, config);
+			throw new AssertionError(verdictHint + "\n" + reason);
 		}
+	}
+
+	/**
+	 * Formats a status hint to include in exception messages.
+	 * Shows current stats without claiming a verdict (which isn't known until test completes).
+	 */
+	private String formatVerdictHint(SampleResultAggregator aggregator, TestConfiguration config) {
+		int successes = aggregator.getSuccesses();
+		int executed = aggregator.getSamplesExecuted();
+		int planned = config.samples();
+		double threshold = config.minPassRate();
+		
+		return String.format(
+			"[PUnit sample %d/%d: %d successes so far, need %.0f%% - see console for final verdict]",
+			executed, planned, successes, threshold * 100);
 	}
 
 	/**
