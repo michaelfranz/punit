@@ -3,8 +3,8 @@ package org.javai.punit.examples.shopping.usecase;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.javai.punit.api.FactorSetter;
 import org.javai.punit.api.UseCase;
-import org.javai.punit.experiment.api.UseCaseContext;
 import org.javai.punit.experiment.model.UseCaseResult;
 
 /**
@@ -22,24 +22,117 @@ import org.javai.punit.experiment.model.UseCaseResult;
  *   <li>Linking experiments and tests to specifications</li>
  * </ul>
  *
+ * <h2>Configuration</h2>
+ * <p>Configuration (model, temperature, etc.) is provided at construction time,
+ * not at each method call. This follows the principle that the use case instance
+ * encapsulates its complete configuration.
+ *
  * <h2>Dependency Injection</h2>
  * <p>Instances are created by {@link org.javai.punit.api.UseCaseProvider}.
- * Configure the provider in {@code @BeforeEach} to control which
- * {@link ShoppingAssistant} implementation is used (mock or real).
+ * In EXPLORE mode, the provider creates differently-configured instances
+ * for each factor combination.
  *
  * @see org.javai.punit.api.UseCaseProvider
  */
 @UseCase  // ID defaults to "ShoppingUseCase" (simple class name)
 public class ShoppingUseCase {
 
-    private final ShoppingAssistant assistant;
+    private ShoppingAssistant assistant;
+    private String model = "default";
+    private double temperature = 0.0;
 
+    /**
+     * Creates a use case with the given assistant and default configuration.
+     */
     public ShoppingUseCase(ShoppingAssistant assistant) {
         this.assistant = assistant;
     }
 
     /**
-     * Use case: Search for products matching a query.
+     * Creates a use case with explicit configuration.
+     *
+     * <p>In EXPLORE mode, the UseCaseProvider creates instances with different
+     * model/temperature combinations to compare configurations.
+     *
+     * @param assistant the shopping assistant implementation
+     * @param model the model name (for metadata in results)
+     * @param temperature the temperature setting (for metadata in results)
+     */
+    public ShoppingUseCase(ShoppingAssistant assistant, String model, double temperature) {
+        this.assistant = assistant;
+        this.model = model;
+        this.temperature = temperature;
+    }
+
+    /**
+     * Returns the model name for this use case configuration.
+     */
+    public String getModel() {
+        return model;
+    }
+
+    /**
+     * Returns the temperature setting for this use case configuration.
+     */
+    public double getTemperature() {
+        return temperature;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FACTOR PARAMETER SETTERS - For auto-wired factor injection
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Sets the model and reconfigures the assistant accordingly.
+     *
+     * <p>Called automatically by {@link org.javai.punit.api.UseCaseProvider}
+     * when using {@code registerAutoWired} in EXPLORE mode.
+     *
+     * @param model the model name (e.g., "gpt-4", "gpt-3.5-turbo")
+     */
+    @FactorSetter("model")
+    public void setModel(String model) {
+        this.model = model;
+        reconfigureAssistant();
+    }
+    
+    /**
+     * Sets the temperature and reconfigures the assistant accordingly.
+     *
+     * <p>Called automatically by {@link org.javai.punit.api.UseCaseProvider}
+     * when using {@code registerAutoWired} in EXPLORE mode.
+     *
+     * @param temperature the temperature setting (0.0 to 1.0)
+     */
+    @FactorSetter("temp")
+    public void setTemperature(double temperature) {
+        this.temperature = temperature;
+        reconfigureAssistant();
+    }
+    
+    /**
+     * Reconfigures the mock assistant based on current model/temperature.
+     *
+     * <p>Different configurations simulate different LLM reliability profiles.
+     */
+    private void reconfigureAssistant() {
+        if (assistant instanceof MockShoppingAssistant mock) {
+            MockShoppingAssistant.MockConfiguration config;
+            if ("gpt-4".equals(model)) {
+                config = temperature == 0.0 
+                    ? MockShoppingAssistant.MockConfiguration.highReliability()
+                    : MockShoppingAssistant.MockConfiguration.experimentRealistic();
+            } else {
+                config = temperature == 0.0
+                    ? MockShoppingAssistant.MockConfiguration.experimentRealistic()
+                    : MockShoppingAssistant.MockConfiguration.defaultConfig();
+            }
+            mock.setConfiguration(config);
+        }
+    }
+
+    /**
+     * Search for products matching a query.
      *
      * <p>Captures observations about:
      * <ul>
@@ -50,13 +143,9 @@ public class ShoppingUseCase {
      * </ul>
      *
      * @param query the search query
-     * @param context the execution context
      * @return observations from the use case execution
      */
-    /**
-     * Search for products matching a query.
-     */
-    public UseCaseResult searchProducts(String query, UseCaseContext context) {
+    public UseCaseResult searchProducts(String query) {
         Instant start = Instant.now();
         
         LlmResponse response = assistant.searchProducts(query);
@@ -84,9 +173,7 @@ public class ShoppingUseCase {
         // Overall success requires all quality checks to pass
         boolean success = isValidJson && hasAllRequiredFields && allProductsHaveRequiredAttributes;
 
-        // Determine failure category:
-        // 1. If failureMode indicates an LLM error, use that
-        // 2. Otherwise, if products are missing or have bad attributes, that's a quality issue
+        // Determine failure category
         String failureCategory = null;
         if (!success) {
             if (failureMode.isFailure()) {
@@ -103,7 +190,7 @@ public class ShoppingUseCase {
         }
 
         return UseCaseResult.builder()
-                .value("success", success)  // Primary success indicator for experiments
+                .value("success", success)
                 .value("isValidJson", isValidJson)
                 .value("hasAllRequiredFields", hasAllRequiredFields)
                 .value("hasProductsField", hasProductsField)
@@ -113,42 +200,34 @@ public class ShoppingUseCase {
                 .value("productCount", productCount)
                 .value("tokensUsed", response.tokensUsed())
                 .value("rawJson", response.rawJson())
-                .value("failureCategory", failureCategory)  // For experiment statistics
-                .value("failureMode", failureMode.name())   // Raw failure mode
+                .value("failureCategory", failureCategory)
+                .value("failureMode", failureMode.name())
                 .meta("query", query)
-                .meta("backend", context.getBackend())
+                .meta("model", model)
+                .meta("temperature", temperature)
                 .executionTime(executionTime)
                 .build();
     }
 
     /**
-     * Use case: Search for products within a price range.
-     *
-     * <p>Captures observations about price constraint compliance in addition
-     * to standard format and quality checks.
+     * Search for products within a price constraint.
      *
      * @param query the search query
      * @param maxPrice the maximum price constraint
-     * @param context the execution context
      * @return observations from the use case execution
      */
-    /**
-     * Search for products within a price constraint.
-     */
-    public UseCaseResult searchProductsWithPriceConstraint(String query, double maxPrice, UseCaseContext context) {
+    public UseCaseResult searchProductsWithPriceConstraint(String query, double maxPrice) {
         Instant start = Instant.now();
         
         LlmResponse response = assistant.searchProducts(query, maxPrice);
         
         Duration executionTime = Duration.between(start, Instant.now());
 
-        // Standard format observations
         boolean isValidJson = response.isValidJson();
         boolean hasAllRequiredFields = response.hasField("products") 
                 && response.hasField("query") 
                 && response.hasField("totalResults");
 
-        // Price constraint compliance
         List<Product> products = response.products();
         boolean allProductsWithinPriceRange = products.stream()
                 .allMatch(p -> p.price() != null && p.price() <= maxPrice);
@@ -160,16 +239,14 @@ public class ShoppingUseCase {
         boolean allProductsHaveRequiredAttributes = products.stream()
                 .allMatch(p -> p.name() != null && p.price() != null && p.category() != null);
 
-        // Capture failure mode for experiment statistics
         FailureMode failureMode = response.failureMode();
         String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
 
-        // Overall success requires all quality checks to pass
         boolean success = isValidJson && hasAllRequiredFields 
                 && allProductsHaveRequiredAttributes && allProductsWithinPriceRange;
 
         return UseCaseResult.builder()
-                .value("success", success)  // Primary success indicator for experiments
+                .value("success", success)
                 .value("isValidJson", isValidJson)
                 .value("hasAllRequiredFields", hasAllRequiredFields)
                 .value("allProductsWithinPriceRange", allProductsWithinPriceRange)
@@ -181,55 +258,44 @@ public class ShoppingUseCase {
                 .value("failureMode", failureMode.name())
                 .meta("query", query)
                 .meta("maxPrice", maxPrice)
-                .meta("backend", context.getBackend())
+                .meta("model", model)
+                .meta("temperature", temperature)
                 .executionTime(executionTime)
                 .build();
     }
 
     /**
-     * Use case: Search for products with a result count limit.
-     *
-     * <p>Captures observations about whether the assistant respects the
-     * requested maximum number of results.
+     * Search for products with a result count limit.
      *
      * @param query the search query
      * @param maxResults the maximum number of products to return
-     * @param context the execution context
      * @return observations from the use case execution
      */
-    /**
-     * Search for products with a result count limit.
-     */
-    public UseCaseResult searchProductsWithLimit(String query, int maxResults, UseCaseContext context) {
+    public UseCaseResult searchProductsWithLimit(String query, int maxResults) {
         Instant start = Instant.now();
         
         LlmResponse response = assistant.searchProducts(query, maxResults);
         
         Duration executionTime = Duration.between(start, Instant.now());
 
-        // Standard format observations
         boolean isValidJson = response.isValidJson();
         boolean hasAllRequiredFields = response.hasField("products") 
                 && response.hasField("query") 
                 && response.hasField("totalResults");
 
-        // Result count compliance
         List<Product> products = response.products();
         boolean respectsResultLimit = products.size() <= maxResults;
         
-        // Check if totalResults field matches actual count
         Integer reportedTotal = response.totalResults();
         boolean totalResultsMatchesActual = reportedTotal != null && reportedTotal == products.size();
 
-        // Capture failure mode for experiment statistics
         FailureMode failureMode = response.failureMode();
         String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
 
-        // Overall success requires all quality checks to pass
         boolean success = isValidJson && hasAllRequiredFields && respectsResultLimit;
 
         return UseCaseResult.builder()
-                .value("success", success)  // Primary success indicator for experiments
+                .value("success", success)
                 .value("isValidJson", isValidJson)
                 .value("hasAllRequiredFields", hasAllRequiredFields)
                 .value("respectsResultLimit", respectsResultLimit)
@@ -241,35 +307,28 @@ public class ShoppingUseCase {
                 .value("failureMode", failureMode.name())
                 .meta("query", query)
                 .meta("maxResults", maxResults)
-                .meta("backend", context.getBackend())
+                .meta("model", model)
+                .meta("temperature", temperature)
                 .executionTime(executionTime)
                 .build();
     }
 
     /**
-     * Use case: Search for products and evaluate relevance.
-     *
-     * <p>Captures observations about product relevance scores.
+     * Search for products and evaluate relevance.
      *
      * @param query the search query
      * @param minRelevanceScore the minimum acceptable relevance score
-     * @param context the execution context
      * @return observations from the use case execution
      */
-    /**
-     * Search for products and evaluate relevance.
-     */
-    public UseCaseResult searchProductsWithRelevanceCheck(String query, double minRelevanceScore, UseCaseContext context) {
+    public UseCaseResult searchProductsWithRelevanceCheck(String query, double minRelevanceScore) {
         Instant start = Instant.now();
         
         LlmResponse response = assistant.searchProducts(query);
         
         Duration executionTime = Duration.between(start, Instant.now());
 
-        // Standard format observations
         boolean isValidJson = response.isValidJson();
 
-        // Relevance observations
         List<Product> products = response.products();
         boolean allProductsRelevant = products.stream()
                 .allMatch(p -> p.relevanceScore() != null && p.relevanceScore() >= minRelevanceScore);
@@ -284,15 +343,13 @@ public class ShoppingUseCase {
                 .filter(p -> p.relevanceScore() != null && p.relevanceScore() < minRelevanceScore)
                 .count();
 
-        // Capture failure mode for experiment statistics
         FailureMode failureMode = response.failureMode();
         String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
 
-        // Overall success requires valid JSON and all products meeting relevance threshold
         boolean success = isValidJson && allProductsRelevant;
 
         return UseCaseResult.builder()
-                .value("success", success)  // Primary success indicator for experiments
+                .value("success", success)
                 .value("isValidJson", isValidJson)
                 .value("allProductsRelevant", allProductsRelevant)
                 .value("averageRelevance", averageRelevance)
@@ -303,7 +360,8 @@ public class ShoppingUseCase {
                 .value("failureMode", failureMode.name())
                 .meta("query", query)
                 .meta("minRelevanceScore", minRelevanceScore)
-                .meta("backend", context.getBackend())
+                .meta("model", model)
+                .meta("temperature", temperature)
                 .executionTime(executionTime)
                 .build();
     }

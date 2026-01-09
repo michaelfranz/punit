@@ -1,14 +1,16 @@
 package org.javai.punit.examples.shopping.experiment;
 
 import java.util.Random;
-
+import java.util.stream.Stream;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
 import org.javai.punit.experiment.api.Experiment;
+import org.javai.punit.experiment.api.ExperimentMode;
+import org.javai.punit.experiment.api.Factor;
+import org.javai.punit.experiment.api.FactorArguments;
+import org.javai.punit.experiment.api.FactorSource;
 import org.javai.punit.experiment.api.ResultCaptor;
-import org.javai.punit.experiment.api.UseCaseContext;
-import org.javai.punit.experiment.model.DefaultUseCaseContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
@@ -25,24 +27,21 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li>Inform appropriate pass rate thresholds for probabilistic tests</li>
  * </ul>
  *
- * <h2>Architecture</h2>
- * <p>This class demonstrates the recommended pattern for PUnit experiments:
+ * <h2>Key Design: Configuration at Construction</h2>
+ * <p>Use case configuration (model, temperature, etc.) is provided at construction
+ * time, not at each method call. The use case instance encapsulates its complete
+ * configuration. This is clean separation of concerns:
  * <ul>
- *   <li>Use {@link UseCaseProvider} to configure use case construction</li>
- *   <li>Reference use case by class: {@code @Experiment(useCase = ShoppingUseCase.class)}</li>
- *   <li>Receive use case via method parameter injection</li>
+ *   <li><b>Configuration factors</b> - Control how use case is built (handled by provider)</li>
+ *   <li><b>Input factors</b> - Vary the inputs to use case methods (passed to method)</li>
  * </ul>
  *
  * <h2>Usage</h2>
  * <pre>{@code
  * ./gradlew experiment --tests "ShoppingExperiment"
  * ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
+ * ./gradlew experiment --tests "ShoppingExperiment.exploreModelConfigurations"
  * }</pre>
- *
- * <h2>Output</h2>
- * <p>Baselines are written to {@code build/punit/baselines/}.
- * These can be approved via {@code ./gradlew punitApprove} to create
- * execution specifications in {@code src/test/resources/punit/specs/}.
  *
  * @see ShoppingUseCase
  * @see UseCaseProvider
@@ -55,80 +54,119 @@ public class ShoppingExperiment {
 
     /**
      * The use case provider handles construction and injection of use cases.
-     *
-     * <p>Registered as a JUnit extension so it can inject parameters into
-     * experiment methods.
      */
     @RegisterExtension
     UseCaseProvider provider = new UseCaseProvider();
 
     /**
-     * Shared context for all experiments.
-     */
-    private UseCaseContext context;
-
-    /**
      * Configures the use case provider before each experiment sample.
      *
-     * <p>This is where you configure which implementation to use:
+     * <h2>Two Registration Patterns</h2>
      * <ul>
-     *   <li>Mock with specific configuration for experiments</li>
-     *   <li>Real implementation for integration tests</li>
-     *   <li>Spring-injected beans in {@code @SpringBootTest}</li>
+     *   <li><b>Regular factory</b> - For BASELINE mode with fixed configuration</li>
+     *   <li><b>Factor factory</b> - For EXPLORE mode with configuration from factors</li>
      * </ul>
      */
     @BeforeEach
     void setUp() {
-        // Configure how ShoppingUseCase instances are created
+        // BASELINE mode: Fixed configuration with ~95% success rate
         provider.register(ShoppingUseCase.class, () ->
             new ShoppingUseCase(
                 new MockShoppingAssistant(
                     new Random(),
                     MockShoppingAssistant.MockConfiguration.experimentRealistic()
-                )
+                ),
+                "default",
+                0.0
             )
         );
-
-        // Shared context for experiments
-        context = DefaultUseCaseContext.builder()
-            .backend("mock")
-            .parameter("configuration", "experimentRealistic")
-            .build();
+        
+        // EXPLORE mode: Auto-wired factory
+        // @FactorSetter annotations on ShoppingUseCase handle model/temp injection!
+        // The provider automatically calls setModel() and setTemperature().
+        provider.registerAutoWired(ShoppingUseCase.class, () ->
+            new ShoppingUseCase(
+                new MockShoppingAssistant(new Random(), MockShoppingAssistant.MockConfiguration.defaultConfig())
+            )
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // PRIMARY EXPERIMENT (1000 samples)
+    // EXPLORE MODE EXPERIMENT - Factor-based exploration
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Experiment: Establish realistic baseline for basic product search.
+     * EXPLORE experiment: Compare different model, temperature, and query configurations.
+     *
+     * <h2>Clean Design</h2>
+     * <ul>
+     *   <li>Factor names are defined WITH values via {@link FactorArguments#withFactors()}</li>
+     *   <li>Use case is injected PRE-CONFIGURED with model/temperature</li>
+     *   <li>Use {@code @Factor} to inject any factor you need directly</li>
+     *   <li>Method only declares parameters it actually uses</li>
+     * </ul>
+     *
+     * <h2>Output</h2>
+     * <pre>
+     * build/punit/baselines/ShoppingUseCase/
+     * ├── model-gpt-4_temp-0.0_query-wireless_headphones.yaml
+     * └── ... (one file per configuration)
+     * </pre>
+     */
+    @Experiment(
+        mode = ExperimentMode.EXPLORE,
+        useCase = ShoppingUseCase.class,
+        samplesPerConfig = 1,
+        experimentId = "explore-model-configs"
+    )
+    @FactorSource("modelConfigurations")
+    void exploreModelConfigurations(
+            ShoppingUseCase useCase,       // Pre-configured with model/temp
+            @Factor("query") String query, // Injected directly - clean!
+            ResultCaptor captor
+    ) {
+        captor.record(useCase.searchProducts(query));
+    }
+
+    /**
+     * Factor source: Explicit configurations to explore.
+     *
+     * <p>Names declared once, then each configuration listed explicitly.
+     * This is clearer than Cartesian products and reflects real experiment design.
+     */
+    static Stream<FactorArguments> modelConfigurations() {
+        return FactorArguments.configurations()
+            .names("model", "temp", "query")
+            .values("gpt-4", 0.0, "wireless headphones")
+            .values("gpt-4", 0.7, "wireless headphones")
+            .values("gpt-4", 0.0, "laptop stand")
+            .values("gpt-4", 0.7, "laptop stand")
+            .values("gpt-3.5-turbo", 0.0, "wireless headphones")
+            .values("gpt-3.5-turbo", 0.7, "wireless headphones")
+            .values("gpt-3.5-turbo", 0.0, "laptop stand")
+            .values("gpt-3.5-turbo", 0.7, "laptop stand")
+            .stream();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PRIMARY BASELINE EXPERIMENT (1000 samples)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * BASELINE experiment: Establish reliable statistics for product search.
      *
      * <p>This is the primary experiment for generating a statistically reliable
-     * baseline. It runs 1000 samples with the {@code experimentRealistic()}
-     * configuration (~95% success rate, varied failure modes).
+     * baseline. It runs 1000 samples with fixed configuration (~95% success rate).
      *
-     * <h2>Mock Configuration</h2>
+     * <h2>Key Design Points</h2>
      * <ul>
-     *   <li>2.0% - Malformed JSON (syntax errors)</li>
-     *   <li>1.5% - Hallucinated field names</li>
-     *   <li>1.0% - Invalid field values (wrong types)</li>
-     *   <li>0.5% - Missing required fields</li>
+     *   <li>Use case is pre-configured by UseCaseProvider (set in @BeforeEach)</li>
+     *   <li>No context parameter needed - configuration is internal to use case</li>
+     *   <li>Method is minimal: just invoke and record</li>
      * </ul>
      *
-     * <h2>Expected Outcome</h2>
-     * <ul>
-     *   <li>Success rate: ~95% (±2%)</li>
-     *   <li>Confidence interval width: ~2.6%</li>
-     * </ul>
-     *
-     * <h2>Usage</h2>
-     * <pre>{@code
-     * ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
-     * }</pre>
-     *
-     * @param useCase the shopping use case (injected by {@link UseCaseProvider})
-     * @param captor the result captor (injected by ExperimentExtension)
-     * @see MockShoppingAssistant.MockConfiguration#experimentRealistic()
+     * @param useCase the shopping use case (injected, pre-configured)
+     * @param captor the result captor
      */
     @Experiment(
         useCase = ShoppingUseCase.class,
@@ -138,21 +176,16 @@ public class ShoppingExperiment {
         experimentId = "shopping-search-realistic-v1"
     )
     void measureRealisticSearchBaseline(ShoppingUseCase useCase, ResultCaptor captor) {
-        // Execute the use case and record the result
-        captor.record(useCase.searchProducts("wireless headphones", context));
+        // Clean! Use case is pre-configured. Just invoke and record.
+        captor.record(useCase.searchProducts("wireless headphones"));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // LEGACY EXPERIMENTS (deprecated, kept for reference)
+    // LEGACY EXPERIMENTS
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Experiment: Measure basic product search reliability (legacy, 100 samples).
-     *
-     * @param useCase the shopping use case
-     * @param captor the result captor
-     * @deprecated Use {@link #measureRealisticSearchBaseline(ShoppingUseCase, ResultCaptor)} for
-     *             statistically reliable baselines (1000 samples).
+     * Legacy experiment for backwards compatibility.
      */
     @Experiment(
         useCase = ShoppingUseCase.class,
@@ -162,6 +195,6 @@ public class ShoppingExperiment {
         experimentId = "shopping-search-baseline"
     )
     void measureBasicSearchReliability(ShoppingUseCase useCase, ResultCaptor captor) {
-        captor.record(useCase.searchProducts("wireless headphones", context));
+        captor.record(useCase.searchProducts("wireless headphones"));
     }
 }

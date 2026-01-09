@@ -109,29 +109,39 @@ build/punit/baselines/
 
 ```java
 @Experiment(
+    mode = ExperimentMode.EXPLORE,
     useCase = ShoppingUseCase.class,
-    mode = ExperimentMode.EXPLORE
-    // samplesPerConfig = 1 (default) - quick pass to find working configs
+    samplesPerConfig = 1  // Default: 1 for quick exploration
 )
-@FactorSource("configurations")
-void exploreBackendConfigurations(
-    @Factor("backend") String backend,
-    @Factor("temperature") double temperature,
-    ShoppingUseCase useCase,
+@FactorSource("modelConfigurations")
+void exploreModelConfigurations(
+    @Factor("model") String model,
+    @Factor(value = "temperature", filePrefix = "temp") double temperature,
+    @Factor("query") String query,
     ResultCaptor captor
 ) {
-    context.setBackend(backend);
-    context.setTemperature(temperature);
-    captor.record(useCase.searchProducts("headphones", context));
+    // Configure mock based on factors - simulates different LLM reliability
+    MockShoppingAssistant.MockConfiguration config = selectMockConfig(model, temperature);
+    
+    // Create use case with factor-configured implementation
+    ShoppingUseCase useCase = new ShoppingUseCase(
+        new MockShoppingAssistant(new Random(), config)
+    );
+    
+    // Execute and record
+    captor.record(useCase.searchProducts(query, context));
 }
 
-static Stream<Arguments> configurations() {
-    return Stream.of(
-        Arguments.of("gpt-4", 0.0),
-        Arguments.of("gpt-4", 0.7),
-        Arguments.of("gpt-3.5-turbo", 0.0),
-        Arguments.of("gpt-3.5-turbo", 0.7)
-    );
+static Stream<FactorArguments> modelConfigurations() {
+    List<String> models = List.of("gpt-4", "gpt-3.5-turbo");
+    List<Double> temps = List.of(0.0, 0.7);
+    List<String> queries = List.of("wireless headphones", "laptop stand");
+    
+    // Full factorial: 2 × 2 × 2 = 8 configurations
+    return models.stream()
+        .flatMap(m -> temps.stream()
+            .flatMap(t -> queries.stream()
+                .map(q -> FactorArguments.of(m, t, q))));
 }
 ```
 
@@ -158,13 +168,22 @@ This enables comparison using standard tools:
 
 ### Factor Source Options
 
-EXPLORE mode needs a source of configurations. Options (familiar to JUnit users):
+EXPLORE mode needs a source of configurations. Currently supported:
 
 ```java
 // Method source (most flexible)
 @FactorSource("configurations")
-static Stream<Arguments> configurations() { ... }
+static Stream<FactorArguments> configurations() {
+    return Stream.of(
+        FactorArguments.of("gpt-4", 0.0),
+        FactorArguments.of("gpt-4", 0.7),
+        FactorArguments.of("gpt-3.5-turbo", 0.0)
+    );
+}
+```
 
+Future options (not yet implemented):
+```java
 // CSV source (simple cases)
 @CsvFactorSource({
     "gpt-4, 0.0",

@@ -16,48 +16,70 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * <p>Experiments are exploratory: they produce empirical baselines but never pass/fail verdicts.
  * Experiment results are informational only and never gate CI.
  *
- * <h2>Example Usage</h2>
+ * <h2>Experiment Modes</h2>
+ * <p>Two modes are supported:
+ * <ul>
+ *   <li><b>BASELINE</b> (default): Single configuration, large sample size (1000+)
+ *       for precise statistical estimation</li>
+ *   <li><b>EXPLORE</b>: Multiple configurations from a {@link FactorSource},
+ *       small sample size per config (default: 1) for rapid comparison</li>
+ * </ul>
+ *
+ * <h2>Example: BASELINE Mode</h2>
  * <pre>{@code
- * class ShoppingExperiment {
+ * @Experiment(
+ *     useCase = ShoppingUseCase.class,
+ *     samples = 1000,
+ *     timeBudgetMs = 600_000
+ * )
+ * void measureProductSearchBaseline(ShoppingUseCase useCase, ResultCaptor captor) {
+ *     captor.record(useCase.searchProducts("headphones", context));
+ * }
+ * }</pre>
  *
- *     @RegisterExtension
- *     UseCaseProvider provider = new UseCaseProvider();
+ * <h2>Example: EXPLORE Mode</h2>
+ * <pre>{@code
+ * @Experiment(
+ *     mode = ExperimentMode.EXPLORE,
+ *     useCase = ShoppingUseCase.class,
+ *     samplesPerConfig = 1  // Default: 1 for fast exploration
+ * )
+ * @FactorSource("modelConfigs")
+ * void exploreModels(
+ *     @Factor("model") String model,
+ *     @Factor("temperature") double temperature,
+ *     UseCaseProvider provider,
+ *     ResultCaptor captor
+ * ) {
+ *     // Configure use case with factor values
+ *     provider.register(ShoppingUseCase.class, () ->
+ *         new ShoppingUseCase(createAssistant(model, temperature))
+ *     );
+ *     ShoppingUseCase useCase = provider.getInstance(ShoppingUseCase.class);
+ *     captor.record(useCase.searchProducts("headphones"));
+ * }
  *
- *     private UseCaseContext context;
- *
- *     @BeforeEach
- *     void setUp() {
- *         provider.register(ShoppingUseCase.class, () ->
- *             new ShoppingUseCase(new MockShoppingAssistant(
- *                 MockConfiguration.experimentRealistic()
- *             ))
- *         );
- *         context = DefaultUseCaseContext.builder()
- *             .backend("mock")
- *             .build();
- *     }
- *
- *     @Experiment(
- *         useCase = ShoppingUseCase.class,
- *         samples = 1000,
- *         timeBudgetMs = 600_000,
- *         tokenBudget = 500_000
- *     )
- *     void measureProductSearchBaseline(ShoppingUseCase useCase, ResultCaptor captor) {
- *         captor.record(useCase.searchProducts("wireless headphones", context));
- *     }
+ * static Stream<Arguments> modelConfigs() {
+ *     return Stream.of(
+ *         Arguments.of("gpt-4", 0.0),
+ *         Arguments.of("gpt-4", 0.7),
+ *         Arguments.of("gpt-3.5-turbo", 0.0)
+ *     );
  * }
  * }</pre>
  *
  * <h2>Key Characteristics</h2>
  * <ul>
  *   <li><strong>No pass/fail</strong>: Experiments never fail (except for infrastructure errors)</li>
- *   <li><strong>Produces empirical baseline</strong>: After execution, generates a baseline file</li>
+ *   <li><strong>Produces empirical baseline</strong>: After execution, generates baseline file(s)</li>
  *   <li><strong>Never gates CI</strong>: Results are informational only</li>
- *   <li><strong>Use case injection</strong>: Configure via {@link UseCaseProvider} in {@code @BeforeEach}</li>
+ *   <li><strong>Use case injection</strong>: Configure via {@link UseCaseProvider}</li>
  *   <li><strong>Result capture</strong>: Use {@link ResultCaptor} to record results for aggregation</li>
  * </ul>
  *
+ * @see ExperimentMode
+ * @see FactorSource
+ * @see Factor
  * @see UseCase
  * @see UseCaseProvider
  * @see ResultCaptor
@@ -67,6 +89,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @TestTemplate
 @ExtendWith(ExperimentExtension.class)
 public @interface Experiment {
+    
+    /**
+     * The experiment mode: BASELINE or EXPLORE.
+     *
+     * <p>Default is {@link ExperimentMode#BASELINE}, which runs a single configuration
+     * with many samples for precise statistical estimation.
+     *
+     * <p>Use {@link ExperimentMode#EXPLORE} with {@link FactorSource} to compare
+     * multiple configurations.
+     *
+     * @return the experiment mode
+     */
+    ExperimentMode mode() default ExperimentMode.BASELINE;
     
     /**
      * The use case class to execute.
@@ -97,24 +132,35 @@ public @interface Experiment {
     String useCaseId() default "";
     
     /**
-     * Number of sample invocations to execute (for single-config experiments).
+     * Number of sample invocations to execute in BASELINE mode.
      *
-     * <p>For multi-config experiments, use {@link #samplesPerConfig()} instead.
-     * Must be ≥ 1. Default: 100.
+     * <p>This is used when {@code mode = ExperimentMode.BASELINE} (the default).
+     * For EXPLORE mode, use {@link #samplesPerConfig()} instead.
+     *
+     * <p>Must be ≥ 1. Default: 1000 for statistically reliable baselines.
      *
      * @return the number of samples
      */
-    int samples() default 100;
+    int samples() default 1000;
     
     /**
-     * Number of samples per ExperimentConfig (for multi-config experiments).
+     * Number of samples per configuration in EXPLORE mode.
      *
-     * <p>When {@link ExperimentDesign} is present, this is used instead of {@link #samples()}.
-     * Must be ≥ 1. Default: 100.
+     * <p>This is used when {@code mode = ExperimentMode.EXPLORE}.
+     *
+     * <p>Default: 1 (single sample per config for fast initial filtering).
+     * Increase to 10+ when comparing finalists for statistical rigor.
+     *
+     * <p>Typical workflow:
+     * <ol>
+     *   <li>Phase 1: {@code samplesPerConfig = 1} — quick pass to find working configs</li>
+     *   <li>Phase 2: {@code samplesPerConfig = 10} — compare promising configs</li>
+     *   <li>Final: Switch to BASELINE mode with 1000+ samples for chosen config</li>
+     * </ol>
      *
      * @return the number of samples per config
      */
-    int samplesPerConfig() default 100;
+    int samplesPerConfig() default 1;
     
     /**
      * Maximum wall-clock time budget in milliseconds.

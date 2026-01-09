@@ -26,13 +26,25 @@ import java.util.Random;
 public class MockShoppingAssistant implements ShoppingAssistant {
 
     private final Random random;
-    private final MockConfiguration config;
+    private MockConfiguration config;
 
     /**
      * Creates a mock with default configuration (simulates ~90% reliability).
      */
     public MockShoppingAssistant() {
         this(new Random(), MockConfiguration.defaultConfig());
+    }
+    
+    /**
+     * Updates the configuration for this mock.
+     *
+     * <p>Used by {@link ShoppingUseCase} to reconfigure the mock when
+     * factor parameters (model, temperature) are injected.
+     *
+     * @param config the new configuration
+     */
+    public void setConfiguration(MockConfiguration config) {
+        this.config = config;
     }
 
     /**

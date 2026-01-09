@@ -2,14 +2,24 @@ package org.javai.punit.experiment.engine;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+import org.javai.punit.api.FactorValues;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.experiment.api.Experiment;
+import org.javai.punit.experiment.api.ExperimentMode;
+import org.javai.punit.experiment.api.Factor;
+import org.javai.punit.experiment.api.FactorArguments;
+import org.javai.punit.experiment.api.FactorSource;
 import org.javai.punit.experiment.api.ResultCaptor;
 import org.javai.punit.experiment.api.UseCaseContext;
 import org.javai.punit.experiment.model.DefaultUseCaseContext;
@@ -74,7 +84,6 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         
         // Resolve use case ID from class reference or legacy string
         String useCaseId = resolveUseCaseId(annotation);
-        int samples = annotation.samples();
         
         // Store annotation and metadata for later
         ExtensionContext.Store store = context.getStore(NAMESPACE);
@@ -82,8 +91,26 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         store.put("useCaseId", useCaseId);
         store.put("useCaseClass", annotation.useCase());
         store.put("testMethod", testMethod);
+        store.put("startTimeMs", System.currentTimeMillis());
+        store.put("contextBuilt", new AtomicBoolean(false));
         
-        // Create aggregator
+        // Dispatch based on experiment mode
+        if (annotation.mode() == ExperimentMode.EXPLORE) {
+            return provideExploreInvocationContexts(context, testMethod, annotation, useCaseId, store);
+        } else {
+            return provideBaselineInvocationContexts(annotation, useCaseId, store);
+        }
+    }
+    
+    /**
+     * Provides invocation contexts for BASELINE mode (single configuration, many samples).
+     */
+    private Stream<TestTemplateInvocationContext> provideBaselineInvocationContexts(
+            Experiment annotation, String useCaseId, ExtensionContext.Store store) {
+        
+        int samples = annotation.samples();
+        
+        // Create single aggregator
         ExperimentResultAggregator aggregator = new ExperimentResultAggregator(useCaseId, samples);
         store.put("aggregator", aggregator);
         
@@ -91,15 +118,194 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         AtomicInteger currentSample = new AtomicInteger(0);
         store.put("terminated", terminated);
         store.put("currentSample", currentSample);
-        store.put("startTimeMs", System.currentTimeMillis());
-        store.put("contextBuilt", new AtomicBoolean(false));
+        store.put("mode", ExperimentMode.BASELINE);
         
         // Generate sample stream - each invocation gets its own captor
         return Stream.iterate(1, i -> i + 1)
             .limit(samples)
             .takeWhile(i -> !terminated.get())
-            .map(i -> new ExperimentInvocationContext(i, samples, useCaseId, new ResultCaptor()));
+            .map(i -> new BaselineInvocationContext(i, samples, useCaseId, new ResultCaptor()));
     }
+    
+    /**
+     * Provides invocation contexts for EXPLORE mode (multiple configurations from factors).
+     */
+    @SuppressWarnings("unchecked")
+    private Stream<TestTemplateInvocationContext> provideExploreInvocationContexts(
+            ExtensionContext context, Method testMethod, Experiment annotation, 
+            String useCaseId, ExtensionContext.Store store) {
+        
+        int samplesPerConfig = annotation.samplesPerConfig();
+        
+        // Find @FactorSource annotation
+        FactorSource factorSource = testMethod.getAnnotation(FactorSource.class);
+        if (factorSource == null) {
+            // Warn: EXPLORE without factors is equivalent to BASELINE
+            context.publishReportEntry("punit.warning", 
+                "EXPLORE without @FactorSource is equivalent to BASELINE. " +
+                "Consider adding @FactorSource or using mode = BASELINE.");
+            
+            // Fall back to baseline-like behavior with samplesPerConfig
+            store.put("mode", ExperimentMode.EXPLORE);
+            ExperimentResultAggregator aggregator = new ExperimentResultAggregator(useCaseId, samplesPerConfig);
+            store.put("aggregator", aggregator);
+            store.put("terminated", new AtomicBoolean(false));
+            store.put("currentSample", new AtomicInteger(0));
+            
+            return Stream.iterate(1, i -> i + 1)
+                .limit(samplesPerConfig)
+                .map(i -> new BaselineInvocationContext(i, samplesPerConfig, useCaseId, new ResultCaptor()));
+        }
+        
+        // Find factor method
+        String methodName = factorSource.value();
+        Stream<FactorArguments> factorCombinations;
+        try {
+            Method sourceMethod = testMethod.getDeclaringClass().getDeclaredMethod(methodName);
+            sourceMethod.setAccessible(true);
+            factorCombinations = (Stream<FactorArguments>) sourceMethod.invoke(null);
+        } catch (Exception e) {
+            throw new ExtensionConfigurationException(
+                "Cannot invoke @FactorSource method '" + methodName + "': " + e.getMessage(), e);
+        }
+        
+        // Collect all configurations first
+        List<FactorArguments> argsList = factorCombinations.toList();
+        
+        // Get factor names: from FactorArguments, @FactorSource.factors(), or @Factor annotations
+        List<FactorInfo> factorInfos = extractFactorInfos(testMethod, factorSource, argsList);
+        
+        // Store explore-mode metadata
+        store.put("mode", ExperimentMode.EXPLORE);
+        store.put("factorInfos", factorInfos);
+        store.put("configAggregators", new LinkedHashMap<String, ExperimentResultAggregator>());
+        store.put("terminated", new AtomicBoolean(false));
+        
+        // Generate invocation contexts for all configs × samples
+        List<ExploreInvocationContext> invocations = new ArrayList<>();
+        
+        for (int configIndex = 0; configIndex < argsList.size(); configIndex++) {
+            FactorArguments args = argsList.get(configIndex);
+            Object[] factorValues = args.get();
+            
+            // Build configuration name from factor values
+            String configName = buildConfigName(factorInfos, factorValues);
+            
+            // Create aggregator for this configuration
+            ExperimentResultAggregator configAggregator = 
+                new ExperimentResultAggregator(useCaseId + "/" + configName, samplesPerConfig);
+            ((Map<String, ExperimentResultAggregator>) store.get("configAggregators", Map.class))
+                .put(configName, configAggregator);
+            
+            // Generate samples for this configuration
+            for (int sample = 1; sample <= samplesPerConfig; sample++) {
+                invocations.add(new ExploreInvocationContext(
+                    sample, samplesPerConfig, configIndex + 1, argsList.size(),
+                    useCaseId, configName, factorValues, factorInfos, new ResultCaptor()
+                ));
+            }
+        }
+        
+        return invocations.stream().map(c -> (TestTemplateInvocationContext) c);
+    }
+    
+    /**
+     * Extracts factor information for file naming.
+     *
+     * <p>Priority:
+     * <ol>
+     *   <li>Names embedded in {@link FactorArguments} (best DX - names with values)</li>
+     *   <li>{@code @FactorSource(factors = {...})} annotation</li>
+     *   <li>{@code @Factor} annotations on method parameters</li>
+     * </ol>
+     */
+    private List<FactorInfo> extractFactorInfos(Method method, FactorSource factorSource, 
+                                                 List<FactorArguments> argsList) {
+        // 1. Prefer names embedded in FactorArguments (best DX)
+        if (!argsList.isEmpty() && argsList.get(0).hasNames()) {
+            String[] names = argsList.get(0).names();
+            List<FactorInfo> factorInfos = new ArrayList<>();
+            for (int i = 0; i < names.length; i++) {
+                factorInfos.add(new FactorInfo(i, names[i], names[i], Object.class));
+            }
+            return factorInfos;
+        }
+        
+        // 2. Factor names from @FactorSource annotation
+        String[] factorNames = factorSource.factors();
+        if (factorNames.length > 0) {
+            List<FactorInfo> factorInfos = new ArrayList<>();
+            for (int i = 0; i < factorNames.length; i++) {
+                String name = factorNames[i];
+                factorInfos.add(new FactorInfo(i, name, name, Object.class));
+            }
+            return factorInfos;
+        }
+        
+        // 3. Fall back to @Factor annotations on method parameters
+        List<FactorInfo> factorInfos = new ArrayList<>();
+        Parameter[] parameters = method.getParameters();
+        
+        for (int i = 0; i < parameters.length; i++) {
+            Factor factor = parameters[i].getAnnotation(Factor.class);
+            if (factor != null) {
+                String name = factor.value();
+                String filePrefix = factor.filePrefix().isEmpty() ? name : factor.filePrefix();
+                factorInfos.add(new FactorInfo(i, name, filePrefix, parameters[i].getType()));
+            }
+        }
+        
+        return factorInfos;
+    }
+    
+    /**
+     * Builds a configuration name from factor values for file naming.
+     *
+     * <p>Assumes @Factor-annotated parameters are at the start of the method
+     * parameter list and in the same order as FactorArguments values.
+     */
+    private String buildConfigName(List<FactorInfo> factorInfos, Object[] values) {
+        StringBuilder sb = new StringBuilder();
+        
+        // Use whichever is smaller - factorInfos or values
+        int count = Math.min(factorInfos.size(), values.length);
+        
+        for (int i = 0; i < count; i++) {
+            if (i > 0) sb.append("_");
+            FactorInfo info = factorInfos.get(i);
+            Object value = values[i];
+            String valueStr = formatFactorValue(value);
+            sb.append(info.filePrefix()).append("-").append(valueStr);
+        }
+        
+        // If there are more values than factorInfos, add generic names
+        for (int i = count; i < values.length; i++) {
+            if (sb.length() > 0) sb.append("_");
+            String valueStr = formatFactorValue(values[i]);
+            sb.append("f").append(i).append("-").append(valueStr);
+        }
+        
+        return sb.toString();
+    }
+    
+    /**
+     * Formats a factor value for use in file names.
+     */
+    private String formatFactorValue(Object value) {
+        if (value == null) return "null";
+        String str = value.toString();
+        // Clean up for file system compatibility
+        return str.replace(" ", "_")
+                  .replace("/", "-")
+                  .replace("\\", "-")
+                  .replace(":", "-")
+                  .replaceAll("[^a-zA-Z0-9._-]", "");
+    }
+    
+    /**
+     * Info about a factor parameter.
+     */
+    record FactorInfo(int parameterIndex, String name, String filePrefix, Class<?> type) {}
     
     // ═══════════════════════════════════════════════════════════════════════════
     // INVOCATION INTERCEPTOR - Executes experiment and captures results
@@ -114,6 +320,25 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         // Use parent context's store since provideTestTemplateInvocationContexts stored data there
         ExtensionContext parentContext = extensionContext.getParent().orElse(extensionContext);
         ExtensionContext.Store store = parentContext.getStore(NAMESPACE);
+        
+        ExperimentMode mode = store.get("mode", ExperimentMode.class);
+        if (mode == null) mode = ExperimentMode.BASELINE;
+        
+        if (mode == ExperimentMode.EXPLORE) {
+            interceptExploreMethod(invocation, invocationContext, extensionContext, store);
+        } else {
+            interceptBaselineMethod(invocation, extensionContext, store);
+        }
+    }
+    
+    /**
+     * Intercepts BASELINE mode experiment execution.
+     */
+    @SuppressWarnings("unchecked")
+    private void interceptBaselineMethod(
+            Invocation<Void> invocation,
+            ExtensionContext extensionContext,
+            ExtensionContext.Store store) throws Throwable {
         
         // Build context on first invocation
         AtomicBoolean contextBuilt = store.get("contextBuilt", AtomicBoolean.class);
@@ -160,32 +385,8 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         ResultCaptor captor = invocationStore.get("captor", ResultCaptor.class);
         
         try {
-            // Actually execute the experiment method
-            // The method will:
-            // 1. Receive the use case (injected by UseCaseProvider)
-            // 2. Receive the captor (injected by CaptorParameterResolver)
-            // 3. Execute the use case and call captor.record(result)
             invocation.proceed();
-            
-            // Read result from the captor and aggregate
-            if (captor != null && captor.hasResult()) {
-                UseCaseResult result = captor.getResult();
-                boolean success = determineSuccess(result);
-                
-                if (success) {
-                    aggregator.recordSuccess(result);
-                } else {
-                    String failureCategory = determineFailureCategory(result);
-                    aggregator.recordFailure(result, failureCategory);
-                }
-            } else if (captor != null && captor.hasException()) {
-                aggregator.recordException(captor.getException());
-            } else {
-                // No result recorded - treat as success with no data
-                // (The method ran but didn't use the captor)
-                aggregator.recordSuccess(UseCaseResult.builder().value("recorded", false).build());
-            }
-            
+            recordResult(captor, aggregator);
         } catch (Throwable e) {
             aggregator.recordException(e);
         }
@@ -199,6 +400,87 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
                 aggregator.setCompleted();
             }
             generateBaseline(extensionContext, store);
+        }
+    }
+    
+    /**
+     * Intercepts EXPLORE mode experiment execution.
+     */
+    @SuppressWarnings("unchecked")
+    private void interceptExploreMethod(
+            Invocation<Void> invocation,
+            ReflectiveInvocationContext<Method> invocationContext,
+            ExtensionContext extensionContext,
+            ExtensionContext.Store store) throws Throwable {
+        
+        Experiment annotation = store.get("annotation", Experiment.class);
+        AtomicBoolean terminated = store.get("terminated", AtomicBoolean.class);
+        Map<String, ExperimentResultAggregator> configAggregators = 
+            store.get("configAggregators", Map.class);
+        List<FactorInfo> factorInfos = store.get("factorInfos", List.class);
+        
+        // Get explore invocation context info from extension context store
+        ExtensionContext.Store invocationStore = extensionContext.getStore(NAMESPACE);
+        ResultCaptor captor = invocationStore.get("captor", ResultCaptor.class);
+        String configName = invocationStore.get("configName", String.class);
+        int sampleInConfig = invocationStore.get("sampleInConfig", Integer.class);
+        int samplesPerConfig = annotation.samplesPerConfig();
+        Object[] factorValues = invocationStore.get("factorValues", Object[].class);
+        
+        ExperimentResultAggregator aggregator = configAggregators.get(configName);
+        if (aggregator == null) {
+            throw new ExtensionConfigurationException(
+                "No aggregator found for configuration: " + configName);
+        }
+        
+        // Set factor values on the UseCaseProvider BEFORE the method executes
+        UseCaseProvider provider = findUseCaseProvider(extensionContext);
+        if (provider != null && factorValues != null) {
+            List<String> factorNames = factorInfos.stream()
+                .map(FactorInfo::name)
+                .toList();
+            provider.setCurrentFactorValues(factorValues, factorNames);
+        }
+        
+        try {
+            invocation.proceed();
+            recordResult(captor, aggregator);
+        } catch (Throwable e) {
+            aggregator.recordException(e);
+        }
+        
+        // Report progress for this config
+        extensionContext.publishReportEntry("punit.mode", "EXPLORE");
+        extensionContext.publishReportEntry("punit.config", configName);
+        extensionContext.publishReportEntry("punit.sample", sampleInConfig + "/" + samplesPerConfig);
+        extensionContext.publishReportEntry("punit.successRate", 
+            String.format("%.2f%%", aggregator.getObservedSuccessRate() * 100));
+        
+        // Check if this is the last sample for this config
+        if (sampleInConfig >= samplesPerConfig) {
+            aggregator.setCompleted();
+            generateExploreBaseline(extensionContext, store, configName, aggregator);
+        }
+    }
+    
+    /**
+     * Records the result from the captor into the aggregator.
+     */
+    private void recordResult(ResultCaptor captor, ExperimentResultAggregator aggregator) {
+        if (captor != null && captor.hasResult()) {
+            UseCaseResult result = captor.getResult();
+            boolean success = determineSuccess(result);
+            
+            if (success) {
+                aggregator.recordSuccess(result);
+            } else {
+                String failureCategory = determineFailureCategory(result);
+                aggregator.recordFailure(result, failureCategory);
+            }
+        } else if (captor != null && captor.hasException()) {
+            aggregator.recordException(captor.getException());
+        } else {
+            aggregator.recordSuccess(UseCaseResult.builder().value("recorded", false).build());
         }
     }
     
@@ -304,6 +586,49 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         publishFinalReport(context, aggregator);
     }
     
+    /**
+     * Generates a baseline for a single configuration in EXPLORE mode.
+     */
+    private void generateExploreBaseline(
+            ExtensionContext context, 
+            ExtensionContext.Store store, 
+            String configName,
+            ExperimentResultAggregator aggregator) {
+        
+        UseCaseContext useCaseContext = store.get("useCaseContext", UseCaseContext.class);
+        if (useCaseContext == null) {
+            useCaseContext = DefaultUseCaseContext.builder().build();
+        }
+        
+        Experiment annotation = store.get("annotation", Experiment.class);
+        String useCaseId = store.get("useCaseId", String.class);
+        
+        EmpiricalBaselineGenerator generator = new EmpiricalBaselineGenerator();
+        EmpiricalBaseline baseline = generator.generate(
+            aggregator,
+            context.getTestClass().orElse(null),
+            context.getTestMethod().orElse(null),
+            useCaseContext
+        );
+        
+        // Write baseline to config-specific file
+        try {
+            Path outputPath = resolveExploreBaselineOutputPath(annotation, useCaseId, configName);
+            BaselineWriter writer = new BaselineWriter();
+            writer.write(baseline, outputPath, annotation.outputFormat());
+            
+            context.publishReportEntry("punit.baseline.outputPath", outputPath.toString());
+            context.publishReportEntry("punit.config.complete", configName);
+        } catch (IOException e) {
+            context.publishReportEntry("punit.baseline.error", 
+                "Config " + configName + ": " + e.getMessage());
+        }
+        
+        // Publish report for this config
+        context.publishReportEntry("punit.config.successRate", 
+            String.format("%s: %.4f", configName, aggregator.getObservedSuccessRate()));
+    }
+    
     private Path resolveBaselineOutputPath(Experiment annotation, String useCaseId) {
         String filename = useCaseId.replace('.', '-') + "." + annotation.outputFormat();
         
@@ -316,6 +641,38 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         // Fallback: use annotation's baselineOutputDir relative to current directory
         String baseDir = annotation.baselineOutputDir();
         return Paths.get(baseDir, filename);
+    }
+    
+    /**
+     * Resolves the output path for an EXPLORE mode configuration baseline.
+     *
+     * <p>Structure:
+     * <pre>
+     * build/punit/baselines/
+     * └── ShoppingUseCase/              # Directory for use case
+     *     ├── model-gpt-4_temp-0.0.yaml
+     *     └── model-gpt-4_temp-0.7.yaml
+     * </pre>
+     */
+    private Path resolveExploreBaselineOutputPath(Experiment annotation, String useCaseId, String configName) 
+            throws IOException {
+        
+        String filename = configName + "." + annotation.outputFormat();
+        
+        // Check for system property override (set by Gradle experiment task)
+        String outputDirOverride = System.getProperty("punit.baseline.outputDir");
+        Path baseDir;
+        if (outputDirOverride != null && !outputDirOverride.isEmpty()) {
+            baseDir = Paths.get(outputDirOverride);
+        } else {
+            baseDir = Paths.get(annotation.baselineOutputDir());
+        }
+        
+        // Create subdirectory for use case
+        Path useCaseDir = baseDir.resolve(useCaseId.replace('.', '-'));
+        Files.createDirectories(useCaseDir);
+        
+        return useCaseDir.resolve(filename);
     }
     
     private void publishFinalReport(ExtensionContext context, ExperimentResultAggregator aggregator) {
@@ -364,9 +721,9 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
     }
 
     /**
-     * Invocation context for a single experiment sample.
+     * Invocation context for BASELINE mode (single configuration).
      */
-    private record ExperimentInvocationContext(int sampleNumber, int totalSamples,
+    private record BaselineInvocationContext(int sampleNumber, int totalSamples,
                                                String useCaseId, ResultCaptor captor) 
             implements TestTemplateInvocationContext {
 
@@ -377,7 +734,60 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
 
         @Override
         public List<Extension> getAdditionalExtensions() {
-            return List.of(new CaptorParameterResolver(captor));
+            return List.of(new CaptorParameterResolver(captor, null, 0));
+        }
+    }
+    
+    /**
+     * Invocation context for EXPLORE mode (multiple configurations).
+     */
+    private record ExploreInvocationContext(
+            int sampleInConfig, int samplesPerConfig,
+            int configIndex, int totalConfigs,
+            String useCaseId, String configName,
+            Object[] factorValues, List<FactorInfo> factorInfos,
+            ResultCaptor captor) 
+            implements TestTemplateInvocationContext {
+
+        @Override
+        public String getDisplayName(int invocationIndex) {
+            return String.format("[%s] config %d/%d (%s) sample %d/%d", 
+                useCaseId, configIndex, totalConfigs, configName, sampleInConfig, samplesPerConfig);
+        }
+
+        @Override
+        public List<Extension> getAdditionalExtensions() {
+            List<Extension> extensions = new ArrayList<>();
+            extensions.add(new CaptorParameterResolver(captor, configName, sampleInConfig, factorValues));
+            extensions.add(new FactorParameterResolver(factorValues, factorInfos));
+            extensions.add(new FactorValuesResolver(factorValues, factorInfos));
+            return extensions;
+        }
+    }
+    
+    /**
+     * Parameter resolver that provides FactorValues for accessing factor data by name.
+     */
+    private static class FactorValuesResolver implements ParameterResolver {
+        private final Object[] factorValues;
+        private final List<FactorInfo> factorInfos;
+        
+        FactorValuesResolver(Object[] factorValues, List<FactorInfo> factorInfos) {
+            this.factorValues = factorValues;
+            this.factorInfos = factorInfos;
+        }
+        
+        @Override
+        public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
+            return parameterContext.getParameter().getType() == FactorValues.class;
+        }
+        
+        @Override
+        public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
+            List<String> names = factorInfos.stream()
+                .map(FactorInfo::name)
+                .toList();
+            return new FactorValues(factorValues, names);
         }
     }
     
@@ -386,9 +796,19 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
      */
     private static class CaptorParameterResolver implements ParameterResolver {
         private final ResultCaptor captor;
+        private final String configName;
+        private final int sampleInConfig;
+        private final Object[] factorValues;
         
-        CaptorParameterResolver(ResultCaptor captor) {
+        CaptorParameterResolver(ResultCaptor captor, String configName, int sampleInConfig) {
+            this(captor, configName, sampleInConfig, null);
+        }
+        
+        CaptorParameterResolver(ResultCaptor captor, String configName, int sampleInConfig, Object[] factorValues) {
             this.captor = captor;
+            this.configName = configName;
+            this.sampleInConfig = sampleInConfig;
+            this.factorValues = factorValues;
         }
         
         @Override
@@ -400,9 +820,72 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         @Override
         public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext) 
                 throws ParameterResolutionException {
-            // Also store in the extension context so the interceptor can access it
-            extensionContext.getStore(NAMESPACE).put("captor", captor);
+            // Store in the extension context so the interceptor can access it
+            ExtensionContext.Store store = extensionContext.getStore(NAMESPACE);
+            store.put("captor", captor);
+            if (configName != null) {
+                store.put("configName", configName);
+                store.put("sampleInConfig", sampleInConfig);
+            }
+            if (factorValues != null) {
+                store.put("factorValues", factorValues);
+            }
             return captor;
+        }
+    }
+    
+    /**
+     * Finds the UseCaseProvider in the test instance.
+     */
+    private UseCaseProvider findUseCaseProvider(ExtensionContext context) {
+        Object testInstance = context.getRequiredTestInstance();
+        for (java.lang.reflect.Field field : testInstance.getClass().getDeclaredFields()) {
+            if (UseCaseProvider.class.isAssignableFrom(field.getType())) {
+                field.setAccessible(true);
+                try {
+                    return (UseCaseProvider) field.get(testInstance);
+                } catch (IllegalAccessException e) {
+                    // Continue searching
+                }
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Parameter resolver that provides factor values for EXPLORE mode.
+     */
+    private static class FactorParameterResolver implements ParameterResolver {
+        private final Object[] factorValues;
+        private final List<FactorInfo> factorInfos;
+        
+        FactorParameterResolver(Object[] factorValues, List<FactorInfo> factorInfos) {
+            this.factorValues = factorValues;
+            this.factorInfos = factorInfos;
+        }
+        
+        @Override
+        public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext extensionContext) 
+                throws ParameterResolutionException {
+            // Check if this parameter has a @Factor annotation
+            return parameterContext.getParameter().isAnnotationPresent(Factor.class);
+        }
+        
+        @Override
+        public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext) 
+                throws ParameterResolutionException {
+            Factor factor = parameterContext.getParameter().getAnnotation(Factor.class);
+            String factorName = factor.value();
+            
+            // Find the matching factor value
+            for (int i = 0; i < factorInfos.size(); i++) {
+                if (factorInfos.get(i).name().equals(factorName)) {
+                    return factorValues[i];
+                }
+            }
+            
+            throw new ParameterResolutionException(
+                "No factor value found for @Factor(\"" + factorName + "\")");
         }
     }
 }
