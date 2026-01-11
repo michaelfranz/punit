@@ -56,7 +56,7 @@ class ArchitectureTest {
         @DisplayName("Core engine must not depend on LLM extension (llmx)")
         void coreEngineMustNotDependOnLlmx() {
             ArchRule rule = noClasses()
-                    .that().resideInAPackage("org.javai.punit.engine..")
+                    .that().resideInAPackage("org.javai.punit.ptest.engine..")
                     .should().dependOnClassesThat()
                     .resideInAPackage("org.javai.punit.llmx..");
 
@@ -114,7 +114,7 @@ class ArchitectureTest {
                     .that().resideInAPackage("org.javai.punit.api..")
                     .and().areNotAnnotations()  // Allow annotations to reference extensions
                     .should().dependOnClassesThat()
-                    .resideInAPackage("org.javai.punit.engine..");
+                    .resideInAPackage("org.javai.punit.ptest.engine..");
 
             rule.check(punitClasses);
         }
@@ -143,7 +143,7 @@ class ArchitectureTest {
             ArchRule rule = noClasses()
                     .that().resideInAPackage("org.javai.punit.model..")
                     .should().dependOnClassesThat()
-                    .resideInAPackage("org.javai.punit.engine..");
+                    .resideInAPackage("org.javai.punit.ptest.engine..");
 
             rule.check(punitClasses);
         }
@@ -182,7 +182,7 @@ class ArchitectureTest {
                     .should().dependOnClassesThat()
                     .resideInAnyPackage(
                             "org.javai.punit.api..",
-                            "org.javai.punit.engine..",
+                            "org.javai.punit.ptest.engine..",
                             "org.javai.punit.experiment..",
                             "org.javai.punit.spec..",
                             "org.javai.punit.model..",

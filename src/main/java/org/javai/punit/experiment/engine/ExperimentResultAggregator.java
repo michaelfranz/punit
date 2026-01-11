@@ -12,7 +12,7 @@ import org.javai.punit.experiment.model.UseCaseResult;
 /**
  * Aggregates results from experiment sample executions.
  *
- * <p>Unlike {@link org.javai.punit.engine.SampleResultAggregator}, this aggregator
+ * <p>Unlike {@link org.javai.punit.ptest.engine.SampleResultAggregator}, this aggregator
  * is designed for experiments which:
  * <ul>
  *   <li>Collect {@link UseCaseResult} instances (not just pass/fail)</li>

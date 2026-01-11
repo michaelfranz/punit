@@ -1,6 +1,6 @@
 package org.javai.punit.api;
 
-import org.javai.punit.engine.ProbabilisticTestBudgetExtension;
+import org.javai.punit.ptest.engine.ProbabilisticTestBudgetExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.lang.annotation.ElementType;
