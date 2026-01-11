@@ -19,7 +19,7 @@ package org.javai.punit.statistics;
  * @param approach The operational approach used for derivation
  * @param context The derivation context (baseline data, sample sizes, confidence)
  * @param isStatisticallySound True if the derivation produces a reliable threshold;
- *                              false if the implied confidence is too low (< 80%)
+ *                              false if the implied confidence is too low (&lt; 80%)
  * 
  * @see OperationalApproach
  */

@@ -112,7 +112,7 @@ class SpecificationLoaderTest {
             
             ExecutionSpecification spec = SpecificationLoader.parseYaml(yaml);
             
-            assertThat(spec.getSpecId()).isEqualTo("TestUseCase");
+            assertThat(spec.getUseCaseId()).isEqualTo("TestUseCase");
             assertThat(spec.getUseCaseId()).isEqualTo("TestUseCase");
             assertThat(spec.getMinPassRate()).isEqualTo(0.85);
         }
@@ -210,7 +210,7 @@ class SpecificationLoaderTest {
             
             ExecutionSpecification spec = SpecificationLoader.parseYaml(sb.toString());
             
-            assertThat(spec.getSpecId()).isEqualTo("TestCase");
+            assertThat(spec.getUseCaseId()).isEqualTo("TestCase");
         }
 
         @Test
@@ -228,7 +228,7 @@ class SpecificationLoaderTest {
             
             ExecutionSpecification spec = SpecificationLoader.parseYaml(sb.toString());
             
-            assertThat(spec.getSpecId()).isEqualTo("TestCase");
+            assertThat(spec.getUseCaseId()).isEqualTo("TestCase");
             assertThat(spec.getApprovalNotes()).isEqualTo("Some notes here");
         }
 
@@ -326,7 +326,7 @@ class SpecificationLoaderTest {
 
             ExecutionSpecification spec = SpecificationLoader.parseYaml(yaml);
 
-            assertThat(spec.getSpecId()).isEqualTo("TestUseCase");
+            assertThat(spec.getUseCaseId()).isEqualTo("TestUseCase");
             assertThat(spec.hasApprovalMetadata()).isFalse();
             assertThat(spec.hasEmpiricalBasis()).isTrue();
         }

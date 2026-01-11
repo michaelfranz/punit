@@ -286,30 +286,5 @@ class UseCaseResultTest {
             assertThat(copy.metadata()).containsEntry("backend", "openai");
         }
     }
-
-    @Nested
-    @DisplayName("deprecated bridge methods")
-    class DeprecatedBridgeMethods {
-
-        @Test
-        @DisplayName("getAllValues returns same as values()")
-        @SuppressWarnings("deprecation")
-        void getAllValuesReturnsSameAsValues() {
-            UseCaseResult result = UseCaseResult.builder()
-                .value("key", "value")
-                .build();
-
-            assertThat(result.getAllValues()).isEqualTo(result.values());
-        }
-
-        @Test
-        @DisplayName("getTimestamp returns same as timestamp()")
-        @SuppressWarnings("deprecation")
-        void getTimestampReturnsSameAsTimestamp() {
-            UseCaseResult result = UseCaseResult.builder().build();
-
-            assertThat(result.getTimestamp()).isEqualTo(result.timestamp());
-        }
-    }
 }
 

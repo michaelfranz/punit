@@ -153,9 +153,8 @@ public final class SpecificationLoader {
 				inExtendedStatistics = false;
 				inFailureDistribution = false;
 
-				if (line.startsWith("specId:")) {
-					builder.specId(extractValue(line));
-				} else if (line.startsWith("useCaseId:")) {
+				if (line.startsWith("specId:") || line.startsWith("useCaseId:")) {
+					// Both specId (legacy) and useCaseId map to useCaseId
 					builder.useCaseId(extractValue(line));
 				} else if (line.startsWith("version:")) {
 					builder.version(Integer.parseInt(extractValue(line)));

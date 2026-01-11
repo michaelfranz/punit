@@ -37,7 +37,7 @@ class FactorConsistencyValidatorTest {
 
     private ExecutionSpecification createSpecWithFactorMetadata(String hash, String sourceName, int samplesUsed) {
         return ExecutionSpecification.builder()
-                .specId("test-spec")
+                .useCaseId("test-spec")
                 .useCaseId("TestUseCase")
                 .factorSourceMetadata(hash, sourceName, samplesUsed)
                 .build();
@@ -45,7 +45,7 @@ class FactorConsistencyValidatorTest {
 
     private ExecutionSpecification createSpecWithoutFactorMetadata() {
         return ExecutionSpecification.builder()
-                .specId("test-spec")
+                .useCaseId("test-spec")
                 .useCaseId("TestUseCase")
                 .build();
     }

@@ -401,16 +401,10 @@ public class ConfigurationResolver {
      * @return the spec ID, or null if none specified
      */
     private String resolveSpecId(ProbabilisticTest annotation) {
-        // New pattern: use case class reference
+        // Use case class reference determines spec ID
         Class<?> useCaseClass = annotation.useCase();
         if (useCaseClass != null && useCaseClass != Void.class) {
             return UseCaseProvider.resolveId(useCaseClass);
-        }
-
-        // Legacy pattern: explicit spec ID
-        String explicitSpec = annotation.spec();
-        if (explicitSpec != null && !explicitSpec.isEmpty()) {
-            return explicitSpec;
         }
 
         return null;

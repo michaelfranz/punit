@@ -130,18 +130,6 @@ public @interface Experiment {
     Class<?> useCase() default Void.class;
     
     /**
-     * The use case ID to execute (legacy, prefer {@link #useCase()} class reference).
-     *
-     * <p>If both {@code useCaseId} and {@code useCase} are specified, the class reference
-     * takes precedence.
-     *
-     * @return the use case ID
-     * @deprecated Use {@link #useCase()} with class reference for type safety
-     */
-    @Deprecated
-    String useCaseId() default "";
-    
-    /**
      * Number of sample invocations to execute in MEASURE mode.
      *
      * <p>This is used when {@code mode = ExperimentMode.MEASURE}.

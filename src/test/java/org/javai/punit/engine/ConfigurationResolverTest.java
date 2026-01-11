@@ -251,18 +251,8 @@ class ConfigurationResolverTest {
             }
 
             @Override
-            public String spec() {
-                return "";
-            }
-
-            @Override
             public Class<?> useCase() {
                 return Void.class;
-            }
-
-            @Override
-            public String useCaseId() {
-                return "";
             }
 
             @Override
@@ -293,31 +283,19 @@ class ConfigurationResolverTest {
     }
 
     @Test
-    void usesDefaultMinPassRateWhenNaNAndNoSpec() {
-        // When minPassRate is NaN and there's no spec, should use default (0.95)
-        ProbabilisticTest annotation = createAnnotationWithNaNMinPassRate(100, "");
+    void usesDefaultMinPassRateWhenNaNAndNoUseCase() {
+        // When minPassRate is NaN and there's no useCase, should use default (0.95)
+        ProbabilisticTest annotation = createAnnotationWithNaNMinPassRate(100);
         
         ConfigurationResolver.ResolvedConfiguration config = resolver.resolve(annotation, "testMethod");
         
-        assertThat(config.minPassRate()).isEqualTo(ConfigurationResolver.DEFAULT_MIN_PASS_RATE);
-    }
-
-    @Test
-    void loadsMinPassRateFromSpecWhenProvided() {
-        // When minPassRate is NaN but spec is provided, try to load from spec
-        // If spec doesn't exist, falls back to default
-        ProbabilisticTest annotation = createAnnotationWithNaNMinPassRate(100, "nonexistent.spec:v1");
-        
-        ConfigurationResolver.ResolvedConfiguration config = resolver.resolve(annotation, "testMethod");
-        
-        // Since the spec doesn't exist, falls back to default
         assertThat(config.minPassRate()).isEqualTo(ConfigurationResolver.DEFAULT_MIN_PASS_RATE);
     }
 
     /**
-     * Creates a mock annotation with NaN minPassRate and specified spec.
+     * Creates a mock annotation with NaN minPassRate (no spec reference).
      */
-    private ProbabilisticTest createAnnotationWithNaNMinPassRate(int samples, String spec) {
+    private ProbabilisticTest createAnnotationWithNaNMinPassRate(int samples) {
         return new ProbabilisticTest() {
             @Override
             public Class<? extends java.lang.annotation.Annotation> annotationType() {
@@ -365,18 +343,8 @@ class ConfigurationResolverTest {
             }
 
             @Override
-            public String spec() {
-                return spec;
-            }
-
-            @Override
             public Class<?> useCase() {
                 return Void.class;
-            }
-
-            @Override
-            public String useCaseId() {
-                return "";
             }
 
             @Override

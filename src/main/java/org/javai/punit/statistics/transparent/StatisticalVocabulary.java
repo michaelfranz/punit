@@ -68,10 +68,10 @@ public final class StatisticalVocabulary {
     /** Alternative hypothesis symbol (ASCII): H1 */
     public static final String H1_ASCII = "H1";
 
-    /** Less than or equal (ASCII): <= */
+    /** Less than or equal (ASCII): &le; */
     public static final String LEQ_ASCII = "<=";
 
-    /** Greater than or equal (ASCII): >= */
+    /** Greater than or equal (ASCII): &ge; */
     public static final String GEQ_ASCII = ">=";
 
     /** Not equal (ASCII): != */

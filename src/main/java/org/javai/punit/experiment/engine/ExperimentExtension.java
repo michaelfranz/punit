@@ -994,20 +994,13 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
     private String resolveUseCaseId(Experiment annotation) {
         Class<?> useCaseClass = annotation.useCase();
         
-        // New pattern: use case class reference
+        // Use case class reference is required
         if (useCaseClass != null && useCaseClass != Void.class) {
             return UseCaseProvider.resolveId(useCaseClass);
         }
         
-        // Legacy pattern: string ID
-        String legacyId = annotation.useCaseId();
-        if (legacyId != null && !legacyId.isEmpty()) {
-            return legacyId;
-        }
-        
         throw new ExtensionConfigurationException(
-            "Experiment must specify either useCase class or useCaseId. " +
-            "Recommended: @Experiment(useCase = MyUseCase.class, ...)");
+            "Experiment must specify useCase class: @Experiment(useCase = MyUseCase.class, ...)");
     }
 
     /**

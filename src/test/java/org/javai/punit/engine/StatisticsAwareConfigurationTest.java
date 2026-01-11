@@ -32,13 +32,13 @@ class StatisticsAwareConfigurationTest {
         
         // Create a spec with baseline data: 951/1000 successes (95.1%)
         testSpec = ExecutionSpecification.builder()
-                .specId("json.generation:v1")
+                .useCaseId("json.generation:v1")
                 .useCaseId("json.generation")
                 .version(1)
                 .approvedAt(Instant.now())
                 .approvedBy("test")
                 .approvalNotes("Test spec")
-                .baselineData(1000, 951)
+                .empiricalBasis(1000, 951)
                 .build();
     }
 
@@ -208,13 +208,13 @@ class StatisticsAwareConfigurationTest {
         void handlesPerfectBaseline() {
             // Spec with perfect baseline: 1000/1000 (100%)
             ExecutionSpecification perfectSpec = ExecutionSpecification.builder()
-                    .specId("perfect:v1")
+                    .useCaseId("perfect:v1")
                     .useCaseId("perfect")
                     .version(1)
                     .approvedAt(Instant.now())
                     .approvedBy("test")
                     .approvalNotes("Perfect baseline test")
-                    .baselineData(1000, 1000)  // 100% success
+                    .empiricalBasis(1000, 1000)  // 100% success
                     .build();
 
             ProbabilisticTest annotation = createAnnotation(
@@ -239,7 +239,7 @@ class StatisticsAwareConfigurationTest {
         @DisplayName("rejects spec without baseline data")
         void rejectsSpecWithoutBaselineData() {
             ExecutionSpecification specWithoutBaseline = ExecutionSpecification.builder()
-                    .specId("no-baseline:v1")
+                    .useCaseId("no-baseline:v1")
                     .useCaseId("no-baseline")
                     .version(1)
                     .approvedAt(Instant.now())
@@ -267,9 +267,7 @@ class StatisticsAwareConfigurationTest {
 
         return new ProbabilisticTest() {
             @Override public Class<? extends Annotation> annotationType() { return ProbabilisticTest.class; }
-            @Override public String spec() { return spec; }
             @Override public Class<?> useCase() { return Void.class; }
-            @Override public String useCaseId() { return ""; }
             @Override public int samples() { return samples; }
             @Override public double minPassRate() { return minPassRate; }
             @Override public double thresholdConfidence() { return thresholdConfidence; }

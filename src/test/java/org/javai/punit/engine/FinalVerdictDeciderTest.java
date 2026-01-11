@@ -87,31 +87,6 @@ class FinalVerdictDeciderTest {
     }
 
     @Test
-    @SuppressWarnings("deprecation")
-    void buildFailureMessageIncludesStatistics() {
-        SampleResultAggregator aggregator = new SampleResultAggregator(100);
-        for (int i = 0; i < 80; i++) {
-            aggregator.recordSuccess();
-        }
-        for (int i = 0; i < 20; i++) {
-            aggregator.recordFailure(new AssertionError("test failure " + i));
-        }
-        
-        // Using deprecated method for backward compatibility test
-        String message = decider.buildFailureMessage(aggregator, 0.95);
-        
-        // New format uses 1 decimal place (80.0%, 95.0%)
-        assertThat(message)
-                .contains("PUnit FAILED")
-                .contains("80.0%")
-                .contains("threshold=95.0%")
-                .contains("Samples executed: 100")
-                .contains("Successes: 80")
-                .contains("Failures: 20")
-                .contains("Example failures");
-    }
-
-    @Test
     void buildSuccessMessageIncludesStatistics() {
         SampleResultAggregator aggregator = new SampleResultAggregator(100);
         for (int i = 0; i < 98; i++) {

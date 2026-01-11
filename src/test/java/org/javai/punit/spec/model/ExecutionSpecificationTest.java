@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import org.javai.punit.spec.model.ExecutionSpecification.BaselineData;
+import org.javai.punit.spec.model.ExecutionSpecification.EmpiricalBasis;
 import org.javai.punit.spec.model.ExecutionSpecification.CostEnvelope;
 import org.javai.punit.spec.model.ExecutionSpecification.SpecRequirements;
 import org.junit.jupiter.api.DisplayName;
@@ -40,12 +40,12 @@ class ExecutionSpecificationTest {
                 .executionContext(Map.of("model", "gpt-4"))
                 .requirements(0.9, "isValid == true")
                 .costEnvelope(100, 500, 10000)
-                .baselineData(100, 85)
+                .empiricalBasis(100, 85)
                 .build();
 
             assertThat(spec.getUseCaseId()).isEqualTo("TestUseCase");
             // getSpecId() is deprecated and returns useCaseId
-            assertThat(spec.getSpecId()).isEqualTo("TestUseCase");
+            assertThat(spec.getUseCaseId()).isEqualTo("TestUseCase");
             assertThat(spec.getVersion()).isEqualTo(2);
             assertThat(spec.getApprovedAt()).isEqualTo(now);
             assertThat(spec.getApprovedBy()).isEqualTo("approver");
@@ -71,7 +71,7 @@ class ExecutionSpecificationTest {
         @DisplayName("specId sets useCaseId for backwards compatibility")
         void specIdSetsUseCaseId() {
             ExecutionSpecification spec = ExecutionSpecification.builder()
-                .specId("LegacySpec")  // deprecated, but should still work
+                .useCaseId("LegacySpec")  // deprecated, but should still work
                 .approvedAt(Instant.now())
                 .approvedBy("tester")
                 .build();
@@ -121,7 +121,7 @@ class ExecutionSpecificationTest {
         @DisplayName("can set baseline data with record")
         void canSetBaselineDataWithRecord() {
             ExecutionSpecification spec = validBuilder()
-                .baselineData(new BaselineData(50, 40, Instant.now()))
+                .empiricalBasis(new EmpiricalBasis(50, 40, Instant.now()))
                 .build();
 
             assertThat(spec.getBaselineSamples()).isEqualTo(50);
@@ -132,10 +132,10 @@ class ExecutionSpecificationTest {
         void canSetBaselineDataWithTimestamp() {
             Instant now = Instant.now();
             ExecutionSpecification spec = validBuilder()
-                .baselineData(50, 40, now)
+                .empiricalBasis(50, 40, now)
                 .build();
 
-            assertThat(spec.getBaselineData().generatedAt()).isEqualTo(now);
+            assertThat(spec.getEmpiricalBasis().generatedAt()).isEqualTo(now);
         }
     }
 
@@ -144,31 +144,31 @@ class ExecutionSpecificationTest {
     class BaselineDataTests {
 
         @Test
-        @DisplayName("hasBaselineData returns true when present")
-        void hasBaselineDataReturnsTrue() {
+        @DisplayName("hasEmpiricalBasis returns true when present")
+        void hasEmpiricalBasisReturnsTrue() {
             ExecutionSpecification spec = validBuilder()
-                .baselineData(100, 85)
+                .empiricalBasis(100, 85)
                 .build();
 
-            assertThat(spec.hasBaselineData()).isTrue();
+            assertThat(spec.hasEmpiricalBasis()).isTrue();
         }
 
         @Test
-        @DisplayName("hasBaselineData returns false when absent")
-        void hasBaselineDataReturnsFalse() {
+        @DisplayName("hasEmpiricalBasis returns false when absent")
+        void hasEmpiricalBasisReturnsFalse() {
             ExecutionSpecification spec = validBuilder().build();
 
-            assertThat(spec.hasBaselineData()).isFalse();
+            assertThat(spec.hasEmpiricalBasis()).isFalse();
         }
 
         @Test
-        @DisplayName("hasBaselineData returns false when samples is 0")
-        void hasBaselineDataReturnsFalseForZeroSamples() {
+        @DisplayName("hasEmpiricalBasis returns false when samples is 0")
+        void hasEmpiricalBasisReturnsFalseForZeroSamples() {
             ExecutionSpecification spec = validBuilder()
-                .baselineData(0, 0)
+                .empiricalBasis(0, 0)
                 .build();
 
-            assertThat(spec.hasBaselineData()).isFalse();
+            assertThat(spec.hasEmpiricalBasis()).isFalse();
         }
 
         @Test
@@ -199,7 +199,7 @@ class ExecutionSpecificationTest {
         @DisplayName("getObservedRate returns 0 when samples is 0")
         void getObservedRateReturnsZeroForZeroSamples() {
             ExecutionSpecification spec = validBuilder()
-                .baselineData(0, 0)
+                .empiricalBasis(0, 0)
                 .build();
 
             assertThat(spec.getObservedRate()).isEqualTo(0.0);
@@ -209,7 +209,7 @@ class ExecutionSpecificationTest {
         @DisplayName("getObservedRate calculates correctly")
         void getObservedRateCalculatesCorrectly() {
             ExecutionSpecification spec = validBuilder()
-                .baselineData(100, 85)
+                .empiricalBasis(100, 85)
                 .build();
 
             assertThat(spec.getObservedRate()).isEqualTo(0.85);
@@ -225,7 +225,7 @@ class ExecutionSpecificationTest {
         void isApprovedReturnsTrue() {
             ExecutionSpecification spec = validBuilder().build();
 
-            assertThat(spec.isApproved()).isTrue();
+            assertThat(spec.hasApprovalMetadata()).isTrue();
         }
 
         @Test
@@ -237,7 +237,7 @@ class ExecutionSpecificationTest {
                 .approvedBy("approver")
                 .build();
 
-            assertThat(spec.isApproved()).isFalse();
+            assertThat(spec.hasApprovalMetadata()).isFalse();
         }
 
         @Test
@@ -249,7 +249,7 @@ class ExecutionSpecificationTest {
                 .approvedAt(Instant.now())
                 .build();
 
-            assertThat(spec.isApproved()).isFalse();
+            assertThat(spec.hasApprovalMetadata()).isFalse();
         }
 
         @Test
@@ -262,7 +262,7 @@ class ExecutionSpecificationTest {
                 .approvedBy("")
                 .build();
 
-            assertThat(spec.isApproved()).isFalse();
+            assertThat(spec.hasApprovalMetadata()).isFalse();
         }
     }
 
@@ -290,20 +290,6 @@ class ExecutionSpecificationTest {
 
             // Should not throw - approval is optional in v2
             spec.validate();
-        }
-
-        @Test
-        @DisplayName("validateStrict throws when not approved (v1 behavior)")
-        @SuppressWarnings("deprecation")
-        void validateStrictThrowsWhenNotApproved() {
-            ExecutionSpecification spec = ExecutionSpecification.builder()
-                .useCaseId("Spec")
-                .useCaseId("UseCase")
-                .build();
-
-            assertThatThrownBy(spec::validateStrict)
-                .isInstanceOf(SpecificationValidationException.class)
-                .hasMessageContaining("lacks approval metadata");
         }
 
         @Test
@@ -365,13 +351,13 @@ class ExecutionSpecificationTest {
     }
 
     @Nested
-    @DisplayName("BaselineData")
-    class BaselineDataRecordTests {
+    @DisplayName("EmpiricalBasis")
+    class EmpiricalBasisTests {
 
         @Test
         @DisplayName("computes observedRate")
         void computesObservedRate() {
-            BaselineData data = new BaselineData(100, 85, Instant.now());
+            EmpiricalBasis data = new EmpiricalBasis(100, 85, Instant.now());
 
             assertThat(data.observedRate()).isEqualTo(0.85);
         }
@@ -379,7 +365,7 @@ class ExecutionSpecificationTest {
         @Test
         @DisplayName("observedRate is 0 for 0 samples")
         void observedRateIsZeroForZeroSamples() {
-            BaselineData data = new BaselineData(0, 0, null);
+            EmpiricalBasis data = new EmpiricalBasis(0, 0, null);
 
             assertThat(data.observedRate()).isEqualTo(0.0);
         }
@@ -387,7 +373,7 @@ class ExecutionSpecificationTest {
         @Test
         @DisplayName("throws for negative samples")
         void throwsForNegativeSamples() {
-            assertThatThrownBy(() -> new BaselineData(-1, 0, null))
+            assertThatThrownBy(() -> new EmpiricalBasis(-1, 0, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("samples must be non-negative");
         }
@@ -395,7 +381,7 @@ class ExecutionSpecificationTest {
         @Test
         @DisplayName("throws for negative successes")
         void throwsForNegativeSuccesses() {
-            assertThatThrownBy(() -> new BaselineData(10, -1, null))
+            assertThatThrownBy(() -> new EmpiricalBasis(10, -1, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("successes must be non-negative");
         }
@@ -403,7 +389,7 @@ class ExecutionSpecificationTest {
         @Test
         @DisplayName("throws when successes exceeds samples")
         void throwsWhenSuccessesExceedSamples() {
-            assertThatThrownBy(() -> new BaselineData(10, 20, null))
+            assertThatThrownBy(() -> new EmpiricalBasis(10, 20, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("successes cannot exceed samples");
         }

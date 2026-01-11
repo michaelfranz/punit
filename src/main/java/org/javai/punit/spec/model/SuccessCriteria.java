@@ -92,7 +92,7 @@ class ExpressionSuccessCriteria implements SuccessCriteria {
 
 	@Override
 	public boolean isSuccess(UseCaseResult result) {
-		return evaluate(expression, result.getAllValues());
+		return evaluate(expression, result.values());
 	}
 
 	@Override

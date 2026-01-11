@@ -59,7 +59,7 @@ class FactorConsistencyIntegrationTest {
 
             // Simulate storing the spec after experiment
             ExecutionSpecification spec = ExecutionSpecification.builder()
-                    .specId("ProductSearchSpec")
+                    .useCaseId("ProductSearchSpec")
                     .useCaseId("ProductSearchUseCase")
                     .generatedAt(Instant.now())
                     .empiricalBasis(experimentSamples, 940)
@@ -94,7 +94,7 @@ class FactorConsistencyIntegrationTest {
             int experimentSamples = 1000;
 
             ExecutionSpecification spec = ExecutionSpecification.builder()
-                    .specId("ProductSearchSpec")
+                    .useCaseId("ProductSearchSpec")
                     .useCaseId("ProductSearchUseCase")
                     .generatedAt(Instant.now())
                     .empiricalBasis(experimentSamples, 940)
@@ -124,7 +124,7 @@ class FactorConsistencyIntegrationTest {
         void shouldSkipValidationForLegacySpecs() {
             // ARRANGE: Legacy spec without factor metadata
             ExecutionSpecification legacySpec = ExecutionSpecification.builder()
-                    .specId("LegacySpec")
+                    .useCaseId("LegacySpec")
                     .useCaseId("LegacyUseCase")
                     .empiricalBasis(500, 475)
                     // No factorSourceMetadata!
@@ -166,7 +166,7 @@ class FactorConsistencyIntegrationTest {
             HashableFactorSource testSource = DefaultHashableFactorSource.fromList("source", fullSource);
 
             ExecutionSpecification spec = ExecutionSpecification.builder()
-                    .specId("spec")
+                    .useCaseId("spec")
                     .useCaseId("useCase")
                     .factorSourceMetadata(experimentSource.getSourceHash(), "source", 5)
                     .build();
@@ -189,7 +189,7 @@ class FactorConsistencyIntegrationTest {
         void matchResultShouldFormatWithCheckmark() {
             HashableFactorSource source = DefaultHashableFactorSource.fromList("src", PRODUCTION_QUERIES);
             ExecutionSpecification spec = ExecutionSpecification.builder()
-                    .specId("spec")
+                    .useCaseId("spec")
                     .useCaseId("uc")
                     .factorSourceMetadata(source.getSourceHash(), "src", 100)
                     .build();
@@ -207,7 +207,7 @@ class FactorConsistencyIntegrationTest {
             HashableFactorSource testSource = DefaultHashableFactorSource.fromList("test", MODIFIED_QUERIES);
 
             ExecutionSpecification spec = ExecutionSpecification.builder()
-                    .specId("spec")
+                    .useCaseId("spec")
                     .useCaseId("uc")
                     .factorSourceMetadata(experimentSource.getSourceHash(), "exp", 100)
                     .build();

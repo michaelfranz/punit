@@ -24,7 +24,7 @@ public final class PunitFailureMessages {
      *
      * <p>Format:
      * <pre>
-     * PUnit FAILED with 95.0% confidence (alpha=0.050). Observed pass rate=87.0% (87/100) < threshold=91.6%. Baseline=95.1% (N=1000), spec=json.generation:v3
+     * PUnit FAILED with 95.0% confidence (alpha=0.050). Observed pass rate=87.0% (87/100) &lt; threshold=91.6%. Baseline=95.1% (N=1000), spec=json.generation:v3
      * </pre>
      *
      * @param context the statistical context containing all required parameters
@@ -52,7 +52,7 @@ public final class PunitFailureMessages {
      *
      * <p>Format:
      * <pre>
-     * PUnit FAILED. Observed pass rate=87.0% (87/100) < threshold=90.0%.
+     * PUnit FAILED. Observed pass rate=87.0% (87/100) &lt; threshold=90.0%.
      * </pre>
      *
      * @param observedRate the observed pass rate (0.0 to 1.0)

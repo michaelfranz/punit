@@ -78,17 +78,6 @@ public final class ExecutionSpecification {
 	}
 
 	/**
-	 * Returns the use case ID (which also serves as the spec ID).
-	 *
-	 * @return the use case ID
-	 * @deprecated Use {@link #getUseCaseId()} instead. This method will be removed in a future version.
-	 */
-	@Deprecated
-	public String getSpecId() {
-		return useCaseId;
-	}
-
-	/**
 	 * Returns the use case ID.
 	 *
 	 * <p>This is the primary identifier for both the use case and the specification.
@@ -169,17 +158,6 @@ public final class ExecutionSpecification {
 	}
 
 	/**
-	 * Returns the raw baseline data used for threshold derivation.
-	 *
-	 * @return the baseline data, or null if not set (legacy specs)
-	 * @deprecated Use {@link #getEmpiricalBasis()} instead
-	 */
-	@Deprecated(since = "0.2.0", forRemoval = true)
-	public EmpiricalBasis getBaselineData() {
-		return empiricalBasis;
-	}
-
-	/**
 	 * Returns extended statistics from the experiment.
 	 *
 	 * <p>This optional data provides additional detail for analysis but is not
@@ -223,17 +201,6 @@ public final class ExecutionSpecification {
 	}
 
 	/**
-	 * Returns true if this specification has baseline data for threshold derivation.
-	 *
-	 * @return true if baseline data is present
-	 * @deprecated Use {@link #hasEmpiricalBasis()} instead
-	 */
-	@Deprecated(since = "0.2.0", forRemoval = true)
-	public boolean hasBaselineData() {
-		return hasEmpiricalBasis();
-	}
-
-	/**
 	 * Returns the number of samples from the baseline experiment.
 	 *
 	 * @return the baseline sample count, or 0 if no empirical basis
@@ -273,17 +240,6 @@ public final class ExecutionSpecification {
 	 */
 	public boolean hasApprovalMetadata() {
 		return approvedAt != null && approvedBy != null && !approvedBy.isEmpty();
-	}
-
-	/**
-	 * Returns true if this specification has valid approval metadata.
-	 *
-	 * @return true if approved
-	 * @deprecated Use {@link #hasApprovalMetadata()} instead. Approval is now optional.
-	 */
-	@Deprecated(since = "0.2.0", forRemoval = true)
-	public boolean isApproved() {
-		return hasApprovalMetadata();
 	}
 
 	/**
@@ -336,22 +292,6 @@ public final class ExecutionSpecification {
 	}
 
 	/**
-	 * Validates this specification with strict v1 rules (approval required).
-	 *
-	 * @throws SpecificationValidationException if validation fails
-	 * @deprecated Use {@link #validate()} instead. Approval is now optional.
-	 */
-	@Deprecated(since = "0.2.0", forRemoval = true)
-	public void validateStrict() throws SpecificationValidationException {
-		if (!hasApprovalMetadata()) {
-			throw new SpecificationValidationException(
-					"Specification '" + useCaseId + "' lacks approval metadata. " +
-							"Add 'approvedAt', 'approvedBy', and 'approvalNotes' to the specification file.");
-		}
-		validate();
-	}
-
-	/**
 	 * Specification requirements.
 	 */
 	public record SpecRequirements(double minPassRate, String successCriteria) {
@@ -391,42 +331,6 @@ public final class ExecutionSpecification {
 		 * @throws IllegalArgumentException if data is invalid
 		 */
 		public EmpiricalBasis {
-			if (samples < 0) {
-				throw new IllegalArgumentException("samples must be non-negative");
-			}
-			if (successes < 0) {
-				throw new IllegalArgumentException("successes must be non-negative");
-			}
-			if (successes > samples) {
-				throw new IllegalArgumentException("successes cannot exceed samples");
-			}
-		}
-	}
-
-	/**
-	 * Alias for EmpiricalBasis for backwards compatibility.
-	 *
-	 * @deprecated Use {@link EmpiricalBasis} instead
-	 */
-	@Deprecated(since = "0.2.0", forRemoval = true)
-	public record BaselineData(int samples, int successes, Instant generatedAt) {
-
-		/**
-		 * Returns the observed success rate.
-		 *
-		 * @return the rate (0.0 to 1.0)
-		 */
-		public double observedRate() {
-			if (samples == 0) return 0.0;
-			return (double) successes / samples;
-		}
-
-		/**
-		 * Validates that the baseline data is consistent.
-		 *
-		 * @throws IllegalArgumentException if data is invalid
-		 */
-		public BaselineData {
 			if (samples < 0) {
 				throw new IllegalArgumentException("samples must be non-negative");
 			}
@@ -517,17 +421,6 @@ public final class ExecutionSpecification {
 		private Builder() {
 		}
 
-		/**
-		 * Sets the spec ID (alias for useCaseId).
-		 *
-		 * @deprecated Use {@link #useCaseId(String)} instead.
-		 */
-		@Deprecated
-		public Builder specId(String specId) {
-			this.useCaseId = specId;
-			return this;
-		}
-
 		public Builder useCaseId(String useCaseId) {
 			this.useCaseId = useCaseId;
 			return this;
@@ -599,56 +492,6 @@ public final class ExecutionSpecification {
 		}
 
 		public Builder empiricalBasis(int samples, int successes) {
-			this.empiricalBasis = new EmpiricalBasis(samples, successes, null);
-			return this;
-		}
-
-		/**
-		 * Sets the baseline data.
-		 *
-		 * @deprecated Use {@link #empiricalBasis(EmpiricalBasis)} instead
-		 */
-		@Deprecated(since = "0.2.0", forRemoval = true)
-		public Builder baselineData(EmpiricalBasis baselineData) {
-			this.empiricalBasis = baselineData;
-			return this;
-		}
-
-		/**
-		 * Sets the baseline data from a BaselineData record.
-		 *
-		 * @deprecated Use {@link #empiricalBasis(EmpiricalBasis)} instead
-		 */
-		@Deprecated(since = "0.2.0", forRemoval = true)
-		public Builder baselineData(BaselineData baselineData) {
-			if (baselineData != null) {
-				this.empiricalBasis = new EmpiricalBasis(
-						baselineData.samples(),
-						baselineData.successes(),
-						baselineData.generatedAt()
-				);
-			}
-			return this;
-		}
-
-		/**
-		 * Sets the baseline data.
-		 *
-		 * @deprecated Use {@link #empiricalBasis(int, int, Instant)} instead
-		 */
-		@Deprecated(since = "0.2.0", forRemoval = true)
-		public Builder baselineData(int samples, int successes, Instant generatedAt) {
-			this.empiricalBasis = new EmpiricalBasis(samples, successes, generatedAt);
-			return this;
-		}
-
-		/**
-		 * Sets the baseline data.
-		 *
-		 * @deprecated Use {@link #empiricalBasis(int, int)} instead
-		 */
-		@Deprecated(since = "0.2.0", forRemoval = true)
-		public Builder baselineData(int samples, int successes) {
 			this.empiricalBasis = new EmpiricalBasis(samples, successes, null);
 			return this;
 		}

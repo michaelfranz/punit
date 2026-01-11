@@ -44,7 +44,7 @@ public class FinalVerdictDecider {
 	 *
 	 * <p>Format:
 	 * <pre>
-	 * PUnit FAILED with 95.0% confidence (alpha=0.050). Observed pass rate=87.0% (87/100) < threshold=91.6%. Baseline=95.1% (N=1000), spec=json.generation:v3
+	 * PUnit FAILED with 95.0% confidence (alpha=0.050). Observed pass rate=87.0% (87/100) &lt; threshold=91.6%. Baseline=95.1% (N=1000), spec=json.generation:v3
 	 * </pre>
 	 *
 	 * @param aggregator the aggregated sample results
@@ -68,36 +68,6 @@ public class FinalVerdictDecider {
 		sb.append("\n\n");
 
 		// Additional context
-		appendExecutionDetails(sb, aggregator);
-
-		return sb.toString();
-	}
-
-	/**
-	 * Builds a detailed failure message with statistics (legacy method for backward compatibility).
-	 *
-	 * <p>This method is retained for backward compatibility with tests that don't have
-	 * statistical context. For new code, prefer {@link #buildFailureMessage(SampleResultAggregator, PunitFailureMessages.StatisticalContext)}.
-	 *
-	 * @param aggregator the aggregated sample results
-	 * @param minPassRate the minimum required pass rate
-	 * @return a formatted failure message
-	 * @deprecated Use {@link #buildFailureMessage(SampleResultAggregator, PunitFailureMessages.StatisticalContext)} for full statistical context
-	 */
-	@Deprecated
-	public String buildFailureMessage(SampleResultAggregator aggregator, double minPassRate) {
-		StringBuilder sb = new StringBuilder();
-
-		double observedRate = aggregator.getObservedPassRate();
-
-		// Use legacy format without statistical qualifications
-		sb.append(PunitFailureMessages.probabilisticTestFailureLegacy(
-				observedRate,
-				aggregator.getSuccesses(),
-				aggregator.getSamplesExecuted(),
-				minPassRate));
-		sb.append("\n\n");
-
 		appendExecutionDetails(sb, aggregator);
 
 		return sb.toString();

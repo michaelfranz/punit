@@ -356,29 +356,4 @@ public @interface ProbabilisticTest {
      */
     Class<?> useCase() default Void.class;
 
-    /**
-     * Reference to an execution specification (legacy, prefer {@link #useCase()}).
-     *
-     * <p>Format: {@code "useCaseId:version"} (e.g., "usecase.json.generation:v3")
-     *
-     * <p>When provided, the spec supplies the baseline data (samples, successes, observed rate)
-     * needed to derive thresholds statistically.
-     *
-     * <p>When empty and {@link #useCase()} is specified, the spec is looked up automatically
-     * based on the use case ID.
-     *
-     * @return the specification ID, or empty string for automatic lookup
-     * @deprecated Prefer {@link #useCase()} with class reference; spec is derived automatically
-     */
-    @Deprecated
-    String spec() default "";
-
-    /**
-     * The use case ID (legacy, prefer {@link #useCase()} class reference).
-     *
-     * @return the use case ID
-     * @deprecated Use {@link #useCase()} with class reference for type safety
-     */
-    @Deprecated
-    String useCaseId() default "";
 }

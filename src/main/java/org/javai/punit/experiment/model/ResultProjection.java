@@ -1,6 +1,7 @@
 package org.javai.punit.experiment.model;
 
 import java.util.List;
+import org.javai.punit.experiment.engine.ResultProjectionBuilder;
 
 /**
  * A diff-optimized projection of a {@link UseCaseResult}.

@@ -268,52 +268,6 @@ public record UseCaseResult(
         return values.containsKey(key);
     }
     
-    // ========== Deprecated Bridge Methods ==========
-    
-    /**
-     * Returns all values as an unmodifiable map.
-     *
-     * @return unmodifiable map of all values
-     * @deprecated Use {@link #values()} instead. This method will be removed in a future version.
-     */
-    @Deprecated(forRemoval = true)
-    public Map<String, Object> getAllValues() {
-        return values;
-    }
-    
-    /**
-     * Returns all metadata as an unmodifiable map.
-     *
-     * @return unmodifiable map of all metadata
-     * @deprecated Use {@link #metadata()} instead. This method will be removed in a future version.
-     */
-    @Deprecated(forRemoval = true)
-    public Map<String, Object> getAllMetadata() {
-        return metadata;
-    }
-    
-    /**
-     * Returns the timestamp when this result was created.
-     *
-     * @return the creation timestamp
-     * @deprecated Use {@link #timestamp()} instead. This method will be removed in a future version.
-     */
-    @Deprecated(forRemoval = true)
-    public Instant getTimestamp() {
-        return timestamp;
-    }
-    
-    /**
-     * Returns the execution time of the use case invocation.
-     *
-     * @return the execution duration
-     * @deprecated Use {@link #executionTime()} instead. This method will be removed in a future version.
-     */
-    @Deprecated(forRemoval = true)
-    public Duration getExecutionTime() {
-        return executionTime;
-    }
-    
     // ========== Builder ==========
     
     /**

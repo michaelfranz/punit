@@ -56,7 +56,7 @@ public record StatisticsAwareConfiguration(
             ExecutionSpecification spec,
             String testMethodName) {
 
-        boolean hasSpec = spec != null && !annotation.spec().isEmpty();
+        boolean hasSpec = spec != null;
 
         // Validate and resolve the operational approach
         // This enforces: exactly one approach must be specified
@@ -70,7 +70,7 @@ public record StatisticsAwareConfiguration(
         }
 
         // Spec-driven mode: validate spec has baseline data
-        if (!spec.hasBaselineData()) {
+        if (hasSpec && !spec.hasEmpiricalBasis()) {
             throw new ProbabilisticTestConfigurationException(String.format("""
                 
                 ═══════════════════════════════════════════════════════════════════════════
@@ -89,7 +89,7 @@ public record StatisticsAwareConfiguration(
                 This data should be populated when the baseline is approved.
                 
                 ═══════════════════════════════════════════════════════════════════════════
-                """, annotation.spec()));
+                """, spec.getUseCaseId()));
         }
 
         // Derive threshold and sample count based on operational approach
@@ -204,7 +204,7 @@ public record StatisticsAwareConfiguration(
                 ────────────────────────────────────────────────────────────────────────────
                 
                 """,
-                    annotation.spec(),
+                    spec.getUseCaseId(),
                     approach.minPassRate() * 100,
                     spec.getObservedRate() * 100,
                     derivedThreshold.context().confidence() * 100,
