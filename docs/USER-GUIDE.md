@@ -1,23 +1,46 @@
 # PUnit User Guide
 
-The complete guide to probabilistic testing with PUnit.
+*Experimentation and statistical regression testing for non-deterministic systems*
 
-This document walks you through the canonical operational flow—from defining use cases, through experimentation, to running statistically-grounded tests in CI.
+This guide covers both sides of PUnit: **experimentation** (discovering how your system behaves) and **testing** (verifying it continues to behave that way).
 
 ---
 
-## Overview
+## The Two Sides of PUnit
 
-PUnit follows a streamlined workflow:
+PUnit is not just a testing framework—it's an **experimentation and testing platform** for non-deterministic systems.
+
+| Capability | Purpose | Output |
+|------------|---------|--------|
+| **Experimentation** | Discover and measure system behavior | Empirical baselines (specs) |
+| **Testing** | Verify behavior hasn't regressed | Pass/fail verdicts |
+
+These capabilities are deeply connected: experiments generate the empirical data that powers the most rigorous form of probabilistic test—the **spec-driven test**.
+
+### The Operational Flow
 
 ```
-Use Case → Experiment → Spec (commit) → Probabilistic Test
+┌─────────────────────────────────────────────────────────────────────┐
+│                        EXPERIMENTATION                              │
+│                                                                     │
+│   Use Case  ──▶  EXPLORE  ──▶  Choose Config  ──▶  MEASURE  ──▶  Spec
+│                  (compare)                         (baseline)    (commit)
+└─────────────────────────────────────────────────────────────────────┘
+                                                           │
+                                                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                           TESTING                                   │
+│                                                                     │
+│   Spec  ──▶  Spec-Driven Test  ──▶  CI Pass/Fail                   │
+│              (threshold derived)                                    │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 1. **Use Case**: Define *what* behavior you want to observe
-2. **Experiment**: Run the use case repeatedly to gather empirical data  
-3. **Spec**: Machine-generated summary of observed behavior (commit to Git)
-4. **Probabilistic Test**: CI-gated test using spec-derived thresholds
+2. **EXPLORE**: Compare configurations with small samples (discover what works)
+3. **MEASURE**: Run large-scale experiment on chosen config (establish baseline)
+4. **Spec**: Machine-generated empirical baseline (commit to Git)
+5. **Spec-Driven Test**: CI-gated test with threshold derived from your data
 
 ---
 
