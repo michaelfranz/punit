@@ -8,7 +8,7 @@ import java.util.List;
 
 import org.javai.punit.api.DiffableContentProvider;
 import org.javai.punit.experiment.model.ResultProjection;
-import org.javai.punit.experiment.model.UseCaseResult;
+import org.javai.punit.model.UseCaseResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

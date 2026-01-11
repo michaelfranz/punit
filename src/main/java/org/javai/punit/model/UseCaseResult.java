@@ -1,4 +1,4 @@
-package org.javai.punit.experiment.model;
+package org.javai.punit.model;
 
 import java.time.Duration;
 import java.time.Instant;

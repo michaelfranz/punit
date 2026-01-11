@@ -1,4 +1,4 @@
-package org.javai.punit.experiment.model;
+package org.javai.punit.model;
 
 import java.util.List;
 import java.util.Optional;

@@ -1,4 +1,4 @@
-package org.javai.punit.experiment.model;
+package org.javai.punit.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -7,7 +7,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import org.javai.punit.api.UseCaseContext;
-import org.javai.punit.experiment.model.UseCaseResult;
+import org.javai.punit.model.UseCaseResult;
 
 /**
  * Represents a discovered use case definition.

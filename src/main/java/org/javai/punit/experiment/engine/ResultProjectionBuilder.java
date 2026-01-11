@@ -6,7 +6,7 @@ import java.util.Objects;
 
 import org.javai.punit.api.DiffableContentProvider;
 import org.javai.punit.experiment.model.ResultProjection;
-import org.javai.punit.experiment.model.UseCaseResult;
+import org.javai.punit.model.UseCaseResult;
 
 /**
  * Builds diff-optimized result projections from {@link UseCaseResult} instances.

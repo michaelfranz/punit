@@ -2,7 +2,7 @@ package org.javai.punit.spec.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Map;
-import org.javai.punit.experiment.model.UseCaseResult;
+import org.javai.punit.model.UseCaseResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

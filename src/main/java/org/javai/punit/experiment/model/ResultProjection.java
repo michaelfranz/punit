@@ -4,7 +4,7 @@ import java.util.List;
 import org.javai.punit.experiment.engine.ResultProjectionBuilder;
 
 /**
- * A diff-optimized projection of a {@link UseCaseResult}.
+ * A diff-optimized projection of a {@link org.javai.punit.model.UseCaseResult}.
  *
  * <p>Designed for line-by-line comparison in diff tools. All projections
  * for the same use case have identical structure regardless of actual
@@ -21,10 +21,10 @@ import org.javai.punit.experiment.engine.ResultProjectionBuilder;
  *
  * <p>Note: Timestamp is intentionally excluded from the projection because it
  * always differs between samples, creating noise in diffs. The timestamp remains
- * available in the underlying {@link UseCaseResult} for debugging purposes.
+ * available in the underlying {@link org.javai.punit.model.UseCaseResult} for debugging purposes.
  *
  * @see ResultProjectionBuilder
- * @see UseCaseResult#getDiffableContent(int)
+ * @see org.javai.punit.model.UseCaseResult#getDiffableContent(int)
  */
 public record ResultProjection(
     int sampleIndex,

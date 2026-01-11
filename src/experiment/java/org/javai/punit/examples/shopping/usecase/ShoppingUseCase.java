@@ -6,7 +6,7 @@ import java.util.List;
 import org.javai.punit.api.FactorSetter;
 import org.javai.punit.api.UseCase;
 import org.javai.punit.api.FactorArguments;
-import org.javai.punit.experiment.model.UseCaseResult;
+import org.javai.punit.model.UseCaseResult;
 
 /**
  * Use cases for the LLM-powered shopping assistant.

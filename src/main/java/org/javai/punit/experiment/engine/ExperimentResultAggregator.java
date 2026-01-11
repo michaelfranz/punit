@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.javai.punit.experiment.model.ResultProjection;
-import org.javai.punit.experiment.model.UseCaseResult;
+import org.javai.punit.model.UseCaseResult;
 
 /**
  * Aggregates results from experiment sample executions.

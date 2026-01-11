@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import org.javai.punit.experiment.model.FailureObservation;
+import org.javai.punit.model.FailureObservation;
 
 /**
  * Analyzes failure observations to identify patterns for prompt refinement.

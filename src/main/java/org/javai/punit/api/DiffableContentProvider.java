@@ -2,7 +2,7 @@ package org.javai.punit.api;
 
 import java.util.List;
 
-import org.javai.punit.experiment.model.UseCaseResult;
+import org.javai.punit.model.UseCaseResult;
 
 /**
  * Interface for use case classes that want to customize diff projection.

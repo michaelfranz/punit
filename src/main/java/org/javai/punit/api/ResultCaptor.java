@@ -1,6 +1,6 @@
 package org.javai.punit.api;
 
-import org.javai.punit.experiment.model.UseCaseResult;
+import org.javai.punit.model.UseCaseResult;
 
 /**
  * Captures use case execution results during experiments.
