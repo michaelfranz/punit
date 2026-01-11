@@ -2,6 +2,7 @@ package org.javai.punit.experiment.model;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,8 +52,13 @@ public record UseCaseResult(
      * Compact constructor for defensive copying and validation.
      */
     public UseCaseResult {
-        values = values != null ? Map.copyOf(values) : Map.of();
-        metadata = metadata != null ? Map.copyOf(metadata) : Map.of();
+        // Map.copyOf doesn't support null values, so use LinkedHashMap for defensive copy
+        values = values != null 
+            ? Collections.unmodifiableMap(new LinkedHashMap<>(values)) 
+            : Map.of();
+        metadata = metadata != null 
+            ? Collections.unmodifiableMap(new LinkedHashMap<>(metadata)) 
+            : Map.of();
         Objects.requireNonNull(timestamp, "timestamp must not be null");
         Objects.requireNonNull(executionTime, "executionTime must not be null");
     }
