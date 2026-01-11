@@ -75,11 +75,16 @@ This is a broader design consideration that should be addressed before implement
 
 ---
 
-## Phase 3: Adaptive Pacing (Future)
+## Phase 3: Adaptive Pacing ~~(Future)~~ DEFERRED
 
-- [ ] Detect 429 responses and back off
-- [ ] Learn average latency during execution
-- [ ] Adjust pacing dynamically within constraints
+> **Decision**: Adaptive pacing is deferred indefinitely. The complexity of detecting 429s,
+> learning latency, and adjusting dynamically is not justified by current use cases.
+> Static pacing constraints provide sufficient control for the foreseeable future.
+> If demand emerges, this can be revisited.
+
+- ~~Detect 429 responses and back off~~
+- ~~Learn average latency during execution~~
+- ~~Adjust pacing dynamically within constraints~~
 
 ---
 
