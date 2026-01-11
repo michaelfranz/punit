@@ -4,7 +4,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import org.javai.punit.experiment.api.FactorArguments;
+import org.javai.punit.api.FactorArguments;
 
 /**
  * An iterator that cycles through a list of factor arguments.
@@ -39,7 +39,7 @@ import org.javai.punit.experiment.api.FactorArguments;
  * }</pre>
  *
  * @see DefaultHashableFactorSource
- * @see org.javai.punit.experiment.api.FactorSourceType#LIST_CYCLING
+ * @see org.javai.punit.api.FactorSourceType#LIST_CYCLING
  */
 public class CyclingFactorIterator implements Iterator<FactorArguments> {
 

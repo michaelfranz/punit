@@ -3,7 +3,7 @@ package org.javai.punit.experiment.model;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.javai.punit.experiment.api.AdaptiveFactor;
+import org.javai.punit.api.AdaptiveFactor;
 import org.javai.punit.experiment.spi.RefinementStrategy;
 
 /**

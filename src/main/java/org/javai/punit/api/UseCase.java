@@ -7,21 +7,22 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a class as a PUnit use case and optionally specifies its ID.
+ * Marks a class or method as a PUnit use case and optionally specifies its ID.
  *
- * <p>Use cases are the core abstraction in PUnit for encapsulating LLM-powered
- * behavior that needs probabilistic testing. They provide:
+ * <p>Use cases are the core abstraction in PUnit for encapsulating behavior
+ * that needs probabilistic testing or experimentation. They provide:
  * <ul>
  *   <li>A stable identifier for linking experiments, specs, and tests</li>
  *   <li>Encapsulation of success/failure observation logic</li>
  *   <li>A bridge between test assertions and production code</li>
  * </ul>
  *
- * <h2>Usage</h2>
+ * <h2>Class-Level Usage (Recommended)</h2>
  *
  * <h3>Default ID (simple class name)</h3>
  * <pre>{@code
  * // ID is "ShoppingUseCase"
+ * @UseCase
  * public class ShoppingUseCase {
  *     public UseCaseResult searchProducts(String query, UseCaseContext ctx) {
  *         // ...
@@ -34,6 +35,17 @@ import java.lang.annotation.Target;
  * @UseCase("shopping.product.search")
  * public class ShoppingUseCase {
  *     // ID is "shopping.product.search"
+ * }
+ * }</pre>
+ *
+ * <h2>Method-Level Usage</h2>
+ * <pre>{@code
+ * @UseCase("usecase.email.validation")
+ * UseCaseResult validateEmailFormat(String email, UseCaseContext context) {
+ *     ValidationResult result = emailValidator.validate(email);
+ *     return UseCaseResult.builder()
+ *         .value("isValid", result.isValid())
+ *         .build();
  * }
  * }</pre>
  *
@@ -56,7 +68,7 @@ import java.lang.annotation.Target;
  * @see ProbabilisticTest#useCase()
  */
 @Documented
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface UseCase {
 
@@ -75,6 +87,15 @@ public @interface UseCase {
      * @return the use case ID, or empty string to use class name
      */
     String value() default "";
+
+    /**
+     * Human-readable description of what this use case tests.
+     *
+     * <p>This is used for documentation and logging purposes.
+     *
+     * @return description of the use case
+     */
+    String description() default "";
 
     /**
      * Maximum number of content lines to include in EXPLORE result projections.

@@ -1,4 +1,4 @@
-package org.javai.punit.experiment.api;
+package org.javai.punit.api;
 
 import org.javai.punit.experiment.model.UseCaseResult;
 
@@ -26,7 +26,7 @@ import org.javai.punit.experiment.model.UseCaseResult;
  *   <li>After method execution, the extension reads the result and aggregates it</li>
  * </ol>
  *
- * @see org.javai.punit.experiment.api.Experiment
+ * @see org.javai.punit.api.Experiment
  */
 public class ResultCaptor {
 

@@ -2,7 +2,7 @@ package org.javai.punit.examples.shopping.usecase;
 
 import java.util.List;
 import java.util.stream.Stream;
-import org.javai.punit.experiment.api.FactorArguments;
+import org.javai.punit.api.FactorArguments;
 
 /**
  * Standalone factor source provider for shopping-related experiments.

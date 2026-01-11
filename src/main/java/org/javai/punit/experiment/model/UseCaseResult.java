@@ -39,7 +39,7 @@ import java.util.Optional;
  * int tokens = result.getInt("tokensUsed", 0);
  * }</pre>
  *
- * @see org.javai.punit.experiment.api.UseCase
+ * @see org.javai.punit.api.UseCase
  */
 public record UseCaseResult(
     Map<String, Object> values,

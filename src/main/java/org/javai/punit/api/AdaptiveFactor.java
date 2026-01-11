@@ -1,4 +1,4 @@
-package org.javai.punit.experiment.api;
+package org.javai.punit.api;
 
 import java.util.Optional;
 import org.javai.punit.experiment.model.IterationFeedback;

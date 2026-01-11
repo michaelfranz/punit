@@ -6,9 +6,9 @@ import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.stream.Stream;
-import org.javai.punit.experiment.api.FactorArguments;
-import org.javai.punit.experiment.api.FactorSource;
-import org.javai.punit.experiment.api.HashableFactorSource;
+import org.javai.punit.api.FactorArguments;
+import org.javai.punit.api.FactorSource;
+import org.javai.punit.api.HashableFactorSource;
 
 /**
  * Resolves factor source methods and wraps them in {@link HashableFactorSource} instances.

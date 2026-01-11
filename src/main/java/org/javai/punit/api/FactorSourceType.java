@@ -1,4 +1,4 @@
-package org.javai.punit.experiment.api;
+package org.javai.punit.api;
 
 /**
  * Defines the consumption model for a factor source.

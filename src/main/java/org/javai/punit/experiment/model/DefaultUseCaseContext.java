@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import org.javai.punit.experiment.api.UseCaseContext;
+import org.javai.punit.api.UseCaseContext;
 
 /**
  * Default implementation of {@link UseCaseContext}.

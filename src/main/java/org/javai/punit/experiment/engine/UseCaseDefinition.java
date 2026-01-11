@@ -6,7 +6,7 @@ import java.lang.reflect.Parameter;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import org.javai.punit.experiment.api.UseCaseContext;
+import org.javai.punit.api.UseCaseContext;
 import org.javai.punit.experiment.model.UseCaseResult;
 
 /**

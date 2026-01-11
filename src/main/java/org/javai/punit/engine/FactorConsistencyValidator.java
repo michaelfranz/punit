@@ -1,7 +1,7 @@
 package org.javai.punit.engine;
 
 import java.util.Objects;
-import org.javai.punit.experiment.api.HashableFactorSource;
+import org.javai.punit.api.HashableFactorSource;
 import org.javai.punit.spec.model.ExecutionSpecification;
 import org.javai.punit.spec.model.ExecutionSpecification.FactorSourceMetadata;
 

@@ -6,9 +6,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-import org.javai.punit.experiment.api.FactorArguments;
-import org.javai.punit.experiment.api.FactorSourceType;
-import org.javai.punit.experiment.api.HashableFactorSource;
+import org.javai.punit.api.FactorArguments;
+import org.javai.punit.api.FactorSourceType;
+import org.javai.punit.api.HashableFactorSource;
 
 /**
  * A {@link HashableFactorSource} implementation for streaming (non-materializing) factor sources.

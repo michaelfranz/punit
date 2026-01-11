@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import org.javai.punit.experiment.api.DiffableContentProvider;
+import org.javai.punit.api.DiffableContentProvider;
 import org.javai.punit.experiment.model.ResultProjection;
 import org.javai.punit.experiment.model.UseCaseResult;
 

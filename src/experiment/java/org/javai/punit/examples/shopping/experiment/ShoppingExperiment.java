@@ -5,12 +5,12 @@ import java.util.stream.Stream;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
-import org.javai.punit.experiment.api.Experiment;
-import org.javai.punit.experiment.api.ExperimentMode;
-import org.javai.punit.experiment.api.Factor;
-import org.javai.punit.experiment.api.FactorArguments;
-import org.javai.punit.experiment.api.FactorSource;
-import org.javai.punit.experiment.api.ResultCaptor;
+import org.javai.punit.api.Experiment;
+import org.javai.punit.api.ExperimentMode;
+import org.javai.punit.api.Factor;
+import org.javai.punit.api.FactorArguments;
+import org.javai.punit.api.FactorSource;
+import org.javai.punit.api.ResultCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
 

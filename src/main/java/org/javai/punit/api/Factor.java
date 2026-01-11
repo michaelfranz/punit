@@ -1,4 +1,4 @@
-package org.javai.punit.experiment.api;
+package org.javai.punit.api;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

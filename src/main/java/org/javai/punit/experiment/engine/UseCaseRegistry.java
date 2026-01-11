@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import org.javai.punit.experiment.api.UseCase;
+import org.javai.punit.api.UseCase;
 
 /**
  * Registry for discovering and caching use case definitions.

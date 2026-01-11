@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import org.javai.punit.api.FactorSetter;
 import org.javai.punit.api.UseCase;
-import org.javai.punit.experiment.api.FactorArguments;
+import org.javai.punit.api.FactorArguments;
 import org.javai.punit.experiment.model.UseCaseResult;
 
 /**

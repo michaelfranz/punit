@@ -4,7 +4,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.stream.Stream;
-import org.javai.punit.experiment.api.FactorArguments;
+import org.javai.punit.api.FactorArguments;
 
 /**
  * An iterator that consumes factor arguments sequentially from a stream.
@@ -45,7 +45,7 @@ import org.javai.punit.experiment.api.FactorArguments;
  * }</pre>
  *
  * @see StreamingHashableFactorSource
- * @see org.javai.punit.experiment.api.FactorSourceType#STREAM_SEQUENTIAL
+ * @see org.javai.punit.api.FactorSourceType#STREAM_SEQUENTIAL
  */
 public class SequentialFactorIterator implements Iterator<FactorArguments>, AutoCloseable {
 

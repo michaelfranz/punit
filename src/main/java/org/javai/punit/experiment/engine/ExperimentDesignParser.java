@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.javai.punit.experiment.api.Config;
-import org.javai.punit.experiment.api.ExperimentDesign;
+import org.javai.punit.api.Config;
+import org.javai.punit.api.ExperimentDesign;
 import org.javai.punit.experiment.model.ExperimentConfig;
 
 /**

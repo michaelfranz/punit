@@ -1,6 +1,6 @@
 package org.javai.punit.experiment.engine;
 
-import org.javai.punit.experiment.api.ExperimentGoal;
+import org.javai.punit.api.ExperimentGoal;
 
 /**
  * Evaluates whether an experiment goal has been achieved.

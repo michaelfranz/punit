@@ -45,7 +45,7 @@ public @interface FactorSetter {
      * The name of the factor to inject.
      *
      * <p>Must match a factor name defined in the experiment's
-     * {@link org.javai.punit.experiment.api.FactorArguments}.
+     * {@link org.javai.punit.api.FactorArguments}.
      *
      * @return the factor name
      */

@@ -1,7 +1,7 @@
 package org.javai.punit.experiment.spi;
 
 import java.util.Map;
-import org.javai.punit.experiment.api.UseCaseContext;
+import org.javai.punit.api.UseCaseContext;
 
 /**
  * SPI for experiment backends that provide domain-specific execution context.

@@ -3,7 +3,7 @@ package org.javai.punit.experiment.engine;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Map;
-import org.javai.punit.experiment.api.UseCaseContext;
+import org.javai.punit.api.UseCaseContext;
 import org.javai.punit.experiment.model.EmpiricalBaseline;
 import org.javai.punit.experiment.model.EmpiricalBaseline.CostSummary;
 import org.javai.punit.experiment.model.EmpiricalBaseline.ExecutionSummary;
