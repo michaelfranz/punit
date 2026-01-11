@@ -265,16 +265,12 @@ class BaselineWriterTest {
         // Adjust executed to be slightly less for realism
         int executed = 950;
         
-        Map<String, Object> context = new LinkedHashMap<>();
-        context.put("backend", "test");
-
         return EmpiricalBaseline.builder()
             .useCaseId("TestUseCase")
             .generatedAt(Instant.parse("2024-01-15T10:30:00Z"))
             .execution(new ExecutionSummary(total, executed, "COMPLETED", null))
             .statistics(createStatistics(successRate, total, successes, failures))
             .cost(new CostSummary(5000, 5, 100000, 100))
-            .context(context)
             .build();
     }
 

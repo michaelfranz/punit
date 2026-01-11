@@ -69,11 +69,6 @@ public class EmpiricalBaselineGenerator {
             builder.experimentMethod(experimentMethod.getName());
         }
         
-        if (context != null) {
-            builder.context("backend", context.getBackend());
-            builder.context(context.getAllParameters());
-        }
-        
         // Add result projections (EXPLORE mode only)
         if (aggregator.hasResultProjections()) {
             builder.resultProjections(aggregator.getResultProjections());

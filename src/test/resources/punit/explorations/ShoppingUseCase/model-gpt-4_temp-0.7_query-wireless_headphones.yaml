@@ -4,12 +4,9 @@
 
 schemaVersion: punit-spec-1
 useCaseId: ShoppingUseCase/model-gpt-4_temp-0.7_query-wireless_headphones
-generatedAt: 2026-01-11T09:25:25.139954Z
+generatedAt: 2026-01-11T09:30:49.110548Z
 experimentClass: org.javai.punit.examples.shopping.experiment.ShoppingExperiment
 experimentMethod: exploreModelConfigurations
-
-context:
-  backend: generic
 
 execution:
   samplesPlanned: 1
@@ -25,10 +22,10 @@ statistics:
   failures: 0
 
 cost:
-  totalTimeMs: 49
-  avgTimePerSampleMs: 49
-  totalTokens: 369
-  avgTokensPerSample: 369
+  totalTimeMs: 50
+  avgTimePerSampleMs: 50
+  totalTokens: 272
+  avgTokensPerSample: 272
 
 resultProjection:
   sample[0]:
@@ -40,4 +37,4 @@ resultProjection:
       - "hasAllRequiredFields: true"
       - "hasProductsField: true"
       - "<truncated: +7 more>"
-contentFingerprint: 6b8a3307ee0f25cdfaadb7a0d5279bad9d7494e5572f30c85233f18c635a41b5
+contentFingerprint: 12b4b98af6556baf060032f13d8e4640f9cb9780d990b1c8ffc41f730211423f

@@ -99,16 +99,6 @@ public class BaselineWriter {
             sb.append("experimentMethod: ").append(baseline.getExperimentMethod()).append("\n");
         }
         
-        // Context
-        if (!baseline.getContext().isEmpty()) {
-            sb.append("\ncontext:\n");
-            for (Map.Entry<String, Object> entry : baseline.getContext().entrySet()) {
-                sb.append("  ").append(entry.getKey()).append(": ");
-                appendYamlValue(sb, entry.getValue());
-                sb.append("\n");
-            }
-        }
-        
         // Execution
         sb.append("\nexecution:\n");
         sb.append("  samplesPlanned: ").append(baseline.getExecution().samplesPlanned()).append("\n");

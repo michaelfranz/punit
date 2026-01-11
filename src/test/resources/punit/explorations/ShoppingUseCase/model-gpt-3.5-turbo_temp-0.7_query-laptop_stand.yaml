@@ -4,12 +4,9 @@
 
 schemaVersion: punit-spec-1
 useCaseId: ShoppingUseCase/model-gpt-3.5-turbo_temp-0.7_query-laptop_stand
-generatedAt: 2026-01-11T09:25:25.158243Z
+generatedAt: 2026-01-11T09:30:49.129839Z
 experimentClass: org.javai.punit.examples.shopping.experiment.ShoppingExperiment
 experimentMethod: exploreModelConfigurations
-
-context:
-  backend: generic
 
 execution:
   samplesPlanned: 1
@@ -18,28 +15,26 @@ execution:
 
 statistics:
   successRate:
-    observed: 0.0000
+    observed: 1.0000
     standardError: 0.0000
-    confidenceInterval95: [0.0000, 0.0000]
-  successes: 0
-  failures: 1
-  failureDistribution:
-    PRODUCT_ATTRIBUTE_ERROR: 1
+    confidenceInterval95: [1.0000, 1.0000]
+  successes: 1
+  failures: 0
 
 cost:
-  totalTimeMs: 67
-  avgTimePerSampleMs: 67
-  totalTokens: 461
-  avgTokensPerSample: 461
+  totalTimeMs: 69
+  avgTimePerSampleMs: 69
+  totalTokens: 222
+  avgTokensPerSample: 222
 
 resultProjection:
   sample[0]:
     executionTimeMs: 0
     diffableContent:
-      - "allProductsHaveRequiredAttributes: false"
-      - "failureCategory: PRODUCT_ATTRIBUTE_ERROR"
+      - "allProductsHaveRequiredAttributes: true"
+      - "failureCategory: null"
       - "failureMode: NONE"
       - "hasAllRequiredFields: true"
       - "hasProductsField: true"
       - "<truncated: +7 more>"
-contentFingerprint: 11294ef1f867058d3785dce037830ab56d5b5bbc134bfcf31f3815a34056d88b
+contentFingerprint: 353381464739f0c65b548476cac62fd2e542c5f5ad1e2bfa57457de87fc6cc53
