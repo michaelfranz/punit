@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -650,17 +651,19 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         }
         
         // Set factor values on the UseCaseProvider BEFORE the method executes
-        UseCaseProvider provider = findUseCaseProvider(extensionContext);
-        if (provider != null && factorValues != null) {
-            List<String> factorNames = factorInfos.stream()
-                .map(FactorInfo::name)
-                .toList();
-            provider.setCurrentFactorValues(factorValues, factorNames);
-        }
+        Optional<UseCaseProvider> providerOpt = findUseCaseProvider(extensionContext);
+        providerOpt.ifPresent(provider -> {
+            if (factorValues != null) {
+                List<String> factorNames = factorInfos.stream()
+                    .map(FactorInfo::name)
+                    .toList();
+                provider.setCurrentFactorValues(factorValues, factorNames);
+            }
+        });
         
         // Get use case class for projection settings
         Class<?> useCaseClass = store.get("useCaseClass", Class.class);
-        ResultProjectionBuilder projectionBuilder = createProjectionBuilder(useCaseClass, provider);
+        ResultProjectionBuilder projectionBuilder = createProjectionBuilder(useCaseClass, providerOpt.orElse(null));
         
         try {
             invocation.proceed();
@@ -1100,37 +1103,35 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         @Override
         public void beforeEach(ExtensionContext context) {
             // Find the UseCaseProvider and set factor values
-            UseCaseProvider provider = findProvider(context);
-            if (provider != null && factorValues != null) {
-                List<String> factorNames = factorInfos.stream()
-                    .map(FactorInfo::name)
-                    .toList();
-                provider.setCurrentFactorValues(factorValues, factorNames);
-            }
+            findProvider(context).ifPresent(provider -> {
+                if (factorValues != null) {
+                    List<String> factorNames = factorInfos.stream()
+                        .map(FactorInfo::name)
+                        .toList();
+                    provider.setCurrentFactorValues(factorValues, factorNames);
+                }
+            });
         }
         
         @Override
         public void afterEach(ExtensionContext context) {
             // Clear factor values after the test completes
-            UseCaseProvider provider = findProvider(context);
-            if (provider != null) {
-                provider.clearCurrentFactorValues();
-            }
+            findProvider(context).ifPresent(UseCaseProvider::clearCurrentFactorValues);
         }
         
-        private UseCaseProvider findProvider(ExtensionContext context) {
+        private Optional<UseCaseProvider> findProvider(ExtensionContext context) {
             Object testInstance = context.getRequiredTestInstance();
             for (java.lang.reflect.Field field : testInstance.getClass().getDeclaredFields()) {
                 if (UseCaseProvider.class.isAssignableFrom(field.getType())) {
                     field.setAccessible(true);
                     try {
-                        return (UseCaseProvider) field.get(testInstance);
+                        return Optional.of((UseCaseProvider) field.get(testInstance));
                     } catch (IllegalAccessException e) {
                         // Continue searching
                     }
                 }
             }
-            return null;
+            return Optional.empty();
         }
     }
     
@@ -1206,19 +1207,19 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
     /**
      * Finds the UseCaseProvider in the test instance.
      */
-    private UseCaseProvider findUseCaseProvider(ExtensionContext context) {
+    private Optional<UseCaseProvider> findUseCaseProvider(ExtensionContext context) {
         Object testInstance = context.getRequiredTestInstance();
         for (java.lang.reflect.Field field : testInstance.getClass().getDeclaredFields()) {
             if (UseCaseProvider.class.isAssignableFrom(field.getType())) {
                 field.setAccessible(true);
                 try {
-                    return (UseCaseProvider) field.get(testInstance);
+                    return Optional.of((UseCaseProvider) field.get(testInstance));
                 } catch (IllegalAccessException e) {
                     // Continue searching
                 }
             }
         }
-        return null;
+        return Optional.empty();
     }
     
     /**

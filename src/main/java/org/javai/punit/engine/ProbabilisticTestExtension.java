@@ -267,13 +267,13 @@ public class ProbabilisticTestExtension implements
 		}
 
 		// Load the spec
-		String specId = configResolver.resolveSpecIdFromAnnotation(annotation);
-		if (specId == null || specId.isEmpty()) {
+		Optional<String> specIdOpt = configResolver.resolveSpecIdFromAnnotation(annotation);
+		if (specIdOpt.isEmpty()) {
 			// No spec reference - nothing to validate against
 			return;
 		}
 
-		Optional<ExecutionSpecification> optionalSpec = configResolver.loadSpec(specId);
+		Optional<ExecutionSpecification> optionalSpec = configResolver.loadSpec(specIdOpt.get());
 		if (optionalSpec.isEmpty()) {
 			// Spec not found - nothing to validate against
 			return;
@@ -327,8 +327,8 @@ public class ProbabilisticTestExtension implements
 		AtomicBoolean terminated = getTerminatedFlag(extensionContext);
 
 		// Get class and suite budget monitors
-		SharedBudgetMonitor classBudgetMonitor = ProbabilisticTestBudgetExtension.getClassBudgetMonitor(extensionContext);
-		SharedBudgetMonitor suiteBudgetMonitor = SuiteBudgetManager.getMonitor();
+		SharedBudgetMonitor classBudgetMonitor = ProbabilisticTestBudgetExtension.getClassBudgetMonitor(extensionContext).orElse(null);
+		SharedBudgetMonitor suiteBudgetMonitor = SuiteBudgetManager.getMonitor().orElse(null);
 
 		// Note: SampleExecutionCondition handles skipping for terminated tests.
 		// This check is kept as a safety net for edge cases.

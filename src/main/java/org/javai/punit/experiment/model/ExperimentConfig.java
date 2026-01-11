@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -85,20 +86,20 @@ public final class ExperimentConfig {
      * @param <T> the expected type
      * @param factorName the factor name
      * @param type the expected type class
-     * @return the level, or null if not present
+     * @return an Optional containing the level, or empty if not present
      * @throws ClassCastException if the level is not of the expected type
      */
     @SuppressWarnings("unchecked")
-    public <T> T getLevel(String factorName, Class<T> type) {
+    public <T> Optional<T> getLevel(String factorName, Class<T> type) {
         Object level = factors.get(factorName);
         if (level == null) {
-            return null;
+            return Optional.empty();
         }
         if (!type.isInstance(level)) {
             throw new ClassCastException("Factor '" + factorName + "' level is " +
                 level.getClass().getName() + ", not " + type.getName());
         }
-        return (T) level;
+        return Optional.of((T) level);
     }
     
     /**

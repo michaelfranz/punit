@@ -1,5 +1,7 @@
 package org.javai.punit.engine;
 
+import java.util.Optional;
+
 import org.javai.punit.api.ProbabilisticTestBudget;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -65,20 +67,20 @@ public class ProbabilisticTestBudgetExtension implements BeforeAllCallback {
      * Retrieves the class budget monitor from the extension context, if present.
      *
      * @param context the extension context
-     * @return the class budget monitor, or null if not configured
+     * @return an Optional containing the class budget monitor, or empty if not configured
      */
-    public static SharedBudgetMonitor getClassBudgetMonitor(ExtensionContext context) {
+    public static Optional<SharedBudgetMonitor> getClassBudgetMonitor(ExtensionContext context) {
         // Walk up the context hierarchy to find the class-level context
         ExtensionContext current = context;
         while (current != null) {
             SharedBudgetMonitor monitor = current.getStore(NAMESPACE)
                     .get(CLASS_BUDGET_MONITOR_KEY, SharedBudgetMonitor.class);
             if (monitor != null) {
-                return monitor;
+                return Optional.of(monitor);
             }
             current = current.getParent().orElse(null);
         }
-        return null;
+        return Optional.empty();
     }
 }
 

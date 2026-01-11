@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.javai.punit.spec.model.ExecutionSpecification;
 
@@ -83,16 +84,16 @@ public class SpecificationRegistry {
 	}
 
 	private ExecutionSpecification loadSpec(String useCaseId) {
-		Path specPath = resolveSpecPath(useCaseId);
+		Optional<Path> specPathOpt = resolveSpecPath(useCaseId);
 
-		if (specPath == null) {
+		if (specPathOpt.isEmpty()) {
 			throw new SpecificationNotFoundException(
 					"Specification not found: " + useCaseId +
 							" (tried " + useCaseId + ".yaml/.yml in " + specsRoot + ")");
 		}
 
 		try {
-			ExecutionSpecification spec = SpecificationLoader.load(specPath);
+			ExecutionSpecification spec = SpecificationLoader.load(specPathOpt.get());
 			spec.validate();
 			return spec;
 		} catch (IOException e) {
@@ -101,15 +102,15 @@ public class SpecificationRegistry {
 		}
 	}
 
-	private Path resolveSpecPath(String useCaseId) {
+	private Optional<Path> resolveSpecPath(String useCaseId) {
 		// Flat structure: specs/{useCaseId}.yaml
 		Path yamlPath = specsRoot.resolve(useCaseId + ".yaml");
-		if (Files.exists(yamlPath)) return yamlPath;
+		if (Files.exists(yamlPath)) return Optional.of(yamlPath);
 
 		Path ymlPath = specsRoot.resolve(useCaseId + ".yml");
-		if (Files.exists(ymlPath)) return ymlPath;
+		if (Files.exists(ymlPath)) return Optional.of(ymlPath);
 
-		return null;
+		return Optional.empty();
 	}
 
 	/**
@@ -124,7 +125,7 @@ public class SpecificationRegistry {
 		String useCaseId = stripVersionSuffix(specId);
 		if (cache.containsKey(useCaseId)) return true;
 
-		return resolveSpecPath(useCaseId) != null;
+		return resolveSpecPath(useCaseId).isPresent();
 	}
 
 	/**

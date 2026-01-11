@@ -110,9 +110,9 @@ public class ConfigurationResolver {
         // 4. Framework default
         double annotationMinPassRate = annotation.minPassRate();
         
-        // Determine if we have a spec reference (either via useCase class or explicit spec ID)
-        String specId = resolveSpecId(annotation);
-        boolean hasSpec = specId != null && !specId.isEmpty();
+        // Determine if we have a spec reference (via useCase class)
+        Optional<String> specIdOpt = resolveSpecId(annotation);
+        boolean hasSpec = specIdOpt.isPresent();
         
         double minPassRate;
         
@@ -133,7 +133,7 @@ public class ConfigurationResolver {
                 minPassRate = Double.parseDouble(envValue.trim());
             } else if (hasSpec) {
                 // Try to load minPassRate from spec
-                minPassRate = loadMinPassRateFromSpec(specId);
+                minPassRate = loadMinPassRateFromSpec(specIdOpt.get());
             } else {
                 // Legacy mode (no spec): use default
                 minPassRate = DEFAULT_MIN_PASS_RATE;
@@ -398,16 +398,16 @@ public class ConfigurationResolver {
      * </ol>
      *
      * @param annotation the test annotation
-     * @return the spec ID, or null if none specified
+     * @return an Optional containing the spec ID, or empty if none specified
      */
-    private String resolveSpecId(ProbabilisticTest annotation) {
+    private Optional<String> resolveSpecId(ProbabilisticTest annotation) {
         // Use case class reference determines spec ID
         Class<?> useCaseClass = annotation.useCase();
         if (useCaseClass != null && useCaseClass != Void.class) {
-            return UseCaseProvider.resolveId(useCaseClass);
+            return Optional.of(UseCaseProvider.resolveId(useCaseClass));
         }
 
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -460,9 +460,9 @@ public class ConfigurationResolver {
      * <p>Exposed for factor consistency validation.
      *
      * @param annotation the test annotation
-     * @return the spec ID, or null if none specified
+     * @return an Optional containing the spec ID, or empty if none specified
      */
-    public String resolveSpecIdFromAnnotation(ProbabilisticTest annotation) {
+    public Optional<String> resolveSpecIdFromAnnotation(ProbabilisticTest annotation) {
         return resolveSpecId(annotation);
     }
 }

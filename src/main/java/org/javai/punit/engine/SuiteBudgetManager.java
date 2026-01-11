@@ -1,8 +1,9 @@
 package org.javai.punit.engine;
 
-import org.javai.punit.api.BudgetExhaustedBehavior;
-
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+
+import org.javai.punit.api.BudgetExhaustedBehavior;
 
 /**
  * Singleton manager for suite-level budget tracking.
@@ -43,28 +44,29 @@ public final class SuiteBudgetManager {
      * Gets the suite-level budget monitor, creating it if necessary.
      * 
      * <p>The monitor is initialized from system properties/environment variables
-     * on first access. If no suite budget is configured, returns null.
+     * on first access. If no suite budget is configured, returns empty.
      *
-     * @return the suite budget monitor, or null if no suite budget is configured
+     * @return an Optional containing the suite budget monitor, or empty if not configured
      */
-    public static SharedBudgetMonitor getMonitor() {
+    public static Optional<SharedBudgetMonitor> getMonitor() {
         SharedBudgetMonitor monitor = INSTANCE.get();
         if (monitor != null) {
-            return monitor;
+            return Optional.of(monitor);
         }
 
         // Lazy initialization
-        SharedBudgetMonitor newMonitor = createMonitorFromProperties();
-        if (newMonitor == null) {
-            return null;
+        Optional<SharedBudgetMonitor> newMonitorOpt = createMonitorFromProperties();
+        if (newMonitorOpt.isEmpty()) {
+            return Optional.empty();
         }
 
+        SharedBudgetMonitor newMonitor = newMonitorOpt.get();
         // CAS to ensure only one instance is created
         if (INSTANCE.compareAndSet(null, newMonitor)) {
-            return newMonitor;
+            return Optional.of(newMonitor);
         } else {
             // Another thread created the monitor first
-            return INSTANCE.get();
+            return Optional.ofNullable(INSTANCE.get());
         }
     }
 
@@ -74,7 +76,7 @@ public final class SuiteBudgetManager {
      * @return true if suite budget is configured
      */
     public static boolean hasSuiteBudget() {
-        return getMonitor() != null;
+        return getMonitor().isPresent();
     }
 
     /**
@@ -87,13 +89,13 @@ public final class SuiteBudgetManager {
         INSTANCE.set(null);
     }
 
-    private static SharedBudgetMonitor createMonitorFromProperties() {
+    private static Optional<SharedBudgetMonitor> createMonitorFromProperties() {
         long timeBudgetMs = resolveLong(PROP_SUITE_TIME_BUDGET_MS, ENV_SUITE_TIME_BUDGET_MS, 0);
         long tokenBudget = resolveLong(PROP_SUITE_TOKEN_BUDGET, ENV_SUITE_TOKEN_BUDGET, 0);
 
-        // If no budget is configured, return null
+        // If no budget is configured, return empty
         if (timeBudgetMs <= 0 && tokenBudget <= 0) {
-            return null;
+            return Optional.empty();
         }
 
         BudgetExhaustedBehavior behavior = resolveBehavior(
@@ -102,12 +104,12 @@ public final class SuiteBudgetManager {
                 BudgetExhaustedBehavior.FAIL
         );
 
-        return new SharedBudgetMonitor(
+        return Optional.of(new SharedBudgetMonitor(
                 SharedBudgetMonitor.Scope.SUITE,
                 timeBudgetMs,
                 tokenBudget,
                 behavior
-        );
+        ));
     }
 
     private static long resolveLong(String sysProp, String envVar, long defaultValue) {

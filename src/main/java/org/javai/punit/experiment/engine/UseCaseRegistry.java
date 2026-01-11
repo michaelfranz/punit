@@ -105,13 +105,13 @@ public class UseCaseRegistry {
      * Removes a use case from the registry.
      *
      * @param useCaseId the use case ID to remove
-     * @return the removed definition, or null if not found
+     * @return an Optional containing the removed definition, or empty if not found
      */
-    public UseCaseDefinition unregister(String useCaseId) {
+    public Optional<UseCaseDefinition> unregister(String useCaseId) {
         if (useCaseId == null) {
-            return null;
+            return Optional.empty();
         }
-        return registry.remove(useCaseId);
+        return Optional.ofNullable(registry.remove(useCaseId));
     }
     
     /**

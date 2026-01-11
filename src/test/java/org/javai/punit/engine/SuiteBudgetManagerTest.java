@@ -35,7 +35,7 @@ class SuiteBudgetManagerTest {
         @Test
         @DisplayName("returns null when no budget configured")
         void returnsNullWhenNoBudgetConfigured() {
-            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor().orElse(null);
 
             assertThat(monitor).isNull();
         }
@@ -45,7 +45,7 @@ class SuiteBudgetManagerTest {
         void createsMonitorWhenTimeBudgetConfigured() {
             System.setProperty(SuiteBudgetManager.PROP_SUITE_TIME_BUDGET_MS, "10000");
 
-            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor().orElse(null);
 
             assertThat(monitor).isNotNull();
             assertThat(monitor.hasTimeBudget()).isTrue();
@@ -57,7 +57,7 @@ class SuiteBudgetManagerTest {
         void createsMonitorWhenTokenBudgetConfigured() {
             System.setProperty(SuiteBudgetManager.PROP_SUITE_TOKEN_BUDGET, "50000");
 
-            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor().orElse(null);
 
             assertThat(monitor).isNotNull();
             assertThat(monitor.hasTokenBudget()).isTrue();
@@ -69,8 +69,8 @@ class SuiteBudgetManagerTest {
         void returnsSameInstanceOnRepeatedCalls() {
             System.setProperty(SuiteBudgetManager.PROP_SUITE_TIME_BUDGET_MS, "10000");
 
-            SharedBudgetMonitor first = SuiteBudgetManager.getMonitor();
-            SharedBudgetMonitor second = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor first = SuiteBudgetManager.getMonitor().orElse(null);
+            SharedBudgetMonitor second = SuiteBudgetManager.getMonitor().orElse(null);
 
             assertThat(first).isSameAs(second);
         }
@@ -80,7 +80,7 @@ class SuiteBudgetManagerTest {
         void handlesInvalidTimeBudgetGracefully() {
             System.setProperty(SuiteBudgetManager.PROP_SUITE_TIME_BUDGET_MS, "not-a-number");
 
-            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor().orElse(null);
 
             // Should return null since invalid value defaults to 0
             assertThat(monitor).isNull();
@@ -91,7 +91,7 @@ class SuiteBudgetManagerTest {
         void handlesInvalidTokenBudgetGracefully() {
             System.setProperty(SuiteBudgetManager.PROP_SUITE_TOKEN_BUDGET, "invalid");
 
-            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor().orElse(null);
 
             assertThat(monitor).isNull();
         }
@@ -102,7 +102,7 @@ class SuiteBudgetManagerTest {
             System.setProperty(SuiteBudgetManager.PROP_SUITE_TIME_BUDGET_MS, "10000");
             System.setProperty(SuiteBudgetManager.PROP_SUITE_ON_BUDGET_EXHAUSTED, "INVALID_BEHAVIOR");
 
-            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor().orElse(null);
 
             // Should create monitor with default FAIL behavior
             assertThat(monitor).isNotNull();
@@ -114,7 +114,7 @@ class SuiteBudgetManagerTest {
             System.setProperty(SuiteBudgetManager.PROP_SUITE_TIME_BUDGET_MS, "10000");
             System.setProperty(SuiteBudgetManager.PROP_SUITE_ON_BUDGET_EXHAUSTED, "EVALUATE_PARTIAL");
 
-            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor monitor = SuiteBudgetManager.getMonitor().orElse(null);
 
             assertThat(monitor).isNotNull();
         }
@@ -147,10 +147,10 @@ class SuiteBudgetManagerTest {
         @DisplayName("clears cached monitor")
         void clearsCachedMonitor() {
             System.setProperty(SuiteBudgetManager.PROP_SUITE_TIME_BUDGET_MS, "10000");
-            SharedBudgetMonitor first = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor first = SuiteBudgetManager.getMonitor().orElse(null);
             
             SuiteBudgetManager.reset();
-            SharedBudgetMonitor second = SuiteBudgetManager.getMonitor();
+            SharedBudgetMonitor second = SuiteBudgetManager.getMonitor().orElse(null);
 
             assertThat(first).isNotSameAs(second);
         }
