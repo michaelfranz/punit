@@ -1,0 +1,39 @@
+Attribution Required License (ARL-1.0)
+
+Copyright (c) 2026 Mike Mannion
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+1) Attribution Requirement.
+Any application, service, work product, or deliverable that uses the Software
+(or a substantial portion of it), whether distributed to third parties or used
+internally, must include the following attribution in a credits, acknowledgements,
+or "About" section that is reasonably visible to recipients/users:
+
+  "Built with PUnit by Mike Mannion."
+
+This attribution may be satisfied in end-user documentation for products that
+do not reasonably have a user-visible credits/About screen (e.g., libraries,
+batch jobs, backend services), provided it is included in the primary documentation
+or repository README of the deliverable.
+
+2) Preservation of Notice.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+3) No Endorsement.
+Use of Mike Mannion’s name for endorsement or promotion of derived products is
+prohibited without prior written permission, except for the attribution required
+by Section 1.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

@@ -40,12 +40,12 @@ This ensures predictable, reproducible output even with non-deterministic comple
 
 ### Design Decisions
 
-| Question | Decision | Rationale |
-|----------|----------|-----------|
-| **Early termination with in-flight samples** | Abandon immediately | Faster response; no waiting for potentially slow API calls that won't affect verdict |
-| **IDE display order** | Show results as they arrive | Natural feedback; developers see progress in real-time |
-| **Token recording** | Global concern (see note) | Token budgets span tests, experiments, and concurrent samples |
-| **Budget check timing** | Ongoing via global monitor | Continuous checking, not just at sample completion |
+| Question                                     | Decision                    | Rationale                                                                            |
+|----------------------------------------------|-----------------------------|--------------------------------------------------------------------------------------|
+| **Early termination with in-flight samples** | Abandon immediately         | Faster response; no waiting for potentially slow API calls that won't affect verdict |
+| **IDE display order**                        | Show results as they arrive | Natural feedback; developers see progress in real-time                               |
+| **Token recording**                          | Global concern (see note)   | Token budgets span tests, experiments, and concurrent samples                        |
+| **Budget check timing**                      | Ongoing via global monitor  | Continuous checking, not just at sample completion                                   |
 
 ### Prerequisite: Global Token Monitoring
 
@@ -97,12 +97,12 @@ This is a broader design consideration that should be addressed before implement
 
 ## Dependencies
 
-| Phase | Depends On |
-|-------|------------|
-| Phase 1 | None |
+| Phase   | Depends On                         |
+|---------|------------------------------------|
+| Phase 1 | None                               |
 | Phase 2 | Global monitoring singleton design |
-| Phase 3 | Phase 2 |
-| Phase 4 | Phase 1 |
+| Phase 3 | Phase 2                            |
+| Phase 4 | Phase 1                            |
 
 ---
 
