@@ -254,7 +254,6 @@ public interface DiffableContentProvider {
  */
 public record ResultProjection(
     int sampleIndex,
-    Instant timestamp,
     long executionTimeMs,
     List<String> diffableLines
 ) {
@@ -263,6 +262,10 @@ public record ResultProjection(
      * but are expected based on maxDiffableLines configuration.
      */
     public static final String ABSENT = "<absent>";
+    
+    // Note: Timestamp is intentionally excluded because it always differs 
+    // between samples, creating noise in diffs. The timestamp remains
+    // available in the underlying UseCaseResult for debugging.
     
     /**
      * Compact constructor for defensive copying.
@@ -420,7 +423,6 @@ public class ResultProjectionBuilder {
         
         return new ResultProjection(
             sampleIndex,
-            result.timestamp(),
             result.executionTime().toMillis(),
             normalizedLines
         );
@@ -429,15 +431,14 @@ public class ResultProjectionBuilder {
     /**
      * Builds a projection for an error case.
      */
-    public ResultProjection buildError(int sampleIndex, Instant timestamp, 
-                                        long executionTimeMs, Throwable error) {
+    public ResultProjection buildError(int sampleIndex, long executionTimeMs, Throwable error) {
         List<String> lines = new ArrayList<>();
         lines.add(truncate("error: " + error.getClass().getSimpleName()));
         lines.add(truncate("message: " + firstLine(error.getMessage())));
         
         List<String> normalizedLines = normalizeLineCount(lines);
         
-        return new ResultProjection(sampleIndex, timestamp, executionTimeMs, normalizedLines);
+        return new ResultProjection(sampleIndex, executionTimeMs, normalizedLines);
     }
     
     private List<String> getDiffableLines(UseCaseResult result) {
@@ -536,7 +537,6 @@ public class ResultProjectionBuilder {
 # Added to EXPLORE specs only
 resultProjection:
   sample[0]:
-    timestamp: "2026-01-10T17:30:45.123456Z"
     executionTimeMs: 245
     diffableContent:
       - "category: Electronics"
@@ -545,7 +545,6 @@ resultProjection:
       - "<absent>"
       - "<absent>"
   sample[1]:
-    timestamp: "2026-01-10T17:30:45.456789Z"
     executionTimeMs: 198
     diffableContent:
       - "category: Electronics"
@@ -554,6 +553,10 @@ resultProjection:
       - "<absent>"
       - "<absent>"
 ```
+
+> **Note:** Timestamp is intentionally excluded from the projection because it always
+> differs between samples, creating noise in diffs. The timestamp remains available
+> in the underlying `UseCaseResult` for debugging purposes.
 
 ### 5.2 BaselineWriter Extension
 
@@ -569,9 +572,6 @@ private String buildYamlContent(EmpiricalBaseline baseline) {
         
         for (ResultProjection projection : baseline.getResultProjections()) {
             sb.append("  sample[").append(projection.sampleIndex()).append("]:\n");
-            sb.append("    timestamp: \"")
-              .append(ISO_FORMATTER.format(projection.timestamp()))
-              .append("\"\n");
             sb.append("    executionTimeMs: ")
               .append(projection.executionTimeMs())
               .append("\n");
@@ -806,7 +806,7 @@ The `resultProjection` section is included in fingerprint computation, ensuring 
 
 ### 11.1 Memory
 
-- Each `ResultProjection` is small (index, timestamp, long, list of strings)
+- Each `ResultProjection` is small (index, long, list of strings)
 - For `samplesPerConfig = 10` and `maxDiffableLines = 5`: ~50 strings per config
 - Negligible compared to actual LLM responses
 

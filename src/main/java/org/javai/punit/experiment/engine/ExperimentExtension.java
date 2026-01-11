@@ -680,7 +680,6 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
             // Build error projection for EXPLORE mode
             ResultProjection projection = projectionBuilder.buildError(
                 sampleInConfig - 1,
-                java.time.Instant.now(),
                 System.currentTimeMillis() - store.get("startTimeMs", Long.class),
                 e
             );

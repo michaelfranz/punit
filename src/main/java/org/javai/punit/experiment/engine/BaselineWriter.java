@@ -157,9 +157,6 @@ public class BaselineWriter {
             
             for (ResultProjection projection : baseline.getResultProjections()) {
                 sb.append("  sample[").append(projection.sampleIndex()).append("]:\n");
-                sb.append("    timestamp: \"")
-                  .append(ISO_FORMATTER.format(projection.timestamp()))
-                  .append("\"\n");
                 sb.append("    executionTimeMs: ")
                   .append(projection.executionTimeMs())
                   .append("\n");

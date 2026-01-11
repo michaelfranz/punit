@@ -1,8 +1,6 @@
 package org.javai.punit.experiment.model;
 
-import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * A diff-optimized projection of a {@link UseCaseResult}.
@@ -20,12 +18,15 @@ import java.util.Objects;
  *
  * <p>Note: The truncation notice does not count toward {@code maxDiffableLines}.
  *
+ * <p>Note: Timestamp is intentionally excluded from the projection because it
+ * always differs between samples, creating noise in diffs. The timestamp remains
+ * available in the underlying {@link UseCaseResult} for debugging purposes.
+ *
  * @see ResultProjectionBuilder
  * @see UseCaseResult#getDiffableContent(int)
  */
 public record ResultProjection(
     int sampleIndex,
-    Instant timestamp,
     long executionTimeMs,
     List<String> diffableLines
 ) {
@@ -42,7 +43,6 @@ public record ResultProjection(
         if (sampleIndex < 0) {
             throw new IllegalArgumentException("sampleIndex must be non-negative");
         }
-        Objects.requireNonNull(timestamp, "timestamp must not be null");
         diffableLines = List.copyOf(diffableLines);
     }
 }

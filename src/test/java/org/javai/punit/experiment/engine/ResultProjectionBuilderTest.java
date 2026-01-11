@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 
 import org.javai.punit.experiment.api.DiffableContentProvider;
@@ -51,21 +50,6 @@ class ResultProjectionBuilderTest {
             ResultProjection projection = builder.build(3, result);
 
             assertThat(projection.sampleIndex()).isEqualTo(3);
-        }
-
-        @Test
-        @DisplayName("captures timestamp from result")
-        void capturesTimestampFromResult() {
-            ResultProjectionBuilder builder = new ResultProjectionBuilder(5, 60);
-            Instant timestamp = Instant.parse("2026-01-10T12:00:00Z");
-            UseCaseResult result = UseCaseResult.builder()
-                .value("key", "value")
-                .timestamp(timestamp)
-                .build();
-
-            ResultProjection projection = builder.build(0, result);
-
-            assertThat(projection.timestamp()).isEqualTo(timestamp);
         }
 
         @Test
@@ -168,7 +152,6 @@ class ResultProjectionBuilderTest {
             
             ResultProjection projection = builder.buildError(
                 0, 
-                Instant.now(), 
                 100, 
                 new IllegalArgumentException("test message")
             );
@@ -184,7 +167,6 @@ class ResultProjectionBuilderTest {
             
             ResultProjection projection = builder.buildError(
                 0, 
-                Instant.now(), 
                 100, 
                 new IllegalArgumentException("test message")
             );
@@ -200,7 +182,6 @@ class ResultProjectionBuilderTest {
             
             ResultProjection projection = builder.buildError(
                 0, 
-                Instant.now(), 
                 100, 
                 new RuntimeException("error")
             );
@@ -217,7 +198,6 @@ class ResultProjectionBuilderTest {
             
             ResultProjection projection = builder.buildError(
                 0, 
-                Instant.now(), 
                 100, 
                 new RuntimeException("first line\nsecond line\nthird line")
             );
@@ -234,7 +214,6 @@ class ResultProjectionBuilderTest {
             
             ResultProjection projection = builder.buildError(
                 0, 
-                Instant.now(), 
                 100, 
                 new RuntimeException((String) null)
             );

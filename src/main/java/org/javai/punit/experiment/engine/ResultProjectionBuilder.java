@@ -1,6 +1,5 @@
 package org.javai.punit.experiment.engine;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -84,7 +83,6 @@ public class ResultProjectionBuilder {
 
         return new ResultProjection(
             sampleIndex,
-            result.timestamp(),
             result.executionTime().toMillis(),
             normalizedLines
         );
@@ -94,14 +92,11 @@ public class ResultProjectionBuilder {
      * Builds a projection for an error case.
      *
      * @param sampleIndex the sample index (0-based)
-     * @param timestamp the timestamp of the error
      * @param executionTimeMs execution time in milliseconds
      * @param error the error that occurred
      * @return the projection
      */
-    public ResultProjection buildError(int sampleIndex, Instant timestamp,
-                                        long executionTimeMs, Throwable error) {
-        Objects.requireNonNull(timestamp, "timestamp must not be null");
+    public ResultProjection buildError(int sampleIndex, long executionTimeMs, Throwable error) {
         Objects.requireNonNull(error, "error must not be null");
         
         List<String> lines = new ArrayList<>();
@@ -110,7 +105,7 @@ public class ResultProjectionBuilder {
 
         List<String> normalizedLines = normalizeLineCount(lines);
 
-        return new ResultProjection(sampleIndex, timestamp, executionTimeMs, normalizedLines);
+        return new ResultProjection(sampleIndex, executionTimeMs, normalizedLines);
     }
 
     private List<String> getDiffableLines(UseCaseResult result) {

@@ -24,8 +24,11 @@ Currently, diffs show metric differences but not the actual use case outputs. By
 Each sample's `UseCaseResult` produces a fixed-format text block with:
 
 1. **Diffable Content**: One line per key-value pair, sorted alphabetically by key
-2. **Timestamp**: Execution timestamp (will always differ, but provides context)
-3. **Execution Time**: Duration in milliseconds
+2. **Execution Time**: Duration in milliseconds
+
+> **Note:** Timestamp is intentionally excluded from the projection because it always
+> differs between samples, creating noise in diffs. The timestamp remains available
+> in the underlying `UseCaseResult` for debugging purposes.
 
 ### Fixed Line Count
 
@@ -79,7 +82,6 @@ public class ShoppingUseCase implements DiffableContentProvider {
 
 resultProjection:
   sample[0]:
-    timestamp: "2026-01-10T17:30:45.123Z"
     executionTimeMs: 245
     diffableContent:
       - "category: Electronics"
@@ -94,8 +96,6 @@ resultProjection:
 ```diff
   resultProjection:
     sample[0]:
--     timestamp: "2026-01-10T17:30:42.001Z"
-+     timestamp: "2026-01-10T17:30:45.123Z"
 -     executionTimeMs: 180
 +     executionTimeMs: 245
       diffableContent:
@@ -189,19 +189,16 @@ When `samplesPerConfig > 1`:
 ```yaml
 resultProjection:
   sample[0]:
-    timestamp: "..."
     executionTimeMs: 123
     diffableContent:
       - "key1: val1"
       - "<absent>"
   sample[1]:
-    timestamp: "..."
     executionTimeMs: 145
     diffableContent:
       - "key1: val2"
       - "<absent>"
   sample[2]:
-    timestamp: "..."
     executionTimeMs: 132
     diffableContent:
       - "key1: val1"
@@ -306,9 +303,9 @@ Consistent ordering ensures the same keys appear on the same lines across config
 - Universally recognized visual cue for truncation
 - Modern terminals and diff tools handle UTF-8 well
 
-### Why Include Timestamp?
+### Why Exclude Timestamp from Projection?
 
-Even though it always differs, it provides temporal context. Users know *when* each config was evaluated, which matters if external factors (API versions, data state) might affect results.
+Timestamp is intentionally excluded from the result projection because it *always* differs between samples, creating noise in diffs. The `generatedAt` field at the top of the spec provides temporal context at the exploration level, and the timestamp remains available in the underlying `UseCaseResult` for any debugging needs.
 
 ### Why Fixed Line Count?
 

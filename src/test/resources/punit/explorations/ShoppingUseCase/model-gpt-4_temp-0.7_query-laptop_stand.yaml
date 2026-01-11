@@ -4,7 +4,7 @@
 
 schemaVersion: punit-spec-1
 useCaseId: ShoppingUseCase/model-gpt-4_temp-0.7_query-laptop_stand
-generatedAt: 2026-01-11T08:19:03.274764Z
+generatedAt: 2026-01-11T09:25:25.146408Z
 experimentClass: org.javai.punit.examples.shopping.experiment.ShoppingExperiment
 experimentMethod: exploreModelConfigurations
 
@@ -25,8 +25,19 @@ statistics:
   failures: 0
 
 cost:
-  totalTimeMs: 53
-  avgTimePerSampleMs: 53
-  totalTokens: 496
-  avgTokensPerSample: 496
-contentFingerprint: fa52260b9a7cfc03e6c9e5e3643ae1917e81aad0a791395330bc90b525e0e81a
+  totalTimeMs: 55
+  avgTimePerSampleMs: 55
+  totalTokens: 338
+  avgTokensPerSample: 338
+
+resultProjection:
+  sample[0]:
+    executionTimeMs: 0
+    diffableContent:
+      - "allProductsHaveRequiredAttributes: true"
+      - "failureCategory: null"
+      - "failureMode: NONE"
+      - "hasAllRequiredFields: true"
+      - "hasProductsField: true"
+      - "<truncated: +7 more>"
+contentFingerprint: 2490ea441516c79e3b0a1814fc92234cf183878953b514c66581a8a126ffa4a6
