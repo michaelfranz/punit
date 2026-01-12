@@ -158,7 +158,7 @@ public class StatisticalExplanationBuilder {
         int confidencePercent = (int) (confidenceLevel * 100);
         
         return String.format(
-                "Lower bound of %d%% CI = %.1f%%, applied threshold = %.0f%%",
+                "Lower bound of %d%% CI = %.1f%%, min pass rate = %.0f%%",
                 confidencePercent, lowerBound * 100, threshold * 100);
     }
 
@@ -209,20 +209,20 @@ public class StatisticalExplanationBuilder {
             if (baseline != null && baseline.hasData()) {
                 plainEnglish = String.format(
                         "The observed success rate of %.1f%% is consistent with the baseline expectation of %.1f%%. " +
-                        "The test passes because the observed rate (%.1f%%) meets or exceeds the threshold (%.1f%%).",
+                        "The test passes because the observed rate (%.1f%%) meets or exceeds the min pass rate (%.1f%%).",
                         observedRate * 100,
                         baseline.baselineRate() * 100,
                         observedRate * 100,
                         threshold * 100);
             } else {
                 plainEnglish = String.format(
-                        "The observed success rate of %.1f%% meets the required threshold of %.1f%%.",
+                        "The observed success rate of %.1f%% meets the required min pass rate of %.1f%%.",
                         observedRate * 100,
                         threshold * 100);
             }
         } else {
             plainEnglish = String.format(
-                    "The observed success rate of %.1f%% falls below the required threshold of %.1f%%. " +
+                    "The observed success rate of %.1f%% falls below the required min pass rate of %.1f%%. " +
                     "This suggests a potential regression or the system is not meeting its expected performance level.",
                     observedRate * 100,
                     threshold * 100);
@@ -250,12 +250,12 @@ public class StatisticalExplanationBuilder {
         String plainEnglish;
         if (passed) {
             plainEnglish = String.format(
-                    "The observed success rate of %.1f%% meets the required threshold of %.1f%%.",
+                    "The observed success rate of %.1f%% meets the required min pass rate of %.1f%%.",
                     observedRate * 100,
                     threshold * 100);
         } else {
             plainEnglish = String.format(
-                    "The observed success rate of %.1f%% falls below the required threshold of %.1f%%.",
+                    "The observed success rate of %.1f%% falls below the required min pass rate of %.1f%%.",
                     observedRate * 100,
                     threshold * 100);
         }
@@ -292,7 +292,7 @@ public class StatisticalExplanationBuilder {
             double margin = observedRate - threshold;
             if (margin > 0 && margin < 0.05) {
                 caveats.add(String.format(
-                        "The observed rate (%.1f%%) is close to the threshold (%.1f%%). " +
+                        "The observed rate (%.1f%%) is close to the min pass rate (%.1f%%). " +
                         "Small fluctuations in future runs may cause different verdicts.",
                         observedRate * 100, threshold * 100));
             }

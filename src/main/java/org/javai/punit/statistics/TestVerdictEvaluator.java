@@ -87,7 +87,7 @@ public class TestVerdictEvaluator {
             double falsePositivePercent = (1.0 - confidence) * 100;
             
             return String.format(
-                "Observed %.1f%% < %.1f%% threshold (shortfall: %.1f%%). " +
+                "Observed %.1f%% < %.1f%% min pass rate (shortfall: %.1f%%). " +
                 "This indicates DEGRADATION from the baseline with %.0f%% confidence. " +
                 "There is a %.1f%% probability this failure is due to sampling variance " +
                 "rather than actual system degradation.",

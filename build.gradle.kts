@@ -17,8 +17,8 @@ group = "org.javai"
 version = "0.1.0"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
     
     // Generate sources and javadoc jars for publishing
     withSourcesJar()

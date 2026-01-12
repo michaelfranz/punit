@@ -5,7 +5,10 @@ import java.time.Instant;
 import java.util.List;
 import org.javai.punit.api.FactorSetter;
 import org.javai.punit.api.UseCase;
+import org.javai.punit.api.UseCaseContract;
 import org.javai.punit.api.FactorArguments;
+import org.javai.punit.model.UseCaseCriteria;
+import org.javai.punit.model.UseCaseOutcome;
 import org.javai.punit.model.UseCaseResult;
 
 /**
@@ -16,12 +19,18 @@ import org.javai.punit.model.UseCaseResult;
  * compliance, and relevance for probabilistic testing.
  *
  * <h2>Use Case ID</h2>
- * <p>The {@code @UseCase} annotation provides the ID used for:
+ * <p>Implements {@link UseCaseContract} to provide the use case ID. The default
+ * implementation returns the simple class name ("ShoppingUseCase"), used for:
  * <ul>
  *   <li>Baseline file naming: {@code baselines/ShoppingUseCase.yaml}</li>
  *   <li>Spec file location: {@code specs/ShoppingUseCase/v1.yaml}</li>
  *   <li>Linking experiments and tests to specifications</li>
  * </ul>
+ *
+ * <h2>Success Criteria</h2>
+ * <p>Each use case method returns a {@link UseCaseOutcome} bundling the result
+ * with method-specific success criteria. The {@link UseCaseContract#criteria}
+ * method uses the default (trivial) implementation since criteria are per-method.
  *
  * <h2>Configuration</h2>
  * <p>Configuration (model, temperature, etc.) is provided at construction time,
@@ -34,9 +43,10 @@ import org.javai.punit.model.UseCaseResult;
  * for each factor combination.
  *
  * @see org.javai.punit.api.UseCaseProvider
+ * @see UseCaseContract
  */
-@UseCase  // ID defaults to "ShoppingUseCase" (simple class name)
-public class ShoppingUseCase {
+@UseCase  // Optional marker annotation
+public class ShoppingUseCase implements UseCaseContract {
 
     private ShoppingAssistant assistant;
     private String model = "default";
@@ -135,79 +145,81 @@ public class ShoppingUseCase {
     /**
      * Search for products matching a query.
      *
-     * <p>Captures observations about:
+     * <p>The result contains <b>raw observations</b> only:
      * <ul>
-     *   <li>Whether the response is valid JSON</li>
-     *   <li>Whether required fields are present (products, query, totalResults)</li>
-     *   <li>Whether all products have required attributes (name, price, category)</li>
-     *   <li>Token consumption</li>
+     *   <li>Format observations: isValidJson, field presence flags</li>
+     *   <li>Content observations: productCount, rawJson</li>
+     *   <li>Resource usage: tokensUsed</li>
+     * </ul>
+     *
+     * <p>The criteria define <b>success conditions</b> (postconditions):
+     * <ul>
+     *   <li>Valid JSON format</li>
+     *   <li>Required fields present</li>
+     *   <li>Products have required attributes</li>
      * </ul>
      *
      * @param query the search query
-     * @return observations from the use case execution
+     * @return outcome containing result and success criteria
      */
-    public UseCaseResult searchProducts(String query) {
+    public UseCaseOutcome searchProducts(String query) {
         Instant start = Instant.now();
         
         LlmResponse response = assistant.searchProducts(query);
         
         Duration executionTime = Duration.between(start, Instant.now());
 
-        // Observe response format
+        // ═══════════════════════════════════════════════════════════════════
+        // RAW OBSERVATIONS - factual, neutral, no judgments
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Format observations
         boolean isValidJson = response.isValidJson();
         boolean hasProductsField = response.hasField("products");
         boolean hasQueryField = response.hasField("query");
         boolean hasTotalResultsField = response.hasField("totalResults");
-        boolean hasAllRequiredFields = hasProductsField && hasQueryField && hasTotalResultsField;
 
-        // Observe product quality
+        // Content observations
         List<Product> products = response.products();
-        boolean hasProducts = !products.isEmpty();
-        boolean allProductsHaveRequiredAttributes = hasProducts && products.stream()
-                .allMatch(p -> p.name() != null && p.price() != null && p.category() != null);
-        
         int productCount = products.size();
+        boolean allProductsHaveRequiredAttributes = !products.isEmpty() && products.stream()
+                .allMatch(p -> p.name() != null && p.price() != null && p.category() != null);
 
-        // Capture failure mode for experiment statistics
-        FailureMode failureMode = response.failureMode();
-
-        // Overall success requires all quality checks to pass
-        boolean success = isValidJson && hasAllRequiredFields && allProductsHaveRequiredAttributes;
-
-        // Determine failure category
-        String failureCategory = null;
-        if (!success) {
-            if (failureMode.isFailure()) {
-                failureCategory = failureMode.name();
-            } else if (!hasProducts) {
-                failureCategory = "EMPTY_RESPONSE";
-            } else if (!allProductsHaveRequiredAttributes) {
-                failureCategory = "PRODUCT_ATTRIBUTE_ERROR";
-            } else if (!hasAllRequiredFields) {
-                failureCategory = "MISSING_REQUIRED_FIELDS";
-            } else {
-                failureCategory = "VALIDATION_ERROR";
-            }
-        }
-
-        return UseCaseResult.builder()
-                .value("success", success)
+        UseCaseResult result = UseCaseResult.builder()
+                // Format observations
                 .value("isValidJson", isValidJson)
-                .value("hasAllRequiredFields", hasAllRequiredFields)
                 .value("hasProductsField", hasProductsField)
                 .value("hasQueryField", hasQueryField)
                 .value("hasTotalResultsField", hasTotalResultsField)
                 .value("allProductsHaveRequiredAttributes", allProductsHaveRequiredAttributes)
+                // Content observations
                 .value("productCount", productCount)
-                .value("tokensUsed", response.tokensUsed())
                 .value("rawJson", response.rawJson())
-                .value("failureCategory", failureCategory)
-                .value("failureMode", failureMode.name())
+                // Resource usage
+                .value("tokensUsed", response.tokensUsed())
+                // Context
                 .meta("query", query)
                 .meta("model", model)
                 .meta("temperature", temperature)
                 .executionTime(executionTime)
                 .build();
+
+        // ═══════════════════════════════════════════════════════════════════
+        // SUCCESS CRITERIA - postconditions that define "success"
+        // ═══════════════════════════════════════════════════════════════════
+        
+        UseCaseCriteria criteria = UseCaseCriteria.ordered()
+            .criterion("Valid JSON", 
+                () -> result.getBoolean("isValidJson", false))
+            .criterion("Has required fields", 
+                () -> result.getBoolean("hasProductsField", false)
+                    && result.getBoolean("hasQueryField", false)
+                    && result.getBoolean("hasTotalResultsField", false))
+            .criterion("Products have required attributes", 
+                () -> result.getBoolean("allProductsHaveRequiredAttributes", false))
+            .build();
+
+        return new UseCaseOutcome(result, criteria);
     }
 
     /**
@@ -215,54 +227,65 @@ public class ShoppingUseCase {
      *
      * @param query the search query
      * @param maxPrice the maximum price constraint
-     * @return observations from the use case execution
+     * @return outcome containing result and success criteria
      */
-    public UseCaseResult searchProductsWithPriceConstraint(String query, double maxPrice) {
+    public UseCaseOutcome searchProductsWithPriceConstraint(String query, double maxPrice) {
         Instant start = Instant.now();
         
         LlmResponse response = assistant.searchProducts(query, maxPrice);
         
         Duration executionTime = Duration.between(start, Instant.now());
 
+        // Raw observations
         boolean isValidJson = response.isValidJson();
-        boolean hasAllRequiredFields = response.hasField("products") 
-                && response.hasField("query") 
-                && response.hasField("totalResults");
+        boolean hasProductsField = response.hasField("products");
+        boolean hasQueryField = response.hasField("query");
+        boolean hasTotalResultsField = response.hasField("totalResults");
 
         List<Product> products = response.products();
+        int productCount = products.size();
+        
+        boolean allProductsHaveRequiredAttributes = !products.isEmpty() && products.stream()
+                .allMatch(p -> p.name() != null && p.price() != null && p.category() != null);
+        
         boolean allProductsWithinPriceRange = products.stream()
                 .allMatch(p -> p.price() != null && p.price() <= maxPrice);
         
-        long productsExceedingPrice = products.stream()
+        int productsExceedingPrice = (int) products.stream()
                 .filter(p -> p.price() != null && p.price() > maxPrice)
                 .count();
 
-        boolean allProductsHaveRequiredAttributes = products.stream()
-                .allMatch(p -> p.name() != null && p.price() != null && p.category() != null);
-
-        FailureMode failureMode = response.failureMode();
-        String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
-
-        boolean success = isValidJson && hasAllRequiredFields 
-                && allProductsHaveRequiredAttributes && allProductsWithinPriceRange;
-
-        return UseCaseResult.builder()
-                .value("success", success)
+        UseCaseResult result = UseCaseResult.builder()
                 .value("isValidJson", isValidJson)
-                .value("hasAllRequiredFields", hasAllRequiredFields)
-                .value("allProductsWithinPriceRange", allProductsWithinPriceRange)
-                .value("productsExceedingPrice", (int) productsExceedingPrice)
+                .value("hasProductsField", hasProductsField)
+                .value("hasQueryField", hasQueryField)
+                .value("hasTotalResultsField", hasTotalResultsField)
                 .value("allProductsHaveRequiredAttributes", allProductsHaveRequiredAttributes)
-                .value("productCount", products.size())
+                .value("allProductsWithinPriceRange", allProductsWithinPriceRange)
+                .value("productsExceedingPrice", productsExceedingPrice)
+                .value("productCount", productCount)
                 .value("tokensUsed", response.tokensUsed())
-                .value("failureCategory", failureCategory)
-                .value("failureMode", failureMode.name())
                 .meta("query", query)
                 .meta("maxPrice", maxPrice)
                 .meta("model", model)
                 .meta("temperature", temperature)
                 .executionTime(executionTime)
                 .build();
+
+        UseCaseCriteria criteria = UseCaseCriteria.ordered()
+            .criterion("Valid JSON", 
+                () -> result.getBoolean("isValidJson", false))
+            .criterion("Has required fields", 
+                () -> result.getBoolean("hasProductsField", false)
+                    && result.getBoolean("hasQueryField", false)
+                    && result.getBoolean("hasTotalResultsField", false))
+            .criterion("Products have required attributes", 
+                () -> result.getBoolean("allProductsHaveRequiredAttributes", false))
+            .criterion("All products within price range", 
+                () -> result.getBoolean("allProductsWithinPriceRange", false))
+            .build();
+
+        return new UseCaseOutcome(result, criteria);
     }
 
     /**
@@ -270,48 +293,51 @@ public class ShoppingUseCase {
      *
      * @param query the search query
      * @param maxResults the maximum number of products to return
-     * @return observations from the use case execution
+     * @return outcome containing result and success criteria
      */
-    public UseCaseResult searchProductsWithLimit(String query, int maxResults) {
+    public UseCaseOutcome searchProductsWithLimit(String query, int maxResults) {
         Instant start = Instant.now();
         
         LlmResponse response = assistant.searchProducts(query, maxResults);
         
         Duration executionTime = Duration.between(start, Instant.now());
 
-        boolean isValidJson = response.isValidJson();
-        boolean hasAllRequiredFields = response.hasField("products") 
-                && response.hasField("query") 
-                && response.hasField("totalResults");
-
         List<Product> products = response.products();
-        boolean respectsResultLimit = products.size() <= maxResults;
+        int productCount = products.size();
+        boolean respectsResultLimit = productCount <= maxResults;
         
         Integer reportedTotal = response.totalResults();
-        boolean totalResultsMatchesActual = reportedTotal != null && reportedTotal == products.size();
+        boolean totalResultsMatchesActual = reportedTotal != null && reportedTotal == productCount;
 
-        FailureMode failureMode = response.failureMode();
-        String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
-
-        boolean success = isValidJson && hasAllRequiredFields && respectsResultLimit;
-
-        return UseCaseResult.builder()
-                .value("success", success)
-                .value("isValidJson", isValidJson)
-                .value("hasAllRequiredFields", hasAllRequiredFields)
+        UseCaseResult result = UseCaseResult.builder()
+                .value("isValidJson", response.isValidJson())
+                .value("hasProductsField", response.hasField("products"))
+                .value("hasQueryField", response.hasField("query"))
+                .value("hasTotalResultsField", response.hasField("totalResults"))
                 .value("respectsResultLimit", respectsResultLimit)
                 .value("totalResultsMatchesActual", totalResultsMatchesActual)
-                .value("productCount", products.size())
-                .value("requestedMaxResults", maxResults)
+                .value("productCount", productCount)
+                .value("reportedTotalResults", reportedTotal)
                 .value("tokensUsed", response.tokensUsed())
-                .value("failureCategory", failureCategory)
-                .value("failureMode", failureMode.name())
                 .meta("query", query)
                 .meta("maxResults", maxResults)
                 .meta("model", model)
                 .meta("temperature", temperature)
                 .executionTime(executionTime)
                 .build();
+
+        UseCaseCriteria criteria = UseCaseCriteria.ordered()
+            .criterion("Valid JSON", 
+                () -> result.getBoolean("isValidJson", false))
+            .criterion("Has required fields", 
+                () -> result.getBoolean("hasProductsField", false)
+                    && result.getBoolean("hasQueryField", false)
+                    && result.getBoolean("hasTotalResultsField", false))
+            .criterion("Respects result limit", 
+                () -> result.getBoolean("respectsResultLimit", false))
+            .build();
+
+        return new UseCaseOutcome(result, criteria);
     }
 
     /**
@@ -319,18 +345,21 @@ public class ShoppingUseCase {
      *
      * @param query the search query
      * @param minRelevanceScore the minimum acceptable relevance score
-     * @return observations from the use case execution
+     * @return outcome containing result and success criteria
      */
-    public UseCaseResult searchProductsWithRelevanceCheck(String query, double minRelevanceScore) {
+    public UseCaseOutcome searchProductsWithRelevanceCheck(String query, double minRelevanceScore) {
         Instant start = Instant.now();
         
         LlmResponse response = assistant.searchProducts(query);
         
         Duration executionTime = Duration.between(start, Instant.now());
 
+        // Raw observations
         boolean isValidJson = response.isValidJson();
 
         List<Product> products = response.products();
+        int productCount = products.size();
+        
         boolean allProductsRelevant = products.stream()
                 .allMatch(p -> p.relevanceScore() != null && p.relevanceScore() >= minRelevanceScore);
         
@@ -340,31 +369,32 @@ public class ShoppingUseCase {
                 .average()
                 .orElse(0.0);
         
-        long lowRelevanceCount = products.stream()
+        int lowRelevanceCount = (int) products.stream()
                 .filter(p -> p.relevanceScore() != null && p.relevanceScore() < minRelevanceScore)
                 .count();
 
-        FailureMode failureMode = response.failureMode();
-        String failureCategory = failureMode.isFailure() ? failureMode.name() : null;
-
-        boolean success = isValidJson && allProductsRelevant;
-
-        return UseCaseResult.builder()
-                .value("success", success)
+        UseCaseResult result = UseCaseResult.builder()
                 .value("isValidJson", isValidJson)
                 .value("allProductsRelevant", allProductsRelevant)
                 .value("averageRelevance", averageRelevance)
-                .value("lowRelevanceCount", (int) lowRelevanceCount)
-                .value("productCount", products.size())
+                .value("lowRelevanceCount", lowRelevanceCount)
+                .value("productCount", productCount)
                 .value("tokensUsed", response.tokensUsed())
-                .value("failureCategory", failureCategory)
-                .value("failureMode", failureMode.name())
                 .meta("query", query)
                 .meta("minRelevanceScore", minRelevanceScore)
                 .meta("model", model)
                 .meta("temperature", temperature)
                 .executionTime(executionTime)
                 .build();
+
+        UseCaseCriteria criteria = UseCaseCriteria.ordered()
+            .criterion("Valid JSON", 
+                () -> result.getBoolean("isValidJson", false))
+            .criterion("All products relevant", 
+                () -> result.getBoolean("allProductsRelevant", false))
+            .build();
+
+        return new UseCaseOutcome(result, criteria);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

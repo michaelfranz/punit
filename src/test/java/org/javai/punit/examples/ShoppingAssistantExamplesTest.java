@@ -7,7 +7,7 @@ import org.javai.punit.api.ProbabilisticTestBudget;
 import org.javai.punit.api.TokenChargeRecorder;
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
-import org.javai.punit.model.UseCaseResult;
+import org.javai.punit.model.UseCaseOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 
@@ -55,9 +55,8 @@ import org.junit.jupiter.api.Disabled;
  *
  * <h2>Testing Strategy</h2>
  * <p>These probabilistic tests invoke {@link ShoppingUseCase} methods and assert
- * on the observations captured in the {@link UseCaseResult}. This demonstrates
- * how use cases decouple the act of invoking production code from the act of
- * asserting on outcomes.
+ * on the observations captured in the {@link UseCaseOutcome}. The use case methods
+ * now return a unified outcome containing both the result and its success criteria.
  *
  * <p>The tests use token budgets to control LLM API costs during testing.
  */
@@ -96,13 +95,13 @@ class ShoppingAssistantExamplesTest {
 			maxExampleFailures = 5
 	)
 	void shouldReturnValidJsonFormat(TokenChargeRecorder tokenRecorder) {
-		UseCaseResult result = useCase.searchProducts("wireless headphones");
+		UseCaseOutcome outcome = useCase.searchProducts("wireless headphones");
 
 		// Record tokens from the use case result
-		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
 		// Assert on observations captured by the use case
-		assertThat(result.getBoolean("isValidJson", false))
+		assertThat(outcome.result().getBoolean("isValidJson", false))
 				.as("Response should be valid JSON")
 				.isTrue();
 	}
@@ -124,18 +123,18 @@ class ShoppingAssistantExamplesTest {
 			maxExampleFailures = 5
 	)
 	void shouldIncludeAllRequiredFields(TokenChargeRecorder tokenRecorder) {
-		UseCaseResult result = useCase.searchProducts("laptop stand");
+		UseCaseOutcome outcome = useCase.searchProducts("laptop stand");
 
-		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
 		// Assert on individual field presence observations
-		assertThat(result.getBoolean("hasProductsField", false))
+		assertThat(outcome.result().getBoolean("hasProductsField", false))
 				.as("Response should have 'products' field")
 				.isTrue();
-		assertThat(result.getBoolean("hasQueryField", false))
+		assertThat(outcome.result().getBoolean("hasQueryField", false))
 				.as("Response should have 'query' field")
 				.isTrue();
-		assertThat(result.getBoolean("hasTotalResultsField", false))
+		assertThat(outcome.result().getBoolean("hasTotalResultsField", false))
 				.as("Response should have 'totalResults' field")
 				.isTrue();
 	}
@@ -159,12 +158,12 @@ class ShoppingAssistantExamplesTest {
 			maxExampleFailures = 5
 	)
 	void shouldReturnProductsWithRequiredAttributes(TokenChargeRecorder tokenRecorder) {
-		UseCaseResult result = useCase.searchProducts("USB-C hub");
+		UseCaseOutcome outcome = useCase.searchProducts("USB-C hub");
 
-		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
 		// The use case already checked if all products have required attributes
-		assertThat(result.getBoolean("allProductsHaveRequiredAttributes", false))
+		assertThat(outcome.result().getBoolean("allProductsHaveRequiredAttributes", false))
 				.as("All products should have name, price, and category")
 				.isTrue();
 	}
@@ -187,14 +186,14 @@ class ShoppingAssistantExamplesTest {
 	void shouldReturnRelevantProducts(TokenChargeRecorder tokenRecorder) {
 		double minRelevanceScore = 0.7;
 
-		UseCaseResult result = useCase.searchProductsWithRelevanceCheck("mechanical keyboard", minRelevanceScore);
+		UseCaseOutcome outcome = useCase.searchProductsWithRelevanceCheck("mechanical keyboard", minRelevanceScore);
 
-		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
 		// Assert that all products meet the relevance threshold
-		assertThat(result.getBoolean("allProductsRelevant", false))
+		assertThat(outcome.result().getBoolean("allProductsRelevant", false))
 				.as("All products should have relevance score >= %.1f (average was %.2f)",
-						minRelevanceScore, result.getDouble("averageRelevance", 0.0))
+						minRelevanceScore, outcome.result().getDouble("averageRelevance", 0.0))
 				.isTrue();
 	}
 
@@ -216,14 +215,14 @@ class ShoppingAssistantExamplesTest {
 	void shouldRespectPriceRangeFilter(TokenChargeRecorder tokenRecorder) {
 		double maxPrice = 50.00;
 
-		UseCaseResult result = useCase.searchProductsWithPriceConstraint("webcam 4k", maxPrice);
+		UseCaseOutcome outcome = useCase.searchProductsWithPriceConstraint("webcam 4k", maxPrice);
 
-		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
 		// Assert that all products are within price range
-		assertThat(result.getBoolean("allProductsWithinPriceRange", false))
+		assertThat(outcome.result().getBoolean("allProductsWithinPriceRange", false))
 				.as("All products should be under $%.2f (found %d exceeding price)",
-						maxPrice, result.getInt("productsExceedingPrice", 0))
+						maxPrice, outcome.result().getInt("productsExceedingPrice", 0))
 				.isTrue();
 	}
 
@@ -244,14 +243,14 @@ class ShoppingAssistantExamplesTest {
 	void shouldRespectResultCountLimit(TokenChargeRecorder tokenRecorder) {
 		int maxResults = 5;
 
-		UseCaseResult result = useCase.searchProductsWithLimit("bluetooth speaker waterproof", maxResults);
+		UseCaseOutcome outcome = useCase.searchProductsWithLimit("bluetooth speaker waterproof", maxResults);
 
-		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
 		// Assert on result limit compliance
-		assertThat(result.getBoolean("respectsResultLimit", false))
+		assertThat(outcome.result().getBoolean("respectsResultLimit", false))
 				.as("Should return at most %d products (got %d)",
-						maxResults, result.getInt("productCount", 0))
+						maxResults, outcome.result().getInt("productCount", 0))
 				.isTrue();
 	}
 
@@ -267,12 +266,12 @@ class ShoppingAssistantExamplesTest {
 	void shouldHaveConsistentResultCount(TokenChargeRecorder tokenRecorder) {
 		int maxResults = 5;
 
-		UseCaseResult result = useCase.searchProductsWithLimit("noise cancelling earbuds", maxResults);
+		UseCaseOutcome outcome = useCase.searchProductsWithLimit("noise cancelling earbuds", maxResults);
 
-		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
 		// Assert that reported total matches actual count
-		assertThat(result.getBoolean("totalResultsMatchesActual", false))
+		assertThat(outcome.result().getBoolean("totalResultsMatchesActual", false))
 				.as("totalResults field should match actual product count")
 				.isTrue();
 	}
@@ -291,16 +290,67 @@ class ShoppingAssistantExamplesTest {
 			maxExampleFailures = 5
 	)
 	void shouldReturnCompleteValidResponse(TokenChargeRecorder tokenRecorder) {
-		UseCaseResult result = useCase.searchProducts("microphone for streaming");
+		UseCaseOutcome outcome = useCase.searchProducts("microphone for streaming");
 
-		tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
 		// Combined assertion: valid JSON AND all required fields
-		assertThat(result.getBoolean("isValidJson", false))
+		assertThat(outcome.result().getBoolean("isValidJson", false))
 				.as("Response should be valid JSON")
 				.isTrue();
-		assertThat(result.getBoolean("hasAllRequiredFields", false))
+		assertThat(outcome.result().getBoolean("hasAllRequiredFields", false))
 				.as("Response should have all required fields")
 				.isTrue();
+	}
+
+	// ========== Using Success Criteria ==========
+
+	/**
+	 * Tests using the use case's success criteria bundled with the outcome.
+	 *
+	 * <p>This demonstrates the recommended pattern: the use case method returns
+	 * a {@link UseCaseOutcome} containing both the result and its success criteria,
+	 * ensuring type-safe binding and consistency between experiments and tests.
+	 *
+	 * <h2>Benefits</h2>
+	 * <ul>
+	 *   <li><b>Type safety</b> - Criteria is bound to its result, no mismatches</li>
+	 *   <li><b>Consistency</b> - Same criteria used in MEASURE experiments and tests</li>
+	 *   <li><b>Single source of truth</b> - Success definition lives with the use case</li>
+	 *   <li><b>Cleaner tests</b> - Just call outcome.assertAll()</li>
+	 * </ul>
+	 */
+	@ProbabilisticTest(
+			samples = 30,
+			minPassRate = 0.85,
+			maxExampleFailures = 5
+	)
+	void shouldPassAllSuccessCriteria(TokenChargeRecorder tokenRecorder) {
+		UseCaseOutcome outcome = useCase.searchProducts("wireless headphones");
+
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
+
+		// Assert all criteria bundled with the outcome - same as used in experiments!
+		// This ensures evaluator consistency between MEASURE and test.
+		outcome.assertAll();
+	}
+
+	/**
+	 * Tests using the outcome's criteria for product search.
+	 *
+	 * <p>Demonstrates using the bundled criteria for validation.
+	 */
+	@ProbabilisticTest(
+			samples = 25,
+			minPassRate = 0.80,
+			maxExampleFailures = 5
+	)
+	void shouldPassCriteriaForProductSearch(TokenChargeRecorder tokenRecorder) {
+		UseCaseOutcome outcome = useCase.searchProducts("laptop stand");
+
+		tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
+
+		// The criteria is bundled with the outcome
+		outcome.assertAll();
 	}
 }

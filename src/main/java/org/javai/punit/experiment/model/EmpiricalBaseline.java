@@ -90,7 +90,7 @@ public final class EmpiricalBaseline {
         return cost;
     }
     
-    public String getSuccessCriteriaDefinition() {
+    public String getUseCaseCriteria() {
         return successCriteriaDefinition;
     }
     
@@ -125,11 +125,21 @@ public final class EmpiricalBaseline {
 	 */
 	public record StatisticsSummary(double observedSuccessRate, double standardError, double confidenceIntervalLower,
 									double confidenceIntervalUpper, int successes, int failures,
-									Map<String, Integer> failureDistribution) {
+									Map<String, Integer> failureDistribution,
+									Map<String, Double> criteriaPassRates) {
 		public StatisticsSummary(double observedSuccessRate, double standardError,
 								 double confidenceIntervalLower, double confidenceIntervalUpper,
 								 int successes, int failures,
 								 Map<String, Integer> failureDistribution) {
+			this(observedSuccessRate, standardError, confidenceIntervalLower, confidenceIntervalUpper,
+				 successes, failures, failureDistribution, null);
+		}
+		
+		public StatisticsSummary(double observedSuccessRate, double standardError,
+								 double confidenceIntervalLower, double confidenceIntervalUpper,
+								 int successes, int failures,
+								 Map<String, Integer> failureDistribution,
+								 Map<String, Double> criteriaPassRates) {
 			this.observedSuccessRate = observedSuccessRate;
 			this.standardError = standardError;
 			this.confidenceIntervalLower = confidenceIntervalLower;
@@ -139,6 +149,16 @@ public final class EmpiricalBaseline {
 			this.failureDistribution = failureDistribution != null
 					? Collections.unmodifiableMap(new LinkedHashMap<>(failureDistribution))
 					: Collections.emptyMap();
+			this.criteriaPassRates = criteriaPassRates != null
+					? Collections.unmodifiableMap(new LinkedHashMap<>(criteriaPassRates))
+					: Collections.emptyMap();
+		}
+		
+		/**
+		 * Returns true if criteria pass rates are available.
+		 */
+		public boolean hasCriteriaPassRates() {
+			return criteriaPassRates != null && !criteriaPassRates.isEmpty();
 		}
 	}
 

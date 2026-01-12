@@ -744,7 +744,7 @@ When any sample fails, the IDE shows the test as ❌ FAILED. **This is correct b
 ```
 ═══════════════════════════════════════════════════════════════
 PUnit PASSED: sample()
-  Observed pass rate: 99.0% (97/98) >= threshold: 95.0%
+  Observed pass rate: 99.0% (97/98) >= min pass rate: 95.0%
   Termination: Required pass rate already achieved
 ═══════════════════════════════════════════════════════════════
 ```

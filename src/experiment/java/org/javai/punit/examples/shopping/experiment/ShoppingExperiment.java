@@ -11,6 +11,7 @@ import org.javai.punit.api.Factor;
 import org.javai.punit.api.FactorArguments;
 import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.ResultCaptor;
+import org.javai.punit.model.UseCaseOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
@@ -35,6 +36,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li><b>Configuration factors</b> - Control how use case is built (handled by provider)</li>
  *   <li><b>Input factors</b> - Vary the inputs to use case methods (passed to method)</li>
  * </ul>
+ *
+ * <h2>UseCaseOutcome Pattern</h2>
+ * <p>Use case methods now return {@link UseCaseOutcome}, which bundles both the
+ * result and its success criteria. This ensures type-safe binding and evaluator
+ * consistency between experiments and tests.
  *
  * <h2>Usage</h2>
  * <pre>{@code
@@ -108,6 +114,10 @@ public class ShoppingExperiment {
      *   <li>Method only declares parameters it actually uses</li>
      * </ul>
      *
+     * <h2>UseCaseOutcome</h2>
+     * <p>The use case method returns a {@link UseCaseOutcome} containing both the
+     * result and its success criteria, ensuring type-safe binding.
+     *
      * <h2>Output</h2>
      * <pre>
      * src/test/resources/punit/explorations/ShoppingUseCase/
@@ -127,7 +137,8 @@ public class ShoppingExperiment {
             @Factor("query") String query, // Injected directly - clean!
             ResultCaptor captor
     ) {
-        captor.record(useCase.searchProducts(query));
+        UseCaseOutcome outcome = useCase.searchProducts(query);
+        captor.record(outcome);  // Records both result and criteria
     }
 
     /**
@@ -171,6 +182,11 @@ public class ShoppingExperiment {
      *   <li>The same factor source should be used by probabilistic tests</li>
      * </ul>
      *
+     * <h2>UseCaseOutcome</h2>
+     * <p>The use case method returns a {@link UseCaseOutcome} containing both the
+     * result and its success criteria. Recording the outcome automatically records
+     * both the raw result values and the criteria for aggregation.
+     *
      * <h2>Factor Consistency</h2>
      * <p>The {@code @FactorSource} annotation references a method in {@link ShoppingUseCase}.
      * When probabilistic tests reference the same factor source, PUnit can verify
@@ -199,7 +215,8 @@ public class ShoppingExperiment {
         useCase.setTemperature(0.7);
         
         // Query varies from factor source (cycling through representative inputs)
-        captor.record(useCase.searchProducts(query));
+        UseCaseOutcome outcome = useCase.searchProducts(query);
+        captor.record(outcome);  // Records both result and criteria
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -229,6 +246,7 @@ public class ShoppingExperiment {
         useCase.setTemperature(0.7);
         
         // Query varies from factor source (cycling through extended inputs)
-        captor.record(useCase.searchProducts(query));
+        UseCaseOutcome outcome = useCase.searchProducts(query);
+        captor.record(outcome);  // Records both result and criteria
     }
 }

@@ -45,6 +45,11 @@ public class EmpiricalBaselineGenerator {
             ? Map.of() 
             : aggregator.getFailureDistribution();
         
+        // Include criteria pass rates if available
+        Map<String, Double> criteriaPassRates = aggregator.hasCriteriaStats()
+            ? aggregator.getCriteriaPassRates()
+            : Map.of();
+        
         StatisticsSummary statistics = new StatisticsSummary(
             aggregator.getObservedSuccessRate(),
             aggregator.getStandardError(),
@@ -52,7 +57,8 @@ public class EmpiricalBaselineGenerator {
             ci[1],
             aggregator.getSuccesses(),
             aggregator.getFailures(),
-            failureDistribution
+            failureDistribution,
+            criteriaPassRates
         );
         
         CostSummary cost = new CostSummary(

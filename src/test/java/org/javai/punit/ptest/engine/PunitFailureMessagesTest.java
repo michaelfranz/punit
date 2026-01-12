@@ -36,7 +36,7 @@ class PunitFailureMessagesTest {
                 .contains("alpha=0.050")
                 .contains("87.0%")
                 .contains("(87/100)")
-                .contains("threshold=91.6%")
+                .contains("min pass rate=91.6%")
                 .contains("Baseline=95.1%")
                 .contains("N=1000")
                 .contains("spec=json.generation:v3");
@@ -63,7 +63,7 @@ class PunitFailureMessagesTest {
         // Then - verify exact format
         assertThat(message).isEqualTo(
                 "PUnit FAILED with 95.0% confidence (alpha=0.050). " +
-                "Observed pass rate=87.0% (87/100) < threshold=91.6%. " +
+                "Observed pass rate=87.0% (87/100) < min pass rate=91.6%. " +
                 "Baseline=95.1% (N=1000), spec=json.generation:v3"
         );
     }
@@ -84,7 +84,7 @@ class PunitFailureMessagesTest {
                 .contains("PUnit FAILED")
                 .contains("87.0%")
                 .contains("(87/100)")
-                .contains("threshold=90.0%")
+                .contains("min pass rate=90.0%")
                 .doesNotContain("confidence")
                 .doesNotContain("Baseline");
     }
@@ -209,7 +209,7 @@ class PunitFailureMessagesTest {
         assertThat(message)
                 .contains("100.0%")
                 .contains("(100/100)")
-                .contains("threshold=100.0%");
+                .contains("min pass rate=100.0%");
     }
 }
 

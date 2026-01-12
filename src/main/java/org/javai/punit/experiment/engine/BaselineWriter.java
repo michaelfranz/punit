@@ -108,6 +108,14 @@ public class BaselineWriter {
             sb.append("  terminationDetails: ").append(baseline.getExecution().terminationDetails()).append("\n");
         }
         
+        // Requirements (derived from empirical data)
+        // minPassRate is set to the lower bound of the 95% confidence interval
+        // This is statistically sound: if the true rate is at this bound, there's
+        // a 95% chance the test will pass (given sufficient samples)
+        double derivedMinPassRate = baseline.getStatistics().confidenceIntervalLower();
+        sb.append("\nrequirements:\n");
+        sb.append("  minPassRate: ").append(String.format("%.4f", derivedMinPassRate)).append("\n");
+        
         // Statistics
         sb.append("\nstatistics:\n");
         sb.append("  successRate:\n");
@@ -136,9 +144,9 @@ public class BaselineWriter {
         sb.append("  avgTokensPerSample: ").append(baseline.getCost().avgTokensPerSample()).append("\n");
         
         // Success criteria
-        if (baseline.getSuccessCriteriaDefinition() != null) {
+        if (baseline.getUseCaseCriteria() != null) {
             sb.append("\nsuccessCriteria:\n");
-            sb.append("  definition: \"").append(escapeYamlString(baseline.getSuccessCriteriaDefinition())).append("\"\n");
+            sb.append("  definition: \"").append(escapeYamlString(baseline.getUseCaseCriteria())).append("\"\n");
         }
         
         // Result projections (EXPLORE mode only)

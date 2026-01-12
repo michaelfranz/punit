@@ -7,7 +7,7 @@ import org.javai.punit.api.TokenChargeRecorder;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
-import org.javai.punit.model.UseCaseResult;
+import org.javai.punit.model.UseCaseOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
@@ -67,7 +67,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * @see ShoppingUseCase
  * @see UseCaseProvider
  */
-@Disabled("Example - run MEASURE experiment first to generate spec")
+//@Disabled("Example - run MEASURE experiment first to generate spec")
 @DisplayName("Shopping Assistant Spec-Driven Tests")
 class ShoppingAssistantSpecExamplesTest {
 
@@ -152,11 +152,11 @@ class ShoppingAssistantSpecExamplesTest {
         useCase.setTemperature(0.7);
         
         // Query can vary - using a representative query from the standard set
-        UseCaseResult result = useCase.searchProducts("wireless headphones");
+        UseCaseOutcome outcome = useCase.searchProducts("wireless headphones");
 
-        tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
-        assertThat(result.getBoolean("isValidJson", false))
+        assertThat(outcome.result().getBoolean("isValidJson", false))
             .as("Response should be valid JSON")
             .isTrue();
     }
@@ -187,12 +187,88 @@ class ShoppingAssistantSpecExamplesTest {
         useCase.setTemperature(0.7);
         
         // Query can vary - using a representative query
-        UseCaseResult result = useCase.searchProducts("laptop stand");
+        UseCaseOutcome outcome = useCase.searchProducts("laptop stand");
 
-        tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
-        assertThat(result.getBoolean("isValidJson", false))
+        assertThat(outcome.result().getBoolean("isValidJson", false))
             .as("Response should be valid JSON")
             .isTrue();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SUCCESS CRITERIA-DRIVEN TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Tests using the use case's success criteria bundled with the outcome.
+     *
+     * <p>This demonstrates the best practice: the use case method returns a
+     * {@link UseCaseOutcome} containing both the result and its success criteria.
+     * This ensures:
+     * <ul>
+     *   <li><b>Type safety</b>: Criteria is bound to its result, no mismatches</li>
+     *   <li><b>Evaluator consistency</b>: Same criteria used in MEASURE experiments</li>
+     *   <li><b>Single source of truth</b>: Success definition lives with the use case</li>
+     *   <li><b>Cleaner tests</b>: Just call outcome.assertAll()</li>
+     * </ul>
+     *
+     * <p>The spec file will contain per-criterion pass rates from the MEASURE
+     * experiment, providing visibility into which criteria are most reliable.
+     *
+     * @param useCase the shopping use case (injected by {@link UseCaseProvider})
+     * @param tokenRecorder for tracking token consumption
+     */
+    @ProbabilisticTest(
+        useCase = ShoppingUseCase.class,
+        samples = 30,
+        maxExampleFailures = 5
+        // minPassRate is derived from spec
+    )
+    @DisplayName("Should pass all success criteria (spec-driven)")
+    void shouldPassAllSuccessCriteria(
+            ShoppingUseCase useCase,
+            TokenChargeRecorder tokenRecorder) {
+        // Configuration fixed post-EXPLORE (same as MEASURE experiment)
+        useCase.setModel("gpt-4");
+        useCase.setTemperature(0.7);
+        
+        UseCaseOutcome outcome = useCase.searchProducts("wireless headphones");
+
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
+
+        // The success criteria is bundled with the outcome - same as used in experiments!
+        // This ensures evaluator consistency between MEASURE and test.
+        outcome.assertAll();
+    }
+
+    /**
+     * Tests using success criteria with explicit threshold.
+     *
+     * <p>Combines the clarity of success criteria with explicit threshold control.
+     *
+     * @param useCase the shopping use case
+     * @param tokenRecorder for tracking token consumption
+     */
+    @ProbabilisticTest(
+        useCase = ShoppingUseCase.class,
+        samples = 25,
+        minPassRate = 0.90,  // Explicit threshold
+        maxExampleFailures = 3
+    )
+    @DisplayName("Should pass success criteria (explicit threshold)")
+    void shouldPassSuccessCriteriaExplicit(
+            ShoppingUseCase useCase,
+            TokenChargeRecorder tokenRecorder) {
+        // Configuration fixed post-EXPLORE
+        useCase.setModel("gpt-4");
+        useCase.setTemperature(0.7);
+        
+        UseCaseOutcome outcome = useCase.searchProducts("USB-C hub");
+
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
+
+        // Success criteria bundled with the outcome
+        outcome.assertAll();
     }
 }

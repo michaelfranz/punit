@@ -180,7 +180,7 @@ class ConsoleExplanationRendererTest {
                         "TestUseCase.yaml",
                         Instant.parse("2026-01-10T10:00:00Z"),
                         1000, 870, 0.87,
-                        "Lower bound of 95% CI = 85.1%, applied threshold = 85%",
+                        "Lower bound of 95% CI = 85.1%, min pass rate = 85%",
                         0.85
                 ),
                 new StatisticalExplanation.StatisticalInference(

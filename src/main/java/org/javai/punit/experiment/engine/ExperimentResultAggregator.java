@@ -6,7 +6,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.javai.punit.engine.CriteriaOutcomeAggregator;
 import org.javai.punit.experiment.model.ResultProjection;
+import org.javai.punit.model.UseCaseCriteria;
 import org.javai.punit.model.UseCaseResult;
 
 /**
@@ -33,6 +35,7 @@ public class ExperimentResultAggregator {
     private final Map<String, Integer> failureDistribution = new LinkedHashMap<>();
     private final List<UseCaseResult> results = new ArrayList<>();
     private final List<ResultProjection> resultProjections = new ArrayList<>();
+    private final CriteriaOutcomeAggregator criteriaAggregator = new CriteriaOutcomeAggregator();
     private String terminationReason = null;
     private String terminationDetails = null;
     
@@ -112,6 +115,20 @@ public class ExperimentResultAggregator {
     public void addTokens(long tokens) {
         if (tokens > 0) {
             totalTokens += tokens;
+        }
+    }
+    
+    /**
+     * Records success criteria outcomes for a sample.
+     *
+     * <p>The criteria's {@code evaluate()} method is called to obtain outcomes,
+     * which are then aggregated for statistical reporting.
+     *
+     * @param criteria the success criteria to record
+     */
+    public void recordCriteria(UseCaseCriteria criteria) {
+        if (criteria != null) {
+            criteriaAggregator.record(criteria);
         }
     }
     
@@ -272,6 +289,36 @@ public class ExperimentResultAggregator {
     
     public int getRemainingSamples() {
         return Math.max(0, totalSamples - getSamplesExecuted());
+    }
+    
+    /**
+     * Returns the criteria outcome aggregator.
+     *
+     * @return the criteria aggregator
+     */
+    public CriteriaOutcomeAggregator getCriteriaAggregator() {
+        return criteriaAggregator;
+    }
+    
+    /**
+     * Returns true if any criteria have been recorded.
+     *
+     * @return true if criteria stats are available
+     */
+    public boolean hasCriteriaStats() {
+        return criteriaAggregator.getSamplesRecorded() > 0;
+    }
+    
+    /**
+     * Returns a summary of criterion pass rates.
+     *
+     * <p>This is a convenience method that returns a map of criterion
+     * descriptions to their observed pass rates. Useful for spec generation.
+     *
+     * @return map of criterion descriptions to pass rates
+     */
+    public Map<String, Double> getCriteriaPassRates() {
+        return criteriaAggregator.getPassRateSummary();
     }
 }
 

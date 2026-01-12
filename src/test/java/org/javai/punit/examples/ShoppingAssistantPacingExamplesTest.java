@@ -9,7 +9,7 @@ import org.javai.punit.api.TokenChargeRecorder;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.shopping.usecase.MockShoppingAssistant;
 import org.javai.punit.examples.shopping.usecase.ShoppingUseCase;
-import org.javai.punit.model.UseCaseResult;
+import org.javai.punit.model.UseCaseOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
@@ -129,11 +129,11 @@ class ShoppingAssistantPacingExamplesTest {
     void shouldReturnValidJsonWithSimpleDelay(
             ShoppingUseCase useCase,
             TokenChargeRecorder tokenRecorder) {
-        UseCaseResult result = useCase.searchProducts("wireless headphones");
+        UseCaseOutcome outcome = useCase.searchProducts("wireless headphones");
 
-        tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
-        assertThat(result.getBoolean("isValidJson", false))
+        assertThat(outcome.result().getBoolean("isValidJson", false))
             .as("Response should be valid JSON")
             .isTrue();
     }
@@ -172,11 +172,11 @@ class ShoppingAssistantPacingExamplesTest {
     void shouldReturnValidJsonWithRateLimit(
             ShoppingUseCase useCase,
             TokenChargeRecorder tokenRecorder) {
-        UseCaseResult result = useCase.searchProducts("laptop stand");
+        UseCaseOutcome outcome = useCase.searchProducts("laptop stand");
 
-        tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
-        assertThat(result.getBoolean("isValidJson", false))
+        assertThat(outcome.result().getBoolean("isValidJson", false))
             .as("Response should be valid JSON")
             .isTrue();
     }
@@ -206,11 +206,11 @@ class ShoppingAssistantPacingExamplesTest {
     void shouldReturnValidJsonWithRpsLimit(
             ShoppingUseCase useCase,
             TokenChargeRecorder tokenRecorder) {
-        UseCaseResult result = useCase.searchProducts("USB-C hub");
+        UseCaseOutcome outcome = useCase.searchProducts("USB-C hub");
 
-        tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
-        assertThat(result.getBoolean("isValidJson", false))
+        assertThat(outcome.result().getBoolean("isValidJson", false))
             .as("Response should be valid JSON")
             .isTrue();
     }
@@ -248,11 +248,11 @@ class ShoppingAssistantPacingExamplesTest {
     void shouldReturnValidJsonWithCombinedConstraints(
             ShoppingUseCase useCase,
             TokenChargeRecorder tokenRecorder) {
-        UseCaseResult result = useCase.searchProducts("mechanical keyboard");
+        UseCaseOutcome outcome = useCase.searchProducts("mechanical keyboard");
 
-        tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
-        assertThat(result.getBoolean("isValidJson", false))
+        assertThat(outcome.result().getBoolean("isValidJson", false))
             .as("Response should be valid JSON")
             .isTrue();
     }
@@ -295,11 +295,11 @@ class ShoppingAssistantPacingExamplesTest {
     void shouldReturnValidJsonWithPacingAndBudgets(
             ShoppingUseCase useCase,
             TokenChargeRecorder tokenRecorder) {
-        UseCaseResult result = useCase.searchProducts("webcam 4k");
+        UseCaseOutcome outcome = useCase.searchProducts("webcam 4k");
 
-        tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
-        assertThat(result.getBoolean("isValidJson", false))
+        assertThat(outcome.result().getBoolean("isValidJson", false))
             .as("Response should be valid JSON")
             .isTrue();
     }
@@ -330,11 +330,11 @@ class ShoppingAssistantPacingExamplesTest {
     void shouldReturnValidJsonWithHourlyLimit(
             ShoppingUseCase useCase,
             TokenChargeRecorder tokenRecorder) {
-        UseCaseResult result = useCase.searchProducts("bluetooth speaker waterproof");
+        UseCaseOutcome outcome = useCase.searchProducts("bluetooth speaker waterproof");
 
-        tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
-        assertThat(result.getBoolean("isValidJson", false))
+        assertThat(outcome.result().getBoolean("isValidJson", false))
             .as("Response should be valid JSON")
             .isTrue();
     }
@@ -366,12 +366,50 @@ class ShoppingAssistantPacingExamplesTest {
     void shouldReturnValidJsonWithConservativePacing(
             ShoppingUseCase useCase,
             TokenChargeRecorder tokenRecorder) {
-        UseCaseResult result = useCase.searchProducts("noise cancelling earbuds");
+        UseCaseOutcome outcome = useCase.searchProducts("noise cancelling earbuds");
 
-        tokenRecorder.recordTokens(result.getInt("tokensUsed", 0));
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
 
-        assertThat(result.getBoolean("isValidJson", false))
+        assertThat(outcome.result().getBoolean("isValidJson", false))
             .as("Response should be valid JSON")
             .isTrue();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EXAMPLE 8: PACING WITH SUCCESS CRITERIA
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Demonstrates pacing combined with use case success criteria.
+     *
+     * <p>This is the recommended pattern: the use case method returns a
+     * {@link UseCaseOutcome} containing both the result and its success criteria.
+     * This ensures consistency between experiments and tests, while pacing
+     * controls the execution rate.
+     *
+     * <p><b>Benefits:</b>
+     * <ul>
+     *   <li>Type-safe binding of result and criteria</li>
+     *   <li>Same success definition as MEASURE experiment</li>
+     *   <li>Cleaner test code (just call outcome.assertAll())</li>
+     *   <li>Controlled execution rate for rate-limited APIs</li>
+     * </ul>
+     */
+    @ProbabilisticTest(
+        useCase = ShoppingUseCase.class,
+        samples = 30,
+        minPassRate = 0.85
+    )
+    @Pacing(maxRequestsPerMinute = 60)
+    @DisplayName("Pacing with success criteria")
+    void shouldPassSuccessCriteriaWithPacing(
+            ShoppingUseCase useCase,
+            TokenChargeRecorder tokenRecorder) {
+        UseCaseOutcome outcome = useCase.searchProducts("gaming mouse");
+
+        tokenRecorder.recordTokens(outcome.result().getInt("tokensUsed", 0));
+
+        // Use the bundled success criteria - same as MEASURE experiment
+        outcome.assertAll();
     }
 }

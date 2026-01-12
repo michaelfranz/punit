@@ -801,7 +801,7 @@ public class ProbabilisticTestExtension implements
 
 		if (passed) {
 			sb.append(String.format("PUnit PASSED: %s%n", testName));
-			sb.append(String.format("  Observed pass rate: %.1f%% (%d/%d) >= threshold: %.1f%%%n",
+			sb.append(String.format("  Observed pass rate: %.1f%% (%d/%d) >= min pass rate: %.1f%%%n",
 					aggregator.getObservedPassRate() * 100,
 					aggregator.getSuccesses(),
 					aggregator.getSamplesExecuted(),
@@ -818,7 +818,7 @@ public class ProbabilisticTestExtension implements
 					config.minPassRate() * 100));
 		} else {
 			sb.append(String.format("PUnit FAILED: %s%n", testName));
-			sb.append(String.format("  Observed pass rate: %.1f%% (%d/%d) < threshold: %.1f%%%n",
+			sb.append(String.format("  Observed pass rate: %.1f%% (%d/%d) < min pass rate: %.1f%%%n",
 					aggregator.getObservedPassRate() * 100,
 					aggregator.getSuccesses(),
 					aggregator.getSamplesExecuted(),

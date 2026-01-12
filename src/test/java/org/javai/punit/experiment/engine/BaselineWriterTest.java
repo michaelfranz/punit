@@ -174,6 +174,66 @@ class BaselineWriterTest {
                 .contains("totalTimeMs:")
                 .contains("totalTokens:");
         }
+
+        /**
+         * CRITICAL: This test ensures the requirements section is always present.
+         *
+         * <p>Without this section, the spec loader defaults to minPassRate=1.0 (100%),
+         * which causes spec-driven tests to fail unexpectedly. This was a major bug
+         * discovered in January 2026.
+         *
+         * @see org.javai.punit.spec.registry.SpecificationLoader
+         */
+        @Test
+        @DisplayName("should include requirements section with minPassRate derived from CI lower bound")
+        void shouldIncludeRequirementsSectionWithMinPassRate() {
+            EmpiricalBaseline baseline = createBaselineWithSuccessRate(0.90);
+
+            String yaml = writer.toYaml(baseline);
+
+            // requirements section must be present
+            assertThat(yaml)
+                .as("requirements section must be present for spec loader to work correctly")
+                .contains("requirements:");
+            
+            // minPassRate must be present and derived from CI lower bound
+            assertThat(yaml)
+                .as("minPassRate must be present and set to CI lower bound")
+                .contains("minPassRate:");
+            
+            // For 90% success rate with 1000 samples, CI lower bound is ~0.88
+            assertThat(yaml)
+                .as("minPassRate should be less than observed success rate (CI lower bound)")
+                .containsPattern("minPassRate: 0\\.8[0-9]+");
+        }
+
+        @Test
+        @DisplayName("minPassRate should equal confidence interval lower bound")
+        void minPassRateShouldEqualConfidenceIntervalLowerBound() {
+            // Create a baseline with known statistics
+            StatisticsSummary stats = new StatisticsSummary(
+                0.85,   // observed success rate
+                0.011,  // standard error
+                0.8285, // CI lower bound
+                0.8715, // CI upper bound
+                850,    // successes
+                150,    // failures
+                Map.of()
+            );
+
+            EmpiricalBaseline baseline = EmpiricalBaseline.builder()
+                .useCaseId("TestUseCase")
+                .generatedAt(Instant.now())
+                .execution(new ExecutionSummary(1000, 1000, "COMPLETED", null))
+                .statistics(stats)
+                .cost(new CostSummary(1000, 1, 10000, 10))
+                .build();
+
+            String yaml = writer.toYaml(baseline);
+
+            // minPassRate should be the CI lower bound (0.8285)
+            assertThat(yaml).contains("minPassRate: 0.8285");
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

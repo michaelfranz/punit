@@ -28,6 +28,8 @@ import org.javai.punit.api.DiffableContentProvider;
 import org.javai.punit.experiment.model.DefaultUseCaseContext;
 import org.javai.punit.experiment.model.EmpiricalBaseline;
 import org.javai.punit.experiment.model.ResultProjection;
+import org.javai.punit.model.CriterionOutcome;
+import org.javai.punit.model.UseCaseCriteria;
 import org.javai.punit.model.UseCaseResult;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionConfigurationException;
@@ -705,16 +707,33 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
     
     /**
      * Records the result from the captor into the aggregator.
+     *
+     * <p>Success is determined in priority order:
+     * <ol>
+     *   <li>If criteria are recorded, use {@code criteria.allPassed()}</li>
+     *   <li>Otherwise, fall back to legacy {@code determineSuccess()} heuristics</li>
+     * </ol>
      */
     private void recordResult(ResultCaptor captor, ExperimentResultAggregator aggregator) {
         if (captor != null && captor.hasResult()) {
             UseCaseResult result = captor.getResult();
-            boolean success = determineSuccess(result);
+            
+            // Determine success: prefer criteria if available
+            boolean success;
+            if (captor.hasCriteria()) {
+                // Use criteria to determine success (the correct approach)
+                success = captor.getCriteria().allPassed();
+                // Also record criteria for per-criterion stats
+                aggregator.recordCriteria(captor.getCriteria());
+            } else {
+                // Legacy fallback: infer success from result values
+                success = determineSuccess(result);
+            }
             
             if (success) {
                 aggregator.recordSuccess(result);
             } else {
-                String failureCategory = determineFailureCategory(result);
+                String failureCategory = determineFailureCategory(result, captor.getCriteria());
                 aggregator.recordFailure(result, failureCategory);
             }
         } else if (captor != null && captor.hasException()) {
@@ -800,8 +819,17 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         return true;
     }
     
-    private String determineFailureCategory(UseCaseResult result) {
-        // Check for common failure category indicators
+    private String determineFailureCategory(UseCaseResult result, UseCaseCriteria criteria) {
+        // If criteria are available, derive failure category from first failed criterion
+        if (criteria != null) {
+            for (CriterionOutcome outcome : criteria.evaluate()) {
+                if (!outcome.passed()) {
+                    return outcome.description();
+                }
+            }
+        }
+        
+        // Legacy: check for common failure category indicators in result
         if (result.hasValue("failureCategory")) {
             return result.getString("failureCategory", "unknown");
         }

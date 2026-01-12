@@ -132,7 +132,7 @@ class FinalVerdictDeciderTest {
                 .contains("alpha=0.050")
                 .contains("87.0%")
                 .contains("(87/100)")
-                .contains("threshold=91.6%")
+                .contains("min pass rate=91.6%")
                 .contains("Baseline=95.1%")
                 .contains("N=1000")
                 .contains("spec=json.generation:v3")

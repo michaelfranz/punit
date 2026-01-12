@@ -160,7 +160,7 @@ public class EarlyTerminationEvaluator {
         double observedPassRate = (double) successesSoFar / samplesExecuted;
         
         return String.format(
-            "After %d samples with %d successes (%.1f%%), required threshold (%d successes) " +
+            "After %d samples with %d successes (%.1f%%), required min pass rate (%d successes) " +
             "already met. Skipping %d remaining samples.",
             samplesExecuted, successesSoFar, observedPassRate * 100,
             requiredSuccesses, remainingSamples);
