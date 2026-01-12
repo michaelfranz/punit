@@ -280,6 +280,10 @@ class OperationalApproachResolverTest {
             }
             @Override public int maxExampleFailures() { return 5; }
             @Override public boolean transparentStats() { return false; }
+            @Override public org.javai.punit.api.TargetSource targetSource() {
+                return org.javai.punit.api.TargetSource.UNSPECIFIED;
+            }
+            @Override public String contractRef() { return ""; }
         };
     }
 }

@@ -62,6 +62,7 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
         renderBaselineReferenceSection(sb, explanation.baseline());
         renderStatisticalInferenceSection(sb, explanation);
         renderVerdictSection(sb, explanation.verdict());
+        renderProvenanceSection(sb, explanation.provenance());
 
         // Footer
         renderFooter(sb);
@@ -244,6 +245,22 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
             }
         }
         
+        sb.append("\n");
+    }
+
+    private void renderProvenanceSection(StringBuilder sb, StatisticalExplanation.Provenance provenance) {
+        // Only render if provenance information is present
+        if (provenance == null || !provenance.hasProvenance()) {
+            return;
+        }
+
+        sb.append("THRESHOLD PROVENANCE\n");
+        if (provenance.hasTargetSource()) {
+            sb.append(String.format("  Target source:       %s%n", provenance.targetSourceName()));
+        }
+        if (provenance.hasContractRef()) {
+            sb.append(String.format("  Contract ref:        %s%n", provenance.contractRef()));
+        }
         sb.append("\n");
     }
 

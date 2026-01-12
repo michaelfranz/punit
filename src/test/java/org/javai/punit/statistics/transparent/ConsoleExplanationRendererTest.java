@@ -137,7 +137,8 @@ class ConsoleExplanationRendererTest {
                     new StatisticalExplanation.StatisticalInference(
                             0.0336, 0.804, 0.936, 0.95, null, null
                     ),
-                    verdict
+                    verdict,
+                    new StatisticalExplanation.Provenance("UNSPECIFIED", "")
             );
             
             String output = renderer.render(explanation);
@@ -193,7 +194,8 @@ class ConsoleExplanationRendererTest {
                                 ? "The observed success rate of 87% meets the threshold."
                                 : "The observed success rate of 87% falls below the threshold.",
                         List.of()
-                )
+                ),
+                new StatisticalExplanation.Provenance("UNSPECIFIED", "")
         );
     }
 }

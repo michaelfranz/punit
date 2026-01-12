@@ -34,12 +34,26 @@ Traditional unit tests follow a simple pass/fail model: if any assertion fails, 
 PUnit lets you express expectations statistically:
 
 ```java
-// "This LLM should return valid JSON at least 90% of the time"
-@ProbabilisticTest(samples = 100, minPassRate = 0.90)
-void llmReturnsValidJson() {
-    String response = llm.complete("Generate a JSON object with name and age");
-    assertThat(response).satisfies(JsonValidator::isValidJson);
+// "Our API must succeed at least 99.5% of the time, per our SLA"
+@ProbabilisticTest(
+    samples = 100,
+    minPassRate = 0.995,
+    targetSource = TargetSource.SLA,
+    contractRef = "Customer API SLA v2.1 §3.1"
+)
+void apiMeetsSlaUptime() {
+    Response response = apiClient.call();
+    assertThat(response.isSuccess()).isTrue();
 }
+```
+
+This test runs 100 samples, requires 99.5% success, and documents where that threshold came from—useful for audits and traceability. When it passes, the verdict includes the provenance:
+
+```
+PUnit PASSED: apiMeetsSlaUptime
+  Observed pass rate: 100.0% (100/100) >= min pass rate: 99.5%
+  Target source: SLA
+  Contract ref: Customer API SLA v2.1 §3.1
 ```
 
 Don't let the simplicity of this snippet fool you. Behind this clean API lies rigorous statistical machinery—thresholds derived from empirical experiments, confidence intervals, and early termination bounds. Read on to see how it works.
@@ -48,20 +62,21 @@ Don't let the simplicity of this snippet fool you. Behind this clean API lies ri
 
 ### Experimentation
 
-| Feature | Description |
-|---------|-------------|
-| 🔬 **EXPLORE Mode** | Compare configurations (models, prompts, parameters) with minimal samples |
-| 📊 **MEASURE Mode** | Run large-scale experiments to establish empirical baselines |
-| 📁 **Spec Generation** | Auto-generate version-controlled specs from experimental data |
+| Feature                | Description                                                               |
+|------------------------|---------------------------------------------------------------------------|
+| 🔬 **EXPLORE Mode**    | Compare configurations (models, prompts, parameters) with minimal samples |
+| 📊 **MEASURE Mode**    | Run large-scale experiments to establish empirical baselines              |
+| 📁 **Spec Generation** | Auto-generate version-controlled specs from experimental data             |
 
 ### Testing
 
-| Feature                       | Description                                                    |
-|-------------------------------|----------------------------------------------------------------|
-| 🎯 **Spec-Driven Thresholds** | Derive pass/fail thresholds from empirical data—not guesswork  |
-| ⚡ **Smart Early Termination** | Stop early when failure is inevitable OR success is guaranteed |
-| 💰 **Budget Control**         | Time and token budgets at method, class, or suite level        |
-| 📈 **Dynamic Token Tracking** | Record actual API consumption per invocation                   |
+| Feature                       | Description                                                        |
+|-------------------------------|--------------------------------------------------------------------|
+| 📋 **SLA-Driven Testing**     | Test against contractual thresholds with provenance tracking       |
+| 🎯 **Spec-Driven Thresholds** | Derive pass/fail thresholds from empirical data—not guesswork      |
+| ⚡ **Smart Early Termination** | Stop early when failure is inevitable OR success is guaranteed     |
+| 💰 **Budget Control**         | Time and token budgets at method, class, or suite level            |
+| 📈 **Dynamic Token Tracking** | Record actual API consumption per invocation                       |
 | 🚦 **Pacing Constraints**     | Declare API rate limits; framework computes optimal execution pace |
 
 ### Operations
@@ -113,14 +128,19 @@ dependencies {
 
 ### Step 2: Write Your First Probabilistic Test
 
-We'll start slow. The really powerful stuff comes later.
 ```java
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.TargetSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MyServiceTest {
 
-    @ProbabilisticTest(samples = 100, minPassRate = 0.95)
+    @ProbabilisticTest(
+        samples = 100,
+        minPassRate = 0.95,
+        targetSource = TargetSource.SLA,
+        contractRef = "Service Agreement §4.2"
+    )
     void serviceReturnsValidResponse() {
         Response response = myService.call();
         assertThat(response.isValid()).isTrue();
@@ -133,6 +153,9 @@ This test:
 2. Counts how many invocations pass vs fail
 3. **Passes** if at least 95% succeed (≥95 out of 100)
 4. **Fails** if the success rate falls below 95%
+5. **Documents** that the 95% threshold comes from an SLA
+
+The `targetSource` and `contractRef` are optional—they provide traceability for audits and compliance. See the [User Guide](docs/USER-GUIDE.md) for details.
 
 ### Step 3: Run It
 
@@ -155,18 +178,20 @@ That's it for the quick start. You're using PUnit... but only a fraction of it.
 
 ### What's Next?
 
-The real power of PUnit lies in its **spec-driven workflow**:
+PUnit supports two complementary approaches:
+
+**SLA-Driven Testing** (shown above): When you have a contractual threshold (SLA, SLO, policy), use it directly. No experiments needed—just declare the requirement and test against it.
+
+**Spec-Driven Testing**: When you don't have an external threshold, let PUnit derive one from empirical data:
 
 1. **EXPLORE** – Compare configurations to find optimal settings
 2. **MEASURE** – Run experiments to establish empirical baselines
 3. **TEST** – Run probabilistic tests with statistically-derived thresholds
 
 This workflow ensures your pass/fail thresholds come from real data, not guesswork.
-In practice *not guessing* means you stop chasing false positives because PUnit will tell you if a fail is statistically significant. With PUnit false positives become rare, and that means you can focus more of your attention on what
-matters. This has long been understood by quality experts, but now PUnit can enable you to apply the same rigor to
-software testing.
+In practice *not guessing* means you stop chasing false positives because PUnit will tell you if a fail is statistically significant. With PUnit false positives become rare, and that means you can focus more of your attention on what matters.
 
-👉 **[Read the User Guide](docs/USER-GUIDE.md)** for the complete walkthrough.
+👉 **[Read the User Guide](docs/USER-GUIDE.md)** for both approaches and complete walkthroughs.
 
 ## Core Concepts
 
@@ -349,24 +374,26 @@ void evaluateWhatWeHave(TokenChargeRecorder recorder) {
 
 ### @ProbabilisticTest Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `samples` | int | 100 | Number of test invocations |
-| `minPassRate` | double | 0.95 | Minimum success rate (0.0 to 1.0) |
-| `timeBudgetMs` | long | 0 | Max time in ms (0 = unlimited) |
-| `tokenCharge` | int | 0 | Static tokens per sample |
-| `tokenBudget` | long | 0 | Max tokens (0 = unlimited) |
-| `onBudgetExhausted` | enum | FAIL | `FAIL` or `EVALUATE_PARTIAL` |
-| `onException` | enum | FAIL_SAMPLE | `FAIL_SAMPLE` or `ABORT_TEST` |
-| `maxExampleFailures` | int | 5 | Example failures to capture for reporting |
+| Parameter            | Type         | Default       | Description                                 |
+|----------------------|--------------|---------------|---------------------------------------------|
+| `samples`            | int          | 100           | Number of test invocations                  |
+| `minPassRate`        | double       | 0.95          | Minimum success rate (0.0 to 1.0)           |
+| `targetSource`       | TargetSource | UNSPECIFIED   | Origin of threshold (SLA, SLO, POLICY, etc) |
+| `contractRef`        | String       | ""            | Reference to source document                |
+| `timeBudgetMs`       | long         | 0             | Max time in ms (0 = unlimited)              |
+| `tokenCharge`        | int          | 0             | Static tokens per sample                    |
+| `tokenBudget`        | long         | 0             | Max tokens (0 = unlimited)                  |
+| `onBudgetExhausted`  | enum         | FAIL          | `FAIL` or `EVALUATE_PARTIAL`                |
+| `onException`        | enum         | FAIL_SAMPLE   | `FAIL_SAMPLE` or `ABORT_TEST`               |
+| `maxExampleFailures` | int          | 5             | Example failures to capture for reporting   |
 
 ### @ProbabilisticTestBudget (Class-Level)
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `timeBudgetMs` | long | 0 | Shared time budget for all methods |
-| `tokenBudget` | long | 0 | Shared token budget for all methods |
-| `onBudgetExhausted` | enum | FAIL | Behavior when class budget exhausted |
+| Parameter           | Type | Default | Description                          |
+|---------------------|------|---------|--------------------------------------|
+| `timeBudgetMs`      | long | 0       | Shared time budget for all methods   |
+| `tokenBudget`       | long | 0       | Shared token budget for all methods  |
+| `onBudgetExhausted` | enum | FAIL    | Behavior when class budget exhausted |
 
 ### System Property Overrides
 
@@ -388,16 +415,16 @@ Override annotation values at runtime (useful for CI/CD):
 
 ### Environment Variables
 
-| System Property | Environment Variable |
-|-----------------|---------------------|
-| `punit.samples` | `PUNIT_SAMPLES` |
-| `punit.minPassRate` | `PUNIT_MIN_PASS_RATE` |
-| `punit.samplesMultiplier` | `PUNIT_SAMPLES_MULTIPLIER` |
-| `punit.timeBudgetMs` | `PUNIT_TIME_BUDGET_MS` |
-| `punit.tokenCharge` | `PUNIT_TOKEN_CHARGE` |
-| `punit.tokenBudget` | `PUNIT_TOKEN_BUDGET` |
+| System Property            | Environment Variable         |
+|----------------------------|------------------------------|
+| `punit.samples`            | `PUNIT_SAMPLES`              |
+| `punit.minPassRate`        | `PUNIT_MIN_PASS_RATE`        |
+| `punit.samplesMultiplier`  | `PUNIT_SAMPLES_MULTIPLIER`   |
+| `punit.timeBudgetMs`       | `PUNIT_TIME_BUDGET_MS`       |
+| `punit.tokenCharge`        | `PUNIT_TOKEN_CHARGE`         |
+| `punit.tokenBudget`        | `PUNIT_TOKEN_BUDGET`         |
 | `punit.suite.timeBudgetMs` | `PUNIT_SUITE_TIME_BUDGET_MS` |
-| `punit.suite.tokenBudget` | `PUNIT_SUITE_TOKEN_BUDGET` |
+| `punit.suite.tokenBudget`  | `PUNIT_SUITE_TOKEN_BUDGET`   |
 
 ### Configuration Precedence
 
@@ -430,13 +457,13 @@ void testRateLimitedApi() {
 
 ### @Pacing Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `maxRequestsPerSecond` | double | 0 | Max RPS (0 = unlimited) |
-| `maxRequestsPerMinute` | double | 0 | Max RPM (0 = unlimited) |
-| `maxRequestsPerHour` | double | 0 | Max RPH (0 = unlimited) |
-| `maxConcurrentRequests` | int | 0 | Max parallel samples (0 = sequential) |
-| `minMsPerSample` | long | 0 | Explicit delay between samples (ms) |
+| Parameter               | Type   | Default | Description                           |
+|-------------------------|--------|---------|---------------------------------------|
+| `maxRequestsPerSecond`  | double | 0       | Max RPS (0 = unlimited)               |
+| `maxRequestsPerMinute`  | double | 0       | Max RPM (0 = unlimited)               |
+| `maxRequestsPerHour`    | double | 0       | Max RPH (0 = unlimited)               |
+| `maxConcurrentRequests` | int    | 0       | Max parallel samples (0 = sequential) |
+| `minMsPerSample`        | long   | 0       | Explicit delay between samples (ms)   |
 
 ### How Constraints Compose
 
@@ -480,12 +507,12 @@ When pacing is configured, PUnit prints an execution plan before starting:
 
 Override pacing at runtime (useful for CI/CD):
 
-| System Property | Environment Variable | Description |
-|-----------------|---------------------|-------------|
-| `punit.pacing.maxRps` | `PUNIT_PACING_MAX_RPS` | Max requests per second |
-| `punit.pacing.maxRpm` | `PUNIT_PACING_MAX_RPM` | Max requests per minute |
-| `punit.pacing.maxRph` | `PUNIT_PACING_MAX_RPH` | Max requests per hour |
-| `punit.pacing.maxConcurrent` | `PUNIT_PACING_MAX_CONCURRENT` | Max concurrent requests |
+| System Property               | Environment Variable             | Description               |
+|-------------------------------|----------------------------------|---------------------------|
+| `punit.pacing.maxRps`         | `PUNIT_PACING_MAX_RPS`           | Max requests per second   |
+| `punit.pacing.maxRpm`         | `PUNIT_PACING_MAX_RPM`           | Max requests per minute   |
+| `punit.pacing.maxRph`         | `PUNIT_PACING_MAX_RPH`           | Max requests per hour     |
+| `punit.pacing.maxConcurrent`  | `PUNIT_PACING_MAX_CONCURRENT`    | Max concurrent requests   |
 | `punit.pacing.minMsPerSample` | `PUNIT_PACING_MIN_MS_PER_SAMPLE` | Min delay between samples |
 
 ### Simple Delay-Based Pacing
@@ -525,11 +552,11 @@ void testWithSimpleDelay() {
 
 ### Token Charging Modes
 
-| Mode | Trigger | When Checked |
-|------|---------|--------------|
-| **Static** | `tokenCharge > 0`, no TokenChargeRecorder param | Before each sample |
-| **Dynamic** | TokenChargeRecorder parameter present | After each sample |
-| **None** | Neither configured | No token tracking |
+| Mode        | Trigger                                         | When Checked       |
+|-------------|-------------------------------------------------|--------------------|
+| **Static**  | `tokenCharge > 0`, no TokenChargeRecorder param | Before each sample |
+| **Dynamic** | TokenChargeRecorder parameter present           | After each sample  |
+| **None**    | Neither configured                              | No token tracking  |
 
 ### Budget Scope Precedence
 
@@ -560,20 +587,20 @@ PUnit provides accurate visual feedback in your IDE:
 
 ### Icon Meanings
 
-| Icon | Meaning |
-|------|---------|
-| ✅ | Sample passed its assertion |
-| ❌ | Sample failed its assertion |
+| Icon | Meaning                     |
+|------|-----------------------------|
+| ✅    | Sample passed its assertion |
+| ❌    | Sample failed its assertion |
 
 ## Best Practices
 
 ### 1. Choose Appropriate Sample Sizes
 
-| Environment | Samples | Purpose |
-|-------------|---------|---------|
-| Local dev | 10-20 | Fast feedback |
-| PR builds | 50-100 | Reasonable confidence |
-| Nightly/Release | 500+ | Statistical significance |
+| Environment     | Samples | Purpose                  |
+|-----------------|---------|--------------------------|
+| Local dev       | 10-20   | Fast feedback            |
+| PR builds       | 50-100  | Reasonable confidence    |
+| Nightly/Release | 500+    | Statistical significance |
 
 Use `samplesMultiplier` to scale per environment:
 
@@ -589,12 +616,12 @@ Use `samplesMultiplier` to scale per environment:
 
 Don't aim for 100% on inherently non-deterministic tests:
 
-| Use Case | Typical Pass Rate |
-|----------|-------------------|
-| LLM format compliance | 85-95% |
-| ML model accuracy | 80-90% |
-| Randomized algorithms | 95-99% |
-| Network-dependent tests | 90-98% |
+| Use Case                | Typical Pass Rate |
+|-------------------------|-------------------|
+| LLM format compliance   | 85-95%            |
+| ML model accuracy       | 80-90%            |
+| Randomized algorithms   | 95-99%            |
+| Network-dependent tests | 90-98%            |
 
 ### 3. Use Budgets for Cost Control
 

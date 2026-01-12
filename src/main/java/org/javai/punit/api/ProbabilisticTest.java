@@ -356,4 +356,46 @@ public @interface ProbabilisticTest {
      */
     Class<?> useCase() default Void.class;
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // THRESHOLD PROVENANCE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Documents the source of the threshold target (e.g., SLA, SLO, policy).
+     *
+     * <p>This metadata is surfaced in the verdict output for traceability:
+     * <pre>
+     * PUnit PASSED: testServiceResponds
+     *   Observed pass rate: 97.0% (97/100) >= min pass rate: 95.0%
+     *   Target source: SLA
+     *   Contract ref: Acme API SLA v3.2 §2.1
+     * </pre>
+     *
+     * <p>Provenance is informational only—it does not affect pass/fail logic.
+     *
+     * @return the target source, or {@link TargetSource#UNSPECIFIED} if not documented
+     * @see TargetSource
+     * @see #contractRef()
+     */
+    TargetSource targetSource() default TargetSource.UNSPECIFIED;
+
+    /**
+     * A human-readable reference to the contract, policy, or document
+     * from which the threshold was derived.
+     *
+     * <p>Examples:
+     * <ul>
+     *   <li>"Acme API SLA v3.2 §2.1"</li>
+     *   <li>"Internal SLO: LLM-2024-Q3"</li>
+     *   <li>"SOC 2 Availability Policy"</li>
+     *   <li>"Baseline spec: shopping-assistant.yaml (2024-01-15)"</li>
+     * </ul>
+     *
+     * <p>This value is surfaced in verdict output when set.
+     *
+     * @return the contract reference, or empty string if not specified
+     * @see #targetSource()
+     */
+    String contractRef() default "";
+
 }

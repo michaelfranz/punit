@@ -3,6 +3,7 @@ package org.javai.punit.testsubjects;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.ProbabilisticTestBudget;
+import org.javai.punit.api.TargetSource;
 import org.javai.punit.api.TokenChargeRecorder;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -281,6 +282,98 @@ public class ProbabilisticTestSubjects {
         void alwaysPasses() {
             samplesActuallyExecuted = counter.incrementAndGet();
             // All samples pass - after 5 successes, we've met the 50% threshold
+            assertThat(true).isTrue();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PROVENANCE TEST SUBJECTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Test with both targetSource and contractRef specified.
+     */
+    public static class ProvenanceWithBothTest {
+        @ProbabilisticTest(
+            samples = 5,
+            minPassRate = 0.8,
+            targetSource = TargetSource.SLA,
+            contractRef = "Acme API SLA v3.2 §2.1"
+        )
+        void testWithFullProvenance() {
+            assertThat(true).isTrue();
+        }
+    }
+
+    /**
+     * Test with only targetSource specified.
+     */
+    public static class ProvenanceTargetSourceOnlyTest {
+        @ProbabilisticTest(
+            samples = 5,
+            minPassRate = 0.8,
+            targetSource = TargetSource.SLO
+        )
+        void testWithTargetSourceOnly() {
+            assertThat(true).isTrue();
+        }
+    }
+
+    /**
+     * Test with only contractRef specified.
+     */
+    public static class ProvenanceContractRefOnlyTest {
+        @ProbabilisticTest(
+            samples = 5,
+            minPassRate = 0.8,
+            contractRef = "Internal Policy DOC-001"
+        )
+        void testWithContractRefOnly() {
+            assertThat(true).isTrue();
+        }
+    }
+
+    /**
+     * Test with explicit UNSPECIFIED targetSource (should not print provenance).
+     */
+    public static class ProvenanceUnspecifiedTest {
+        @ProbabilisticTest(
+            samples = 5,
+            minPassRate = 0.8,
+            targetSource = TargetSource.UNSPECIFIED
+        )
+        void testWithUnspecifiedSource() {
+            assertThat(true).isTrue();
+        }
+    }
+
+    /**
+     * Test each target source value.
+     */
+    public static class ProvenanceSlaSourceTest {
+        @ProbabilisticTest(samples = 3, minPassRate = 0.6, targetSource = TargetSource.SLA)
+        void testSlaSource() {
+            assertThat(true).isTrue();
+        }
+    }
+
+    public static class ProvenanceSloSourceTest {
+        @ProbabilisticTest(samples = 3, minPassRate = 0.6, targetSource = TargetSource.SLO)
+        void testSloSource() {
+            assertThat(true).isTrue();
+        }
+    }
+
+    public static class ProvenancePolicySourceTest {
+        @ProbabilisticTest(samples = 3, minPassRate = 0.6, targetSource = TargetSource.POLICY)
+        void testPolicySource() {
+            assertThat(true).isTrue();
+        }
+    }
+
+    public static class ProvenanceEmpiricalSourceTest {
+        @ProbabilisticTest(samples = 3, minPassRate = 0.6, targetSource = TargetSource.EMPIRICAL)
+        void testEmpiricalSource() {
             assertThat(true).isTrue();
         }
     }

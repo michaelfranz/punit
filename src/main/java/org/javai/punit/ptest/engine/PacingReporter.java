@@ -16,10 +16,10 @@ import java.time.Instant;
  */
 public class PacingReporter {
 
-    private static final String BOX_TOP = "╔══════════════════════════════════════════════════════════════════╗";
-    private static final String BOX_DIVIDER = "╠══════════════════════════════════════════════════════════════════╣";
-    private static final String BOX_BOTTOM = "╚══════════════════════════════════════════════════════════════════╝";
-    private static final int BOX_WIDTH = 66; // Inner width (excluding borders)
+    private static final String BOX_TOP = "╔════════════════════════════════════════════════════════════════════╗";
+    private static final String BOX_DIVIDER = "╠════════════════════════════════════════════════════════════════════╣";
+    private static final String BOX_BOTTOM = "╚════════════════════════════════════════════════════════════════════╝";
+    private static final int BOX_WIDTH = 68; // Inner width (excluding borders and padding spaces)
 
     private final PrintStream out;
 

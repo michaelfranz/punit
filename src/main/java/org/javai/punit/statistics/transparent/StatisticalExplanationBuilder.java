@@ -51,8 +51,40 @@ public class StatisticalExplanationBuilder {
             double threshold,
             boolean passed,
             double confidenceLevel) {
+        return build(testName, samples, successes, baseline, threshold, passed, confidenceLevel,
+                "UNSPECIFIED", "");
+    }
+
+    /**
+     * Builds a complete statistical explanation with provenance information.
+     *
+     * @param testName The name of the test
+     * @param samples Number of samples executed
+     * @param successes Number of successful samples
+     * @param baseline The baseline data (may be null or empty for legacy tests)
+     * @param threshold The pass/fail threshold
+     * @param passed Whether the test passed
+     * @param confidenceLevel The confidence level used (e.g., 0.95)
+     * @param targetSourceName The name of the target source (e.g., "SLA", "SLO")
+     * @param contractRef Human-readable reference to the source document
+     * @return A complete statistical explanation
+     */
+    public StatisticalExplanation build(
+            String testName,
+            int samples,
+            int successes,
+            BaselineData baseline,
+            double threshold,
+            boolean passed,
+            double confidenceLevel,
+            String targetSourceName,
+            String contractRef) {
 
         BaselineData effectiveBaseline = baseline != null ? baseline : BaselineData.empty();
+        StatisticalExplanation.Provenance provenance = new StatisticalExplanation.Provenance(
+                targetSourceName != null ? targetSourceName : "UNSPECIFIED",
+                contractRef != null ? contractRef : ""
+        );
         
         return new StatisticalExplanation(
                 testName,
@@ -60,7 +92,8 @@ public class StatisticalExplanationBuilder {
                 buildObservedData(samples, successes),
                 buildBaselineReference(effectiveBaseline, threshold, confidenceLevel),
                 buildInference(samples, successes, confidenceLevel),
-                buildVerdict(passed, samples, successes, threshold, effectiveBaseline, confidenceLevel)
+                buildVerdict(passed, samples, successes, threshold, effectiveBaseline, confidenceLevel),
+                provenance
         );
     }
 
@@ -76,15 +109,48 @@ public class StatisticalExplanationBuilder {
             int successes,
             double threshold,
             boolean passed) {
+        return buildWithInlineThreshold(testName, samples, successes, threshold, passed,
+                "UNSPECIFIED", "");
+    }
+
+    /**
+     * Builds a statistical explanation for inline threshold mode with provenance.
+     *
+     * <p>Use this when the test specifies an explicit {@code minPassRate} rather than
+     * deriving the threshold from baseline experiment data.
+     *
+     * @param testName The name of the test
+     * @param samples Number of samples executed
+     * @param successes Number of successful samples
+     * @param threshold The pass/fail threshold
+     * @param passed Whether the test passed
+     * @param targetSourceName The name of the target source (e.g., "SLA", "SLO")
+     * @param contractRef Human-readable reference to the source document
+     * @return A complete statistical explanation
+     */
+    public StatisticalExplanation buildWithInlineThreshold(
+            String testName,
+            int samples,
+            int successes,
+            double threshold,
+            boolean passed,
+            String targetSourceName,
+            String contractRef) {
 
         double confidenceLevel = 0.95; // Default confidence for legacy mode
+        StatisticalExplanation.Provenance provenance = new StatisticalExplanation.Provenance(
+                targetSourceName != null ? targetSourceName : "UNSPECIFIED",
+                contractRef != null ? contractRef : ""
+        );
+        
         return new StatisticalExplanation(
                 testName,
                 buildHypothesis(threshold),
                 buildObservedData(samples, successes),
                 buildInlineThresholdBaselineReference(threshold),
                 buildInference(samples, successes, confidenceLevel),
-                buildInlineThresholdVerdict(passed, samples, successes, threshold)
+                buildInlineThresholdVerdict(passed, samples, successes, threshold),
+                provenance
         );
     }
 

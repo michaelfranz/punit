@@ -16,6 +16,7 @@ import java.util.List;
  * @param baseline Reference to the baseline/spec data
  * @param inference Statistical inference calculations
  * @param verdict The final verdict with interpretation
+ * @param provenance Optional provenance information (may be null)
  */
 public record StatisticalExplanation(
         String testName,
@@ -23,8 +24,53 @@ public record StatisticalExplanation(
         ObservedData observed,
         BaselineReference baseline,
         StatisticalInference inference,
-        VerdictInterpretation verdict
+        VerdictInterpretation verdict,
+        Provenance provenance
 ) {
+
+    /**
+     * Provenance information documenting the source of the threshold.
+     * 
+     * <p>This record uses String values to avoid dependencies on the API package,
+     * keeping the statistics module isolated.
+     *
+     * @param targetSourceName The name of the target source (e.g., "SLA", "SLO", "UNSPECIFIED")
+     * @param contractRef Human-readable reference to the source document
+     */
+    public record Provenance(
+            String targetSourceName,
+            String contractRef
+    ) {
+        /**
+         * Returns true if any provenance information is specified.
+         */
+        public boolean hasProvenance() {
+            return hasTargetSource() || hasContractRef();
+        }
+
+        /**
+         * Returns true if targetSource is specified (not UNSPECIFIED or empty).
+         */
+        public boolean hasTargetSource() {
+            return targetSourceName != null 
+                    && !targetSourceName.isEmpty() 
+                    && !"UNSPECIFIED".equals(targetSourceName);
+        }
+
+        /**
+         * Returns true if contractRef is specified (not null or empty).
+         */
+        public boolean hasContractRef() {
+            return contractRef != null && !contractRef.isEmpty();
+        }
+
+        /**
+         * Creates an empty provenance (no information specified).
+         */
+        public static Provenance empty() {
+            return new Provenance("UNSPECIFIED", "");
+        }
+    }
 
     /**
      * The hypothesis being tested.

@@ -7,6 +7,7 @@ import java.util.Map;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.TargetSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -279,6 +280,16 @@ class ConfigurationResolverTest {
             public boolean transparentStats() {
                 return false;
             }
+
+            @Override
+            public TargetSource targetSource() {
+                return TargetSource.UNSPECIFIED;
+            }
+
+            @Override
+            public String contractRef() {
+                return "";
+            }
         };
     }
 
@@ -370,6 +381,16 @@ class ConfigurationResolverTest {
             @Override
             public boolean transparentStats() {
                 return false;
+            }
+
+            @Override
+            public TargetSource targetSource() {
+                return TargetSource.UNSPECIFIED;
+            }
+
+            @Override
+            public String contractRef() {
+                return "";
             }
         };
     }

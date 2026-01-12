@@ -2,53 +2,412 @@
 
 *Experimentation and statistical regression testing for non-deterministic systems*
 
-This guide covers both sides of PUnit: **experimentation** (discovering how your system behaves) and **testing** (verifying it continues to behave that way).
+---
+
+## Table of Contents
+
+- [Introduction](#introduction)
+- [Quick Start](#quick-start)
+- [Part 1: Statistical Foundations](#part-1-statistical-foundations)
+  - [The Parameter Triangle](#the-parameter-triangle)
+  - [Sample-Size-First vs Confidence-First](#sample-size-first-vs-confidence-first)
+- [Part 2: SLA-Driven Testing](#part-2-sla-driven-testing)
+  - [When to Use SLA-Driven Testing](#when-to-use-sla-driven-testing)
+  - [Basic SLA-Driven Test](#basic-sla-driven-test)
+  - [Threshold Provenance](#threshold-provenance)
+  - [Budget Control](#budget-control)
+  - [Pacing Constraints](#pacing-constraints)
+- [Part 3: Spec-Driven Testing](#part-3-spec-driven-testing)
+  - [When to Use Spec-Driven Testing](#when-to-use-spec-driven-testing)
+  - [The Workflow](#the-workflow)
+  - [Step 1: Create a Use Case](#step-1-create-a-use-case)
+  - [Step 2: Run a MEASURE Experiment](#step-2-run-a-measure-experiment)
+  - [Step 3: Commit the Spec](#step-3-commit-the-spec)
+  - [Step 4: Create a Probabilistic Test](#step-4-create-a-probabilistic-test)
+  - [Factor Sources](#factor-sources)
+  - [Factor Consistency](#factor-consistency)
+- [Part 4: EXPLORE Mode](#part-4-explore-mode)
+  - [When to Use EXPLORE](#when-to-use-explore)
+  - [Running Explorations](#running-explorations)
+  - [Comparing Configurations](#comparing-configurations)
+- [Transparent Statistics Mode](#transparent-statistics-mode)
+- [Decision Flowchart](#decision-flowchart)
+- [Next Steps](#next-steps)
 
 ---
 
-## The Two Sides of PUnit
+## Introduction
 
-PUnit is not just a testing framework—it's an **experimentation and testing platform** for non-deterministic systems.
+PUnit is an **experimentation and testing platform** for non-deterministic systems. It provides two complementary approaches:
 
-| Capability          | Purpose                              | Output                      |
-|---------------------|--------------------------------------|-----------------------------|
-| **Experimentation** | Discover and measure system behavior | Empirical baselines (specs) |
-| **Testing**         | Verify behavior hasn't regressed     | Pass/fail verdicts          |
+| Approach         | Threshold Source            | Use When                                    |
+|------------------|-----------------------------|---------------------------------------------|
+| **SLA-Driven**   | External contract or policy | You have a defined target (SLA, SLO, etc.)  |
+| **Spec-Driven**  | Empirical baseline          | You need to discover acceptable performance |
 
-These capabilities are deeply connected: experiments generate the empirical data that powers the most rigorous form of probabilistic test—the **spec-driven test**.
+Both approaches use the same `@ProbabilisticTest` annotation—the difference is where the `minPassRate` comes from.
 
-### The Operational Flow
+This guide is organized in four parts:
+
+1. **Statistical Foundations** — The concepts that underpin PUnit's approach
+2. **SLA-Driven Testing** — Test against contractual thresholds (simpler, fewer moving parts)
+3. **Spec-Driven Testing** — Derive thresholds from empirical experiments (more advanced)
+4. **EXPLORE Mode** — Compare configurations to find optimal settings
+
+---
+
+## Quick Start
+
+**Choose your path based on your scenario:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Do you have a contractual threshold (SLA, SLO, policy)?                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   YES ────────────────────────────► Part 2: SLA-Driven Testing          │
+│   "I have 99.5% uptime SLA"         (skip experiments, test directly)   │
+│                                                                         │
+│   NO ─────────────────────────────► Part 3: Spec-Driven Testing         │
+│   "I need to discover what's        (run experiments, derive threshold) │
+│    acceptable for this LLM"                                             │
+│                                                                         │
+│   MAYBE ──────────────────────────► Part 4: EXPLORE Mode                │
+│   "I want to compare different      (compare configurations first)      │
+│    models/prompts/configs"                                              │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Quick dependency setup:**
+
+```kotlin
+// build.gradle.kts
+dependencies {
+    testImplementation("org.javai:punit:0.1.0")
+}
+```
+
+**Fastest possible test (SLA-driven):**
+
+```java
+@ProbabilisticTest(
+    samples = 100,
+    minPassRate = 0.95,
+    targetSource = TargetSource.SLA,
+    contractRef = "API SLA §3.1"
+)
+void apiMeetsSla() {
+    assertThat(apiClient.call().isSuccess()).isTrue();
+}
+```
+
+---
+
+## Part 1: Statistical Foundations
+
+Before diving into the two testing approaches, you need to understand **how PUnit's parameters interact**. This knowledge applies whether you're testing against an SLA or an empirical baseline.
+
+### The Parameter Triangle
+
+PUnit operates with three interdependent parameters. At any given time, you can control **two of the three**; the third is determined by statistics:
+
+```
+                    ┌─────────────────┐
+                    │   Sample Size   │
+                    │   (Cost/Time)   │
+                    └────────┬────────┘
+                             │
+              Fix any two ───┼─── Third is computed
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+        ▼                    ▼                    ▼
+┌───────────────┐    ┌───────────────┐    ┌───────────────┐
+│  Confidence   │    │   Threshold   │    │   Detection   │
+│   (How sure)  │    │ (How strict)  │    │   Capability  │
+└───────────────┘    └───────────────┘    └───────────────┘
+```
+
+| If You Fix...       | And You Fix...   | Then Statistics Determines... |
+|---------------------|------------------|-------------------------------|
+| Sample size (cost)  | Threshold        | Confidence level              |
+| Sample size (cost)  | Confidence       | How strict threshold can be   |
+| Confidence          | Threshold        | Required sample size          |
+
+**This is not a limitation of PUnit**—it's a fundamental property of statistical inference. PUnit simply makes these trade-offs explicit and computable.
+
+### Sample-Size-First vs Confidence-First
+
+Based on the parameter triangle, there are two operational approaches:
+
+#### Option A: Sample-Size-First (Cost-Driven)
+
+*"We can afford 100 samples. Given a 99.5% threshold, what confidence does that achieve?"*
+
+```java
+@ProbabilisticTest(
+    minPassRate = 0.995,    // SLA requirement
+    samples = 100           // What we can afford
+)
+void slaTest() { ... }
+```
+
+**What PUnit does:**
+- Runs 100 samples
+- Counts successes
+- Computes implied confidence and power
+- Reports whether observed rate meets threshold
+
+**Best for:** Continuous monitoring, CI pipelines with time constraints, API rate limits.
+
+#### Option B: Confidence-First (Risk-Driven)
+
+*"We need 95% confidence that we'd detect a drop from 99.5% to 99.0%. How many samples?"*
+
+```java
+@ProbabilisticTest(
+    minPassRate = 0.995,         // SLA requirement
+    confidence = 0.95,           // How sure we need to be
+    power = 0.80,                // Detection probability
+    minDetectableEffect = 0.005  // Smallest drop we care about
+)
+void assuranceTest() { ... }
+```
+
+**What PUnit does:**
+- Computes required sample size (may be large)
+- Runs that many samples
+- Provides the specified statistical guarantees
+
+**Best for:** Safety-critical systems, pre-release assurance, compliance audits.
+
+#### Why `minDetectableEffect` Matters
+
+Without `minDetectableEffect`, the question "How many samples to verify p ≥ 99.5% with 95% confidence?" has **no finite answer**. Statistics must know:
+
+- Detect a drop to 99%? → Moderate N
+- Detect a drop to 99.4%? → Large N
+- Detect a drop to 99.4999%? → Infinite N
+
+The `minDetectableEffect` defines the smallest violation worth detecting. Only with this can PUnit compute a finite, honest sample size.
+
+---
+
+## Part 2: SLA-Driven Testing
+
+### When to Use SLA-Driven Testing
+
+Use SLA-driven testing when:
+
+- ✅ You have a contractual threshold (SLA, SLO, compliance requirement)
+- ✅ The threshold is defined by business/legal requirements, not technical measurement
+- ✅ You want to get testing running quickly with minimal setup
+- ✅ The system under test is a "black box" you can't experiment with freely
+
+**Examples:**
+- Third-party API with 99.9% uptime SLA
+- Internal service with 95% success rate SLO
+- Compliance requirement: "Must succeed 90% of the time"
+
+### Basic SLA-Driven Test
+
+```java
+import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.TargetSource;
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ApiSlaTest {
+
+    private final ApiClient apiClient = new ApiClient();
+
+    @ProbabilisticTest(
+        samples = 100,
+        minPassRate = 0.995,
+        targetSource = TargetSource.SLA,
+        contractRef = "Vendor API Agreement §2.3"
+    )
+    void vendorApiMeetsSla() {
+        Response response = apiClient.call();
+        assertThat(response.isSuccess()).isTrue();
+    }
+}
+```
+
+Run with:
+
+```bash
+./gradlew test
+```
+
+### Threshold Provenance
+
+The `targetSource` and `contractRef` attributes document **where the threshold came from**. This information appears in the verdict:
+
+```
+═══════════════════════════════════════════════════════════════
+PUnit PASSED: vendorApiMeetsSla
+  Observed pass rate: 99.6% (996/1000) >= min pass rate: 99.5%
+  Target source: SLA
+  Contract ref: Vendor API Agreement §2.3
+  Elapsed: 45234ms
+═══════════════════════════════════════════════════════════════
+```
+
+#### Available Target Sources
+
+| Source        | Use When                                        |
+|---------------|-------------------------------------------------|
+| `UNSPECIFIED` | Default; threshold origin not documented        |
+| `SLA`         | Threshold from external Service Level Agreement |
+| `SLO`         | Threshold from internal Service Level Objective |
+| `POLICY`      | Threshold from compliance or organizational policy |
+| `EMPIRICAL`   | Threshold derived from baseline measurement     |
+
+```java
+// SLA from customer contract
+@ProbabilisticTest(
+    samples = 100, minPassRate = 0.999,
+    targetSource = TargetSource.SLA,
+    contractRef = "Acme Corp Contract #12345 §4.1"
+)
+
+// Internal SLO
+@ProbabilisticTest(
+    samples = 100, minPassRate = 0.95,
+    targetSource = TargetSource.SLO,
+    contractRef = "Platform Team SLO Dashboard"
+)
+
+// Compliance policy
+@ProbabilisticTest(
+    samples = 100, minPassRate = 0.99,
+    targetSource = TargetSource.POLICY,
+    contractRef = "SOC 2 Type II Control CC7.1"
+)
+```
+
+### Budget Control
+
+Control resource consumption with time and token budgets:
+
+```java
+@ProbabilisticTest(
+    samples = 500,
+    minPassRate = 0.95,
+    timeBudgetMs = 60000,    // Stop after 60 seconds
+    tokenBudget = 100000     // Stop after 100k tokens (LLM tests)
+)
+void expensiveTest(TokenChargeRecorder recorder) {
+    LlmResponse response = llmClient.complete("Generate JSON");
+    recorder.recordTokens(response.getUsage().getTotalTokens());
+    assertThat(response.getContent()).satisfies(JsonValidator::isValid);
+}
+```
+
+#### Budget Exhaustion Behavior
+
+```java
+@ProbabilisticTest(
+    samples = 1000,
+    minPassRate = 0.90,
+    tokenBudget = 50000,
+    onBudgetExhausted = BudgetExhaustedBehavior.EVALUATE_PARTIAL
+)
+void evaluateWhatWeHave(TokenChargeRecorder recorder) {
+    // If budget runs out after 200 samples with 185 successes:
+    // 185/200 = 92.5% >= 90% → PASS (instead of automatic FAIL)
+}
+```
+
+### Pacing Constraints
+
+When testing rate-limited APIs, use `@Pacing` to stay under limits:
+
+```java
+@ProbabilisticTest(
+    samples = 200,
+    minPassRate = 0.95,
+    targetSource = TargetSource.SLA,
+    contractRef = "OpenAI API Terms"
+)
+@Pacing(maxRequestsPerMinute = 60)
+void llmApiTest() {
+    // PUnit automatically spaces samples ~1 second apart
+    String response = openAiClient.complete("Generate JSON");
+    assertThat(response).satisfies(JsonValidator::isValid);
+}
+```
+
+PUnit prints an execution plan before starting:
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║ PUnit Test: llmApiTest                                           ║
+╠══════════════════════════════════════════════════════════════════╣
+║ Samples requested:     200                                       ║
+║ Pacing: 60 RPM → 1000ms between samples                          ║
+║ Estimated duration: 3m 20s                                       ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+#### Pacing Parameters
+
+| Parameter               | Description                   | Example                  |
+|-------------------------|-------------------------------|--------------------------|
+| `maxRequestsPerSecond`  | Max RPS                       | `2.0` → 500ms delay      |
+| `maxRequestsPerMinute`  | Max RPM                       | `60` → 1000ms delay      |
+| `maxRequestsPerHour`    | Max RPH                       | `3600` → 1000ms delay    |
+| `minMsPerSample`        | Explicit minimum delay        | `500` → 500ms delay      |
+| `maxConcurrentRequests` | Parallel execution limit      | `3` → up to 3 concurrent |
+
+When multiple constraints are specified, the **most restrictive** wins.
+
+---
+
+## Part 3: Spec-Driven Testing
+
+### When to Use Spec-Driven Testing
+
+Use spec-driven testing when:
+
+- ✅ You don't have an external threshold
+- ✅ You need to discover what "acceptable" means for your system
+- ✅ You want thresholds derived from empirical data, not guesswork
+- ✅ You're working with a system you can experiment with (e.g., your own LLM integration)
+
+**Examples:**
+- LLM-based feature with no predefined success rate
+- ML model where you need to establish a performance baseline
+- New randomized algorithm you're developing
+
+### The Workflow
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        EXPERIMENTATION                              │
 │                                                                     │
-│   Use Case  ──▶  EXPLORE  ──▶  Choose Config  ──▶  MEASURE  ──▶  Spec
-│                  (compare)                         (baseline)    (commit)
+│   Use Case  ──▶  MEASURE  ──▶  Spec                                │
+│                  (1000+ samples)  (commit to Git)                   │
 └─────────────────────────────────────────────────────────────────────┘
-                                                           │
-                                                           ▼
+                                       │
+                                       ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                           TESTING                                   │
 │                                                                     │
-│   Spec  ──▶  Spec-Driven Test  ──▶  CI Pass/Fail                   │
-│              (threshold derived)                                    │
+│   Spec  ──▶  Probabilistic Test  ──▶  CI Pass/Fail                 │
+│              (threshold derived from spec)                          │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-1. **Use Case**: Define *what* behavior you want to observe
-2. **EXPLORE**: Compare configurations with small samples (discover what works)
-3. **MEASURE**: Run large-scale experiment on chosen config (establish baseline)
-4. **Spec**: Machine-generated empirical baseline (commit to Git)
-5. **Spec-Driven Test**: CI-gated test with threshold derived from your data
+1. **Use Case**: Define what behavior to observe
+2. **MEASURE**: Run large-scale experiment to establish baseline
+3. **Spec**: Machine-generated empirical baseline (commit to Git)
+4. **Test**: CI-gated test with threshold derived from spec
 
----
+### Step 1: Create a Use Case
 
-## Step 1: Create a Use Case
-
-A **Use Case** is a reusable method that invokes production code and captures observations. It returns a neutral `UseCaseResult` containing key-value pairs.
-
-### Example: JSON Validation Use Case
+A **Use Case** is a reusable method that invokes production code and captures observations:
 
 ```java
 package com.example.usecases;
@@ -57,25 +416,23 @@ import org.javai.punit.experiment.api.UseCase;
 import org.javai.punit.experiment.api.UseCaseContext;
 import org.javai.punit.experiment.model.UseCaseResult;
 
-public class JsonGenerationUseCases {
+public class JsonGenerationUseCase {
 
-    // Inject your production service
     private final LlmClient llmClient;
 
-    public JsonGenerationUseCases(LlmClient llmClient) {
+    public JsonGenerationUseCase(LlmClient llmClient) {
         this.llmClient = llmClient;
     }
 
     @UseCase("usecase.json.generation")
     public UseCaseResult generateJson(String prompt, UseCaseContext context) {
-        // 1. Get configuration from context (optional)
+        // Get configuration from context
         String model = context.getParameter("model", String.class, "gpt-4");
-        double temperature = context.getParameter("temperature", Double.class, 0.7);
+        
+        // Invoke production code
+        LlmResponse response = llmClient.complete(prompt, model);
 
-        // 2. Invoke production code
-        LlmResponse response = llmClient.complete(prompt, model, temperature);
-
-        // 3. Capture observations as key-value pairs
+        // Capture observations (not assertions!)
         boolean isValidJson = JsonValidator.isValid(response.getContent());
         
         return UseCaseResult.builder()
@@ -83,33 +440,17 @@ public class JsonGenerationUseCases {
             .value("content", response.getContent())
             .value("tokensUsed", response.getTokensUsed())
             .meta("model", model)
-            .meta("requestId", response.getRequestId())
             .build();
     }
 }
 ```
 
-### Key Points
+**Key points:**
+- Use cases return **observations**, not pass/fail verdicts
+- The `@UseCase` ID is used to locate the generated spec
+- Use cases are reused across experiments AND tests
 
-- **Annotate with `@UseCase("id")`**: Use a dot-separated namespace (e.g., `usecase.json.generation`)
-- **Accept `UseCaseContext`**: Provides backend-specific parameters
-- **Return `UseCaseResult`**: Neutral observations, no assertions
-- **Never called by production code**: Use cases exist only in test/experiment space
-
----
-
-## Step 2: Create an Experiment
-
-An **Experiment** executes a use case repeatedly to gather empirical data. Experiments are exploratory—they never produce pass/fail verdicts.
-
-### Experiment Modes
-
-| Mode      | Purpose                                       | Output                            |
-|-----------|-----------------------------------------------|-----------------------------------|
-| `MEASURE` | Establish reliable statistics (1000+ samples) | `specs/{UseCaseId}.yaml`          |
-| `EXPLORE` | Compare configurations (1-10 samples each)    | `explorations/{UseCaseId}/*.yaml` |
-
-### Example: MEASURE Experiment
+### Step 2: Run a MEASURE Experiment
 
 ```java
 package com.example.experiments;
@@ -118,8 +459,6 @@ import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.experiment.api.Experiment;
 import org.javai.punit.experiment.api.ExperimentMode;
 import org.javai.punit.experiment.api.ResultCaptor;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.extension.RegisterExtension;
 
 public class JsonGenerationExperiment {
 
@@ -129,109 +468,71 @@ public class JsonGenerationExperiment {
     @BeforeEach
     void setUp() {
         provider.register(JsonGenerationUseCase.class, () ->
-            new JsonGenerationUseCase(new OpenAIClient("gpt-4", 0.7))
+            new JsonGenerationUseCase(new OpenAIClient())
         );
     }
 
     @Experiment(
-        mode = ExperimentMode.MEASURE,   // Mandatory: MEASURE or EXPLORE
+        mode = ExperimentMode.MEASURE,
         useCase = JsonGenerationUseCase.class,
-        samples = 1000,                   // Default for MEASURE; 0 = use mode default
-        tokenBudget = 500000,             // Stop if tokens exceed 500k
-        timeBudgetMs = 600000             // Stop after 10 minutes
+        samples = 1000
     )
-    void measureJsonGenerationPerformance(JsonGenerationUseCase useCase, ResultCaptor captor) {
-        captor.record(useCase.generateJson("Create a user profile"));
+    void measureJsonGeneration(JsonGenerationUseCase useCase, ResultCaptor captor) {
+        captor.record(useCase.generateJson("Generate a user profile JSON"));
     }
 }
 ```
 
-### Run the Experiment
+Run with:
 
 ```bash
-# For MEASURE experiments (generate specs for tests)
 ./gradlew measure --tests "JsonGenerationExperiment"
-
-# For EXPLORE experiments (compare configurations)
-./gradlew explore --tests "JsonGenerationExperiment.exploreModels"
 ```
 
-### Generated Spec
+### Step 3: Commit the Spec
 
-After running, PUnit generates a spec directly at:
+After running, PUnit generates a spec at:
 
 ```
 src/test/resources/punit/specs/usecase.json.generation.yaml
 ```
 
-Example spec content:
+Example content:
 
 ```yaml
-# Execution Specification for usecase.json.generation
-# Generated by PUnit MEASURE experiment
-
 schemaVersion: punit-spec-2
 specId: usecase.json.generation
 useCaseId: usecase.json.generation
-generatedAt: 2026-01-09T15:30:00Z
+generatedAt: 2026-01-12T10:30:00Z
 
-# Core empirical data (used for threshold derivation)
 empiricalBasis:
   samples: 1000
   successes: 935
-  generatedAt: 2026-01-09T15:30:00Z
+  generatedAt: 2026-01-12T10:30:00Z
 
-# Extended statistics (for analysis)
 extendedStatistics:
   standardError: 0.0078
   confidenceInterval:
     lower: 0.919
     upper: 0.949
-  failureDistribution:
-    malformed_json: 35
-    empty_response: 20
-    timeout: 10
-  totalTimeMs: 450000
-  avgTimePerSampleMs: 450
 
-# Integrity check
 contentFingerprint: sha256:abc123...
 ```
 
-### Key Points
+**Review and commit:**
 
-- **`mode` is mandatory**: Choose `MEASURE` or `EXPLORE`
-- **`samples`**: How many times to run (0 = use mode's default: 1000 for MEASURE, 1 for EXPLORE)
-- **`tokenBudget` / `timeBudgetMs`**: Resource limits
-- **`UseCaseProvider`**: Configures how use cases are instantiated
-- **`ResultCaptor`**: Records results for aggregation into specs
-- **Specs are descriptive**: They record what happened; thresholds are derived at runtime
+```bash
+git add src/test/resources/punit/specs/
+git commit -m "Add baseline for JSON generation (93.5% @ N=1000)"
+```
 
----
-
-## Step 3: Commit the Spec
-
-After running a MEASURE experiment:
-
-1. **Review** the generated spec: `src/test/resources/punit/specs/{UseCaseId}.yaml`
-2. **Commit** to version control: `git add . && git commit -m "Add spec for JsonGenerationUseCase"`
-3. (Optional) Use a **Pull Request** for team review
-
-That's it! No separate approval step—approval is your commit.
-
----
-
-## Step 4: Create a Probabilistic Test
-
-A **Probabilistic Test** uses the spec's empirical data to derive thresholds at runtime.
-
-### Spec-Driven Test (Recommended)
+### Step 4: Create a Probabilistic Test
 
 ```java
 package com.example.tests;
 
 import org.javai.punit.api.ProbabilisticTest;
-import org.javai.punit.api.TokenChargeRecorder;
+import org.javai.punit.api.TargetSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JsonGenerationTest {
@@ -240,644 +541,63 @@ class JsonGenerationTest {
 
     @ProbabilisticTest(
         useCase = JsonGenerationUseCase.class,  // Spec looked up by use case ID
-        samples = 50                             // Run 50 times
-        // minPassRate derived from spec's empiricalBasis (95% CI lower bound)
-    )
-    void shouldGenerateValidJson(TokenChargeRecorder tokenRecorder) {
-        LlmResponse response = llmClient.complete(
-            "Generate a JSON object with name and age",
-            "gpt-4",
-            0.7
-        );
-        tokenRecorder.recordTokens(response.getUsage().getTotalTokens());
-        
-        assertThat(JsonValidator.isValid(response.getContent())).isTrue();
-    }
-}
-```
-
-### Inline Threshold (Simple/Fallback)
-
-When you don't have a spec or want to override:
-
-```java
-@ProbabilisticTest(
-    samples = 50,
-    minPassRate = 0.90  // Explicit threshold (no spec lookup)
-)
-void shouldGenerateValidJsonExplicit(TokenChargeRecorder tokenRecorder) {
-    LlmResponse response = llmClient.complete("Generate JSON...", "gpt-4", 0.7);
-    tokenRecorder.recordTokens(response.getUsage().getTotalTokens());
-    assertThat(JsonValidator.isValid(response.getContent())).isTrue();
-}
-```
-
-### Run Tests
-
-```bash
-./gradlew test
-```
-
-### Understanding Results
-
-```
-✅ shouldGenerateValidJson()
-    ✅ Sample 1/50
-    ✅ Sample 2/50
-    ...
-    ✅ Sample 45/50  ← SUCCESS_GUARANTEED, remaining samples skipped
-    
-Probabilistic test passed: 100.00% >= 91.90% (45/45 samples succeeded)
-```
-
-Or if it fails:
-
-```
-❌ shouldGenerateValidJson()
-    ✅ Sample 1/50
-    ❌ Sample 2/50  ← Assertion failed
-    ...
-    ❌ Sample 10/50  ← IMPOSSIBILITY: cannot reach 91.9% pass rate
-    
-Probabilistic test failed: observed pass rate 72.00% < required 91.90%
-```
-
----
-
-## Summary
-
-| Step               | Command                           | Output                   |
-|--------------------|-----------------------------------|--------------------------|
-| 1. Define Use Case | —                                 | `@UseCase` class         |
-| 2. Run Experiment  | `./gradlew measure --tests "..."` | `specs/{UseCaseId}.yaml` |
-| 3. Commit Spec     | `git commit`                      | Version-controlled spec  |
-| 4. Run Tests       | `./gradlew test`                  | CI pass/fail             |
-
----
-
-## Quick Reference
-
-### Choosing the Right Mode
-
-| Question                        | Mode      | Samples         |
-|---------------------------------|-----------|-----------------|
-| "What's the true success rate?" | `MEASURE` | 1000+           |
-| "Which config is best?"         | `EXPLORE` | 1-10 per config |
-
-### Gradle Commands
-
-```bash
-# MEASURE: Generate specs for probabilistic tests
-./gradlew measure --tests "MyExperiment.measureSomething"
-
-# EXPLORE: Compare configurations
-./gradlew explore --tests "MyExperiment.exploreConfigurations"
-
-# Run probabilistic tests
-./gradlew test
-```
-
-### Budget Control
-
-```java
-@ProbabilisticTest(
-    useCase = MyUseCase.class,
-    samples = 100,
-    timeBudgetMs = 30000,     // Stop after 30 seconds
-    tokenBudget = 50000,      // Stop after 50k tokens
-    onBudgetExhausted = BudgetExhaustedBehavior.EVALUATE_PARTIAL
-)
-```
-
-### Class-Level Shared Budget
-
-```java
-@ProbabilisticTestBudget(tokenBudget = 100000, timeBudgetMs = 60000)
-class LlmIntegrationTests {
-    
-    @ProbabilisticTest(useCase = MyUseCase.class, samples = 30)
-    void test1(TokenChargeRecorder recorder) { /* ... */ }
-    
-    @ProbabilisticTest(useCase = MyUseCase.class, samples = 30)
-    void test2(TokenChargeRecorder recorder) { /* ... */ }
-}
-```
-
----
-
-## Pacing Constraints
-
-When testing APIs with rate limits (requests per minute, concurrent connections, etc.), PUnit's **pacing constraints** let you declare these limits declaratively. The framework computes an optimal execution pace automatically.
-
-### The Problem
-
-Without pacing, you face a dilemma:
-
-1. **Execute fast** → Hit rate limits → Unpredictable failures, retry storms
-2. **Add manual delays** → Cluttered test code, error-prone timing calculations
-
-### The Solution: Declarative Pacing
-
-Declare your constraints; PUnit handles the scheduling:
-
-```java
-@ProbabilisticTest(samples = 200, minPassRate = 0.90)
-@Pacing(maxRequestsPerMinute = 60)
-void testOpenAiApi() {
-    // PUnit spaces samples ~1 second apart automatically
-    LlmResponse response = openAiClient.complete("Generate JSON...");
-    assertThat(response.getContent()).isValidJson();
-}
-```
-
-### Pacing vs Guardrails
-
-PUnit has two complementary mechanisms:
-
-| Guardrails (Time/Token Budgets) | Pacing Constraints                         |
-|---------------------------------|--------------------------------------------|
-| Reactive: "Stop if we exceed X" | Proactive: "Use X to compute optimal pace" |
-| Defensive circuit breakers      | Scheduling algorithm inputs                |
-| Runtime enforcement             | Pre-execution planning                     |
-| Triggers termination            | Prevents hitting limits                    |
-
-Use **both together** for complete control:
-
-```java
-@ProbabilisticTest(
-    samples = 200, 
-    minPassRate = 0.90,
-    timeBudgetMs = 300000,     // Guardrail: stop after 5 minutes
-    tokenBudget = 100000       // Guardrail: stop after 100k tokens
-)
-@Pacing(maxRequestsPerMinute = 60)  // Pacing: stay under 60 RPM
-void testWithBothControls(TokenChargeRecorder recorder) {
-    // ...
-}
-```
-
-### Available Constraints
-
-#### Rate-Based Constraints
-
-Express limits in requests per time unit:
-
-| Parameter              | Description | Implied Delay      |
-|------------------------|-------------|--------------------|
-| `maxRequestsPerSecond` | Maximum RPS | `1000 / RPS` ms    |
-| `maxRequestsPerMinute` | Maximum RPM | `60000 / RPM` ms   |
-| `maxRequestsPerHour`   | Maximum RPH | `3600000 / RPH` ms |
-
-```java
-@Pacing(maxRequestsPerMinute = 60)  // Common for OpenAI, Anthropic
-```
-
-#### Concurrency Constraint
-
-Limit parallel sample execution (future feature—currently sequential):
-
-```java
-@Pacing(maxConcurrentRequests = 3)  // Up to 3 samples in parallel
-```
-
-#### Direct Delay Constraint
-
-For simplicity, specify delay directly:
-
-```java
-@Pacing(minMsPerSample = 500)  // Wait 500ms between samples
-```
-
-### Constraint Composition
-
-When multiple constraints are specified, the **most restrictive wins**:
-
-```java
-@Pacing(
-    maxRequestsPerMinute = 60,    // Implies 1000ms delay
-    maxRequestsPerSecond = 2,     // Implies 500ms delay
-    minMsPerSample = 250          // Explicit 250ms delay
-)
-// Effective delay: 1000ms (RPM is most restrictive)
-```
-
-### Pre-Flight Report
-
-When pacing is configured, PUnit prints an execution plan before starting:
-
-```
-╔══════════════════════════════════════════════════════════════════╗
-║ PUnit Test: testOpenAiApi                                        ║
-╠══════════════════════════════════════════════════════════════════╣
-║ Samples requested:     200                                       ║
-║ Pacing constraints:                                              ║
-║   • Max requests/min:  60 RPM                                    ║
-║   • Min delay/sample:  1000ms (derived from 60 RPM)              ║
-╠══════════════════════════════════════════════════════════════════╣
-║ Computed execution plan:                                         ║
-║   • Concurrency:         sequential                              ║
-║   • Inter-request delay: 1000ms                                  ║
-║   • Effective throughput: 60 samples/min                         ║
-║   • Estimated duration:  3m 20s                                  ║
-║   • Estimated completion: 14:23:45                               ║
-╠══════════════════════════════════════════════════════════════════╣
-║ Started: 14:20:25                                                ║
-║ Proceeding with execution...                                     ║
-╚══════════════════════════════════════════════════════════════════╝
-```
-
-This gives you:
-- **Upfront duration estimate** — know how long the test will take
-- **Completion time** — plan accordingly
-- **Effective throughput** — verify the computed rate
-
-### Feasibility Warnings
-
-If pacing conflicts with time budgets, PUnit warns you:
-
-```
-⚠ WARNING: Pacing conflict detected
-  • 1000 samples at 60 RPM would take ~16.7 minutes
-  • Time budget is 10 minutes (timeBudgetMs = 600000)
-  • Options:
-    1. Reduce sample count to ~600
-    2. Increase time budget to 17 minutes
-    3. Relax pacing constraints (increase rate limits)
-```
-
-### Environment Override
-
-Override pacing at runtime for different environments:
-
-```bash
-# Override RPM for CI (more conservative)
-./gradlew test -Dpunit.pacing.maxRpm=30
-
-# Or via environment variable
-export PUNIT_PACING_MAX_RPM=30
-./gradlew test
-```
-
-All pacing overrides:
-
-| System Property               | Environment Variable             |
-|-------------------------------|----------------------------------|
-| `punit.pacing.maxRps`         | `PUNIT_PACING_MAX_RPS`           |
-| `punit.pacing.maxRpm`         | `PUNIT_PACING_MAX_RPM`           |
-| `punit.pacing.maxRph`         | `PUNIT_PACING_MAX_RPH`           |
-| `punit.pacing.maxConcurrent`  | `PUNIT_PACING_MAX_CONCURRENT`    |
-| `punit.pacing.minMsPerSample` | `PUNIT_PACING_MIN_MS_PER_SAMPLE` |
-
-### Complete Example
-
-```java
-package com.example.tests;
-
-import org.javai.punit.api.Pacing;
-import org.javai.punit.api.ProbabilisticTest;
-import org.javai.punit.api.TokenChargeRecorder;
-import static org.assertj.core.api.Assertions.assertThat;
-
-class RateLimitedApiTest {
-
-    private final OpenAiClient client = new OpenAiClient();
-
-    @ProbabilisticTest(
         samples = 100,
-        minPassRate = 0.90,
-        timeBudgetMs = 180000,     // 3 minute max
-        tokenBudget = 50000
+        targetSource = TargetSource.EMPIRICAL,
+        contractRef = "usecase.json.generation.yaml"
     )
-    @Pacing(
-        maxRequestsPerMinute = 60,  // OpenAI tier 1 limit
-        maxConcurrentRequests = 1   // Sequential for simplicity
-    )
-    void shouldGenerateValidJsonWithRateLimiting(TokenChargeRecorder recorder) {
-        // Pre-flight report shows:
-        //   Estimated duration: 1m 40s
-        //   Effective throughput: 60 samples/min
-        
-        LlmResponse response = client.complete(
-            "Generate a JSON object with name and age"
-        );
-        recorder.recordTokens(response.getUsage().getTotalTokens());
-        
+    void shouldGenerateValidJson() {
+        LlmResponse response = llmClient.complete("Generate a user profile JSON");
         assertThat(JsonValidator.isValid(response.getContent())).isTrue();
     }
 }
 ```
 
-### When to Use Pacing
+The test:
+1. Loads the spec for `usecase.json.generation`
+2. Derives threshold from empirical basis (lower bound of 95% CI)
+3. Runs 100 samples
+4. Compares observed rate to derived threshold
 
-| Scenario                                   | Recommendation                       |
-|--------------------------------------------|--------------------------------------|
-| Testing LLM APIs (OpenAI, Anthropic, etc.) | Use `maxRequestsPerMinute`           |
-| Testing rate-limited REST APIs             | Use appropriate rate constraint      |
-| Testing APIs with burst limits             | Use `minMsPerSample` for steady rate |
-| Testing internal services                  | Usually not needed                   |
-| Local unit tests                           | Usually not needed                   |
+### Factor Sources
 
-### Pacing and Early Termination
-
-Pacing works seamlessly with early termination. If PUnit determines success is guaranteed before all samples run, it stops early—even with pacing configured:
-
-```
-╔══════════════════════════════════════════════════════════════════╗
-║ PUnit Test: testWithPacing                                       ║
-║ Estimated duration: 1m 40s                                       ║
-╚══════════════════════════════════════════════════════════════════╝
-
-✅ Sample 1/100
-✅ Sample 2/100
-...
-✅ Sample 45/100  ← SUCCESS_GUARANTEED, skipping remaining 55 samples
-
-Actual duration: 45s (saved 55s due to early termination)
-```
-
----
-
-## Factor Sources
-
-Factor sources provide **structured, reusable inputs** to experiments and probabilistic tests. They decouple test data from test logic, enabling consistency across the development lifecycle.
-
-### What Are Factor Sources?
-
-A **factor source** is a method that provides input arguments for your use case. Instead of hard-coding inputs in your experiment or test, you define them once and reference them:
+Factor sources provide **structured, reusable inputs** to experiments and tests:
 
 ```java
-// Without factor source (hard-coded):
-captor.record(useCase.searchProducts("wireless headphones"));
+public class JsonGenerationUseCase {
 
-// With factor source (structured, reusable):
-@FactorSource("ShoppingUseCase#standardQueries")
-void measure(@Factor("query") String query, ...) {
-    captor.record(useCase.searchProducts(query));  // query injected
+    // Factor source for consistent inputs across experiments and tests
+    public static List<FactorArguments> standardPrompts() {
+        return List.of(
+            FactorArguments.of("prompt", "Generate a user profile JSON"),
+            FactorArguments.of("prompt", "Generate an order JSON"),
+            FactorArguments.of("prompt", "Generate a product JSON")
+        );
+    }
+
+    @UseCase("usecase.json.generation")
+    public UseCaseResult generateJson(String prompt, UseCaseContext context) {
+        // ...
+    }
 }
 ```
 
-### Defining Factor Sources
-
-Factor sources are static methods that return `List<FactorArguments>` or `Stream<FactorArguments>`.
-They are referenced by method name—no special annotation is needed:
+Reference in experiments:
 
 ```java
-public static List<FactorArguments> standardQueries() {
-    return List.of(
-        FactorArguments.of("query", "wireless headphones"),
-        FactorArguments.of("query", "laptop stand"),
-        FactorArguments.of("query", "USB-C hub")
-    );
+@Experiment(mode = ExperimentMode.MEASURE, samples = 1000)
+@FactorSource("JsonGenerationUseCase#standardPrompts")
+void measure(@Factor("prompt") String prompt, ResultCaptor captor) {
+    captor.record(useCase.generateJson(prompt));
 }
 ```
 
-**Requirements**:
-- Method must be `static`
-- Method must take no parameters
-- Return type must be `List<FactorArguments>` or `Stream<FactorArguments>`
-- Method name serves as the factor source identifier
+**Consumption behavior:**
+- `List<FactorArguments>` → **Cycling**: samples rotate through entries
+- `Stream<FactorArguments>` → **Sequential**: each sample gets next element
 
-### The Two Factor Source Models
+### Factor Consistency
 
-The **return type** determines how factors are consumed:
-
-| Return Type               | Consumption    | Memory       | Best For                                   |
-|---------------------------|----------------|--------------|--------------------------------------------|
-| `List<FactorArguments>`   | **Cycling**    | Materialized | Representative inputs, API testing         |
-| `Stream<FactorArguments>` | **Sequential** | Streaming    | Generated inputs, probabilistic algorithms |
-
-#### List-Based Sources (Cycling)
-
-When you return a `List`, samples cycle through the entries:
-
-```java
-public static List<FactorArguments> productQueries() {
-    return List.of(
-        FactorArguments.of("query", "headphones"),   // index 0
-        FactorArguments.of("query", "laptop"),       // index 1
-        FactorArguments.of("query", "keyboard")      // index 2
-    );
-}
-```
-
-With `samples = 10`:
-```
-Sample 0 → "headphones"
-Sample 1 → "laptop"
-Sample 2 → "keyboard"
-Sample 3 → "headphones"  ← cycle restarts
-Sample 4 → "laptop"
-...
-Sample 9 → "headphones"
-```
-
-Each factor is used approximately `samples / factorCount` times.
-
-#### Stream-Based Sources (Sequential)
-
-When you return a `Stream`, each sample consumes the next element:
-
-```java
-public static Stream<FactorArguments> generatedSeeds() {
-    return Stream.generate(() ->
-        FactorArguments.of("seed", ThreadLocalRandom.current().nextLong())
-    );
-}
-```
-
-With `samples = 1_000_000`:
-- Each sample gets a unique, freshly-generated seed
-- No cycling—stream is consumed sequentially
-- Constant memory (no materialization)
-
-**Use Stream when**:
-- Inputs are generated (random, sequential IDs, etc.)
-- Input space is very large or infinite
-- Memory efficiency matters
-
-### Single-Entry Factor Sources
-
-A factor source with **one entry** is not only valid—it's often ideal for MEASURE experiments:
-
-```java
-/**
- * Single-query factor source for controlled baselines.
- *
- * All 1000 samples use the exact same input, isolating the LLM's
- * behavioral variance from input variance. This produces the
- * cleanest statistical baseline.
- */
-public static List<FactorArguments> singleQuery() {
-    return List.of(
-        FactorArguments.of("query", "wireless headphones")
-    );
-}
-```
-
-**Why single-entry sources make sense**:
-
-| Benefit                | Description                                   |
-|------------------------|-----------------------------------------------|
-| **Statistical purity** | Isolates LLM variance from input variance     |
-| **Clean baseline**     | Spec reflects behavior for one specific query |
-| **Reproducibility**    | Baseline is unambiguously tied to known input |
-
-### Multi-Factor Arguments
-
-Factor sources can provide multiple named values per entry:
-
-```java
-public static List<FactorArguments> modelConfigurations() {
-    return FactorArguments.configurations()
-        .names("model", "temperature", "query")
-        .values("gpt-4", 0.0, "wireless headphones")
-        .values("gpt-4", 0.7, "wireless headphones")
-        .values("gpt-3.5-turbo", 0.0, "laptop stand")
-        .stream()
-        .toList();
-}
-```
-
-Injected into experiments:
-
-```java
-@Experiment(mode = EXPLORE)
-@FactorSource("modelConfigurations")
-void explore(
-        @Factor("model") String model,
-        @Factor("temperature") double temp,
-        @Factor("query") String query,
-        ResultCaptor captor) {
-    // All three factors injected
-}
-```
-
-### Factor Sources in the Operational Workflow
-
-Each stage of the PUnit workflow uses factor sources differently:
-
-#### EXPLORE: Discover Optimal Configurations
-
-**Goal**: Try many configurations to find what works best.
-
-```java
-@Experiment(mode = EXPLORE, samplesPerConfig = 5)
-@FactorSource("exploratoryConfigs")
-void explore(@Factor("model") String model, @Factor("temp") double temp, ...) {
-    // 5 samples per configuration
-}
-
-static List<FactorArguments> exploratoryConfigs() {
-    return FactorArguments.configurations()
-        .names("model", "temp")
-        .values("gpt-3.5-turbo", 0.0)
-        .values("gpt-3.5-turbo", 0.7)
-        .values("gpt-4", 0.0)
-        .values("gpt-4", 0.7)
-        .values("gpt-4-turbo", 0.0)
-        .stream().toList();
-}
-```
-
-**Factor source characteristics for EXPLORE**:
-- Multiple configurations to compare
-- Can live in the experiment class (local to exploration)
-- `samplesPerConfig` creates Cartesian product
-
-#### MEASURE: Establish Statistical Baseline
-
-**Goal**: Gather reliable statistics for a chosen configuration.
-
-**Form 1: Single input, many samples** (statistical purity)
-
-```java
-@Experiment(mode = MEASURE, samples = 1000)
-@FactorSource("ShoppingUseCase#singleQuery")
-void measure(@Factor("query") String query, ResultCaptor captor) {
-    // Same query for all 1000 samples
-}
-```
-
-**Form 2: Varied inputs, cycling** (production-representative)
-
-```java
-@Experiment(mode = MEASURE, samples = 1000)
-@FactorSource("ShoppingUseCase#standardQueries")  // 10 queries
-void measure(@Factor("query") String query, ResultCaptor captor) {
-    // Each query used ~100 times (cycling)
-}
-```
-
-**Factor source characteristics for MEASURE**:
-- Co-locate with UseCase for consistency
-- Same source should be used by probabilistic tests
-- Hash is stored in spec for validation
-
-#### Probabilistic Test: Verify Against Baseline
-
-**Goal**: Run a smaller sample and compare to baseline spec.
-
-```java
-@ProbabilisticTest(samples = 100, useCase = ShoppingUseCase.class)
-@FactorSource("ShoppingUseCase#standardQueries")  // SAME as MEASURE!
-void test(@Factor("query") String query, TokenChargeRecorder recorder) {
-    // Uses first 100 factors from same source
-}
-```
-
-**Factor source characteristics for Tests**:
-- Use the **same source** as the MEASURE experiment
-- PUnit validates hash match and warns if different
-- First-N prefix selection ensures identical inputs
-
-### Summary: Factor Sources by Workflow Stage
-
-| Stage                  | Factor Source Location | Typical Entries      | Consumption                |
-|------------------------|------------------------|----------------------|----------------------------|
-| **EXPLORE**            | Experiment class       | Many configs         | `samplesPerConfig` × each  |
-| **MEASURE Form 1**     | UseCase class          | 1 (single input)     | Same input for all samples |
-| **MEASURE Form 2**     | UseCase class          | 10-20 representative | Cycling through list       |
-| **Probabilistic Test** | Same as MEASURE        | Same as MEASURE      | First-N prefix             |
-
-### Quick Reference
-
-```java
-// Define a factor source (method name = identifier)
-public static List<FactorArguments> myFactors() {
-    return List.of(
-        FactorArguments.of("input", "value1"),
-        FactorArguments.of("input", "value2")
-    );
-}
-
-// Reference from same class
-@FactorSource("myFactors")
-
-// Reference from another class
-@FactorSource("OtherClass#myFactors")
-
-// Inject factor values
-void method(@Factor("input") String input, ...) { }
-```
-
----
-
-## Factor Consistency
-
-Factor consistency ensures **statistical integrity** by verifying that probabilistic tests use the same inputs as the experiments that generated their baseline specifications.
-
-### The Problem
-
-When you run a MEASURE experiment with certain inputs (e.g., product queries), the spec captures the observed behavior for *those specific inputs*. If a probabilistic test later uses *different* inputs, the statistical comparison becomes invalid—you're comparing apples to oranges.
-
-### The Solution: Source-Owned Hash
-
-PUnit automatically validates factor consistency using a **source-owned hash**:
-
-1. During the MEASURE experiment, the factor source computes a hash of its factors
-2. This hash is stored in the spec alongside the empirical data
-3. During the probabilistic test, the factor source computes its hash
-4. PUnit compares the hashes and warns if they differ
+PUnit validates that experiments and tests use the **same factor source**. A hash is stored in the spec and compared at test time:
 
 ```
 ✓ Factor sources match.
@@ -889,340 +609,51 @@ or
 ```
 ⚠️ FACTOR CONSISTENCY WARNING
    Factor source mismatch detected.
-   Baseline: hash=a3f2b8c9..., source=productQueries, samples=1000
-   Test:     hash=7d4e2f1a..., source=modifiedQueries
    Statistical conclusions may be less reliable.
-   Ensure the same @FactorSource is used for experiments and tests.
 ```
-
-### Recommended Pattern: Co-locate Factors with Use Cases
-
-The recommended pattern is to define factor sources **alongside use case classes**:
-
-```java
-public class ProductSearchUseCase {
-
-    // The use case implementation
-    public SearchResult search(String query, String model) {
-        return llmClient.chat(buildPrompt(query), model);
-    }
-
-    // Factor source for MEASURE experiments and probabilistic tests
-    // Method name "standardQueries" is the identifier
-    public static List<FactorArguments> standardQueries() {
-        return List.of(
-            FactorArguments.of("wireless headphones", "gpt-4"),
-            FactorArguments.of("laptop stand", "gpt-4"),
-            FactorArguments.of("USB-C hub", "gpt-4"),
-            FactorArguments.of("mechanical keyboard", "gpt-4"),
-            FactorArguments.of("webcam 4k", "gpt-4")
-        );
-    }
-
-    // Alternative factor source for EXPLORE experiments
-    public static List<FactorArguments> exploratoryQueries() {
-        return List.of(
-            FactorArguments.of("wireless headphones", "gpt-3.5-turbo"),
-            FactorArguments.of("wireless headphones", "gpt-4"),
-            FactorArguments.of("wireless headphones", "gpt-4-turbo")
-        );
-    }
-}
-```
-
-**Benefits of co-location:**
-
-| Benefit                    | Description                                          |
-|----------------------------|------------------------------------------------------|
-| **Single source of truth** | Factors live with the code they exercise             |
-| **Cohesion**               | Related concepts stay together                       |
-| **Discoverability**        | Developers find factors when they find the use case  |
-| **Consistency**            | Easy to use the same source in experiments and tests |
-
-### Referencing Factor Sources
-
-**Same-class reference** (short name):
-
-```java
-@Experiment(type = MEASURE, samples = 1000)
-@FactorSource("standardQueries")  // Method in same class
-void measureProductSearch(...) { ... }
-```
-
-**Cross-class reference** (qualified name):
-
-```java
-@ProbabilisticTest(samples = 100, useCase = ProductSearchUseCase.class)
-@FactorSource("ProductSearchUseCase#standardQueries")  // Method in another class
-void testProductSearch(...) { ... }
-```
-
-### First-N Prefix Selection
-
-When a probabilistic test uses fewer samples than the experiment:
-
-- **Experiment**: 1000 samples → consumes factors F₁, F₂, ... F₁₀₀₀
-- **Test**: 100 samples → consumes factors F₁, F₂, ... F₁₀₀
-
-The test uses a **prefix** of the experiment's factors. Because both use the same factor source, the first N factors are guaranteed to be identical.
-
-### Naming Rules
-
-Factor source names are **class-scoped**:
-
-| Rule                    | Behavior                                                  |
-|-------------------------|-----------------------------------------------------------|
-| Names are class-scoped  | `"queries"` → `"ProductSearchUseCase#queries"` internally |
-| Within-class uniqueness | Enforced at discovery; fail-fast with clear error         |
-| Cross-class references  | Require `ClassName#methodName` syntax                     |
-| Same-class references   | Short names allowed                                       |
-| Default name            | Method name if annotation value omitted                   |
-
-### When to Use Factor Sources
-
-| Scenario                | Recommendation                                     |
-|-------------------------|----------------------------------------------------|
-| **EXPLORE experiments** | Use diverse factors to find optimal configurations |
-| **MEASURE experiments** | Use production-representative factors for baseline |
-| **Probabilistic tests** | Use **same factor source** as MEASURE experiment   |
-
-### Key Takeaways
-
-1. **Same source, same factors**: If experiment and test use the same `@FactorSource`, they consume identical factors
-2. **Hash comparison**: PUnit warns if factor sources differ
-3. **Warning, not blocking**: Mismatch is informational—the test still runs
-4. **Sample count irrelevant**: Hash comparison works regardless of consumption counts
 
 ---
 
-## Exploration Mode: Comparing Configurations
+## Part 4: EXPLORE Mode
 
-EXPLORE mode is designed for **rapid configuration discovery**—trying out different settings to understand how they affect behavior before committing to a statistical baseline.
+### When to Use EXPLORE
 
-### Philosophy
+Use EXPLORE mode when:
 
-EXPLORE mode embodies a fundamentally different mindset from MEASURE:
+- ✅ You have multiple configurations to compare (models, temperatures, prompts)
+- ✅ You want rapid feedback before committing to a statistical baseline
+- ✅ You're discovering what works, not yet measuring reliability
 
-| Aspect                | MEASURE                                   | EXPLORE                                 |
-|-----------------------|-------------------------------------------|-----------------------------------------|
-| **Goal**              | Establish statistically reliable baseline | Discover which configurations work best |
-| **Sample size**       | Large (1000+ by default)                  | Small (1 by default)                    |
-| **Output**            | Single spec per use case                  | One file per configuration              |
-| **Statistical rigor** | High                                      | Low (intentionally)                     |
-| **Time investment**   | Significant                               | Minimal                                 |
-
-**Why small samples?** When comparing 8 configurations, running 1000 samples each would take forever. EXPLORE trades statistical precision for rapid feedback. You're not trying to prove anything—you're trying to *learn* what's worth measuring.
-
-### The Exploration Workflow
-
-```
-1. Define configurations to compare
-2. Run EXPLORE (1-3 samples per config)
-3. Diff the output files
-4. Choose winner(s)
-5. Run MEASURE on chosen config(s)
-```
+**Examples:**
+- Comparing GPT-4 vs GPT-3.5 for a task
+- Testing different temperature settings
+- Evaluating prompt variations
 
 ### Running Explorations
 
-```bash
-# Basic exploration
-./gradlew explore --tests "ShoppingExperiment.exploreModelConfigurations"
-```
-
-**Important**: Gradle caches task results. If you've already run an exploration and the code hasn't changed, Gradle will skip execution:
-
-```
-> Task :explore UP-TO-DATE
-```
-
-### Forcing Regeneration
-
-Use these options to force exploration to run:
-
-```bash
-# Option 1: Clean first (removes all build outputs)
-./gradlew clean explore --tests "ShoppingExperiment.exploreModelConfigurations"
-
-# Option 2: Force task re-run (preserves other build outputs)
-./gradlew explore --tests "ShoppingExperiment.exploreModelConfigurations" --rerun-tasks
-```
-
-| Option          | When to Use                               |
-|-----------------|-------------------------------------------|
-| `clean`         | When you want a completely fresh build    |
-| `--rerun-tasks` | When you just want to re-run explorations |
-
-### Output Location
-
-Exploration results are written to:
-
-```
-src/test/resources/punit/explorations/{UseCaseId}/
-├── model-gpt-4_temp-0.0_query-laptop_stand.yaml
-├── model-gpt-4_temp-0.7_query-laptop_stand.yaml
-├── model-gpt-3.5-turbo_temp-0.0_query-laptop_stand.yaml
-└── ...
-```
-
-Each configuration gets its own file, named based on its factor values.
-
-### Diff-Friendly Output
-
-EXPLORE output is specifically designed for comparison with standard diff tools:
-
-```bash
-# Compare two configurations
-diff explorations/ShoppingUseCase/model-gpt-4_temp-0.0*.yaml \
-     explorations/ShoppingUseCase/model-gpt-4_temp-0.7*.yaml
-
-# Or use a visual diff tool
-code --diff file1.yaml file2.yaml
-```
-
-#### What Makes It Diff-Friendly
-
-1. **Fixed structure**: All files have identical sections in the same order
-2. **Alphabetical keys**: `diffableContent` entries are sorted for consistent alignment
-3. **No timestamps in projections**: Would always differ, creating noise
-4. **No failure distribution**: With 1-3 samples, it's noisy and breaks alignment
-5. **Consistent line counts**: `<absent>` padding and `<truncated>` notices maintain alignment
-
-#### Example Diff Output
-
-```diff
-  resultProjection:
-    sample[0]:
--     executionTimeMs: 180
-+     executionTimeMs: 245
-      diffableContent:
-        - "isValidJson: true"
--       - "productCount: 3"
-+       - "productCount: 5"
-        - "tokensUsed: 150"
-```
-
-The meaningful differences (execution time, product count) stand out clearly.
-
-### Configuring Diffable Content
-
-Control how result values appear in the diff output:
-
-```java
-@UseCase(
-    value = "shopping.search",
-    maxDiffableLines = 10,              // Show up to 10 values (default: 5)
-    diffableContentMaxLineLength = 80   // Truncate long values at 80 chars (default: 60)
-)
-public class ShoppingUseCase { ... }
-```
-
-#### Understanding Line Limits
-
-With `maxDiffableLines = 5`:
-
-- **Fewer than 5 values**: Padded with `<absent>` to maintain 5 lines
-- **Exactly 5 values**: Shown as-is
-- **More than 5 values**: First 5 shown, plus `<truncated: +N more>`
-
-```yaml
-diffableContent:
-  - "alpha: value1"
-  - "beta: value2"
-  - "gamma: value3"
-  - "<absent>"           # Padding for consistent line count
-  - "<absent>"
-```
-
-Or with truncation:
-
-```yaml
-diffableContent:
-  - "alpha: value1"
-  - "beta: value2"
-  - "gamma: value3"
-  - "delta: value4"
-  - "epsilon: value5"
-  - "<truncated: +3 more>"   # Extra line (doesn't count toward limit)
-```
-
-### Increasing Sample Size
-
-For more confidence before choosing a configuration:
-
 ```java
 @Experiment(
     mode = ExperimentMode.EXPLORE,
-    samplesPerConfig = 3    // Run each config 3 times (default: 1)
+    useCase = JsonGenerationUseCase.class,
+    samplesPerConfig = 3  // Small samples for rapid comparison
 )
-void exploreConfigurations(...) { ... }
-```
-
-With multiple samples, you'll see:
-
-```yaml
-resultProjection:
-  sample[0]:
-    executionTimeMs: 180
-    diffableContent:
-      - "isValidJson: true"
-      - "productCount: 3"
-  sample[1]:
-    executionTimeMs: 195
-    diffableContent:
-      - "isValidJson: true"
-      - "productCount: 4"
-  sample[2]:
-    executionTimeMs: 210
-    diffableContent:
-      - "isValidJson: false"   # Spot the outlier!
-      - "productCount: 0"
-```
-
-### Best Practices
-
-1. **Start with 1 sample per config** — It's fast and often sufficient to spot obvious winners/losers
-
-2. **Increase to 3 samples if uncertain** — Helps distinguish signal from noise
-
-3. **Don't over-sample in EXPLORE** — If you need 100+ samples, you're ready for MEASURE
-
-4. **Use meaningful config names** — Factor values become filenames; make them readable
-
-5. **Commit exploration results** — They document your configuration journey
-
-6. **Use `--rerun-tasks` during active exploration** — Avoids stale cached results
-
-### Example: Complete Exploration Experiment
-
-```java
-@Experiment(
-    mode = ExperimentMode.EXPLORE,
-    useCase = ShoppingUseCase.class,
-    samplesPerConfig = 1
-)
-@FactorSource("modelConfigurations")
-void exploreModelConfigurations(
-        ShoppingUseCase useCase,
+@FactorSource("explorationConfigs")
+void exploreModels(
         @Factor("model") String model,
         @Factor("temperature") double temperature,
-        @Factor("query") String query,
         ResultCaptor captor) {
     
-    // Configure the use case with current factors
     useCase.configure(model, temperature);
-    
-    // Execute and capture
-    captor.record(useCase.search(query));
+    captor.record(useCase.generateJson("Generate a user profile"));
 }
 
-static List<FactorArguments> modelConfigurations() {
+static List<FactorArguments> explorationConfigs() {
     return FactorArguments.configurations()
-        .names("model", "temperature", "query")
-        .values("gpt-4", 0.0, "wireless headphones")
-        .values("gpt-4", 0.7, "wireless headphones")
-        .values("gpt-3.5-turbo", 0.0, "wireless headphones")
-        .values("gpt-3.5-turbo", 0.7, "wireless headphones")
+        .names("model", "temperature")
+        .values("gpt-4", 0.0)
+        .values("gpt-4", 0.7)
+        .values("gpt-3.5-turbo", 0.0)
+        .values("gpt-3.5-turbo", 0.7)
         .stream().toList();
 }
 ```
@@ -1230,51 +661,54 @@ static List<FactorArguments> modelConfigurations() {
 Run with:
 
 ```bash
-./gradlew clean explore --tests "ShoppingExperiment.exploreModelConfigurations"
+./gradlew explore --tests "JsonGenerationExperiment.exploreModels"
 ```
 
-Then compare:
+### Comparing Configurations
+
+EXPLORE outputs go to:
+
+```
+src/test/resources/punit/explorations/{UseCaseId}/
+├── model-gpt-4_temp-0.0.yaml
+├── model-gpt-4_temp-0.7.yaml
+├── model-gpt-3.5-turbo_temp-0.0.yaml
+└── model-gpt-3.5-turbo_temp-0.7.yaml
+```
+
+Compare with standard diff tools:
 
 ```bash
-ls src/test/resources/punit/explorations/ShoppingUseCase/
-# model-gpt-4_temp-0.0_query-wireless_headphones.yaml
-# model-gpt-4_temp-0.7_query-wireless_headphones.yaml
-# model-gpt-3.5-turbo_temp-0.0_query-wireless_headphones.yaml
-# model-gpt-3.5-turbo_temp-0.7_query-wireless_headphones.yaml
+diff explorations/*/model-gpt-4*.yaml explorations/*/model-gpt-3.5*.yaml
 ```
+
+**EXPLORE vs MEASURE:**
+
+| Aspect            | EXPLORE                      | MEASURE                  |
+|-------------------|------------------------------|--------------------------|
+| Goal              | Compare configurations       | Establish baseline       |
+| Samples           | Small (1-3 per config)       | Large (1000+)            |
+| Output            | One file per configuration   | Single spec per use case |
+| Statistical rigor | Low (rapid feedback)         | High (reliable baseline) |
 
 ---
 
 ## Transparent Statistics Mode
 
-When you need to understand or document the statistical reasoning behind test verdicts, **Transparent Statistics Mode** provides comprehensive explanations suitable for auditors, stakeholders, and educational purposes.
-
-### Enabling Transparent Mode
-
-#### Via System Property (Recommended for CI)
+Enable detailed statistical explanations for auditing, debugging, or education:
 
 ```bash
 ./gradlew test -Dpunit.stats.transparent=true
 ```
 
-#### Via Environment Variable
-
-```bash
-PUNIT_STATS_TRANSPARENT=true ./gradlew test
-```
-
-#### Via Annotation (Per-Test)
+Or per-test:
 
 ```java
 @ProbabilisticTest(samples = 100, transparentStats = true)
-void myTest() {
-    // This test will output detailed statistical analysis
-}
+void myTest() { ... }
 ```
 
-### Example Output
-
-When transparent mode is enabled, each test verdict includes a complete statistical analysis:
+Example output:
 
 ```
 ══════════════════════════════════════════════════════════════════════════════
@@ -1282,8 +716,8 @@ STATISTICAL ANALYSIS: shouldReturnValidJson
 ══════════════════════════════════════════════════════════════════════════════
 
 HYPOTHESIS TEST
-  H₀ (null):        True success rate π ≤ 0.85 (system does not meet spec)
-  H₁ (alternative): True success rate π > 0.85 (system meets spec)
+  H₀ (null):        True success rate π ≤ 0.85
+  H₁ (alternative): True success rate π > 0.85
   Test type:        One-sided binomial proportion test
 
 OBSERVED DATA
@@ -1291,74 +725,70 @@ OBSERVED DATA
   Successes (k):       87
   Observed rate (p̂):   0.870
 
-BASELINE REFERENCE
-  Source:              ShoppingUseCase.yaml (generated 2026-01-10)
-  Empirical basis:     1000 samples, 872 successes (87.2%)
-  Threshold derivation: Lower bound of 95% CI = 85.1%, rounded to 85%
-
 STATISTICAL INFERENCE
-  Standard error:      SE = √(p̂(1-p̂)/n) = √(0.87 × 0.13 / 100) = 0.0336
+  Standard error:      SE = 0.0336
   95% Confidence interval: [0.804, 0.936]
-  
-  Test statistic:      z = (p̂ - π₀) / √(π₀(1-π₀)/n)
-                       z = (0.87 - 0.85) / √(0.85 × 0.15 / 100)
-                       z = 0.56
-  
-  p-value:             P(Z > 0.56) = 0.288
+  p-value:             0.288
 
 VERDICT
   Result:              PASS
   Interpretation:      The observed success rate of 87% is consistent with 
-                       the baseline expectation of 87.2%. The 95% confidence 
-                       interval [80.4%, 93.6%] contains the threshold of 85%.
-                       
-  Caveat:              With n=100 samples, we can detect a drop from 87% to 
-                       below 85% with approximately 50% power. For higher 
-                       sensitivity, consider increasing sample size.
+                       the baseline expectation.
 
 ══════════════════════════════════════════════════════════════════════════════
 ```
 
-### Configuration Options
+---
 
-| Setting        | System Property           | Environment Variable       | Values                           |
-|----------------|---------------------------|----------------------------|----------------------------------|
-| Enable/disable | `punit.stats.transparent` | `PUNIT_STATS_TRANSPARENT`  | `true`/`false`                   |
-| Detail level   | `punit.stats.detailLevel` | `PUNIT_STATS_DETAIL_LEVEL` | `SUMMARY`, `STANDARD`, `VERBOSE` |
-| Output format  | `punit.stats.format`      | `PUNIT_STATS_FORMAT`       | `CONSOLE`, `MARKDOWN`, `JSON`    |
+## Decision Flowchart
 
-### Detail Levels
+Use this flowchart to choose the right approach:
 
-| Level      | Description                                        |
-|------------|----------------------------------------------------|
-| `SUMMARY`  | Verdict and key numbers only                       |
-| `STANDARD` | Full explanation (default)                         |
-| `VERBOSE`  | Includes power analysis and sensitivity discussion |
+```
+                         ┌─────────────────────────────┐
+                         │  Do you have a contractual  │
+                         │  threshold (SLA/SLO/policy)?│
+                         └──────────────┬──────────────┘
+                                        │
+                        ┌───────────────┴───────────────┐
+                        │                               │
+                       YES                              NO
+                        │                               │
+                        ▼                               ▼
+          ┌──────────────────────┐        ┌─────────────────────────┐
+          │  SLA-DRIVEN TESTING  │        │ Do you have multiple    │
+          │                      │        │ configurations to try?  │
+          │  @ProbabilisticTest( │        └────────────┬────────────┘
+          │    minPassRate=...,  │                     │
+          │    targetSource=SLA  │         ┌───────────┴───────────┐
+          │  )                   │         │                       │
+          └──────────────────────┘        YES                      NO
+                                           │                       │
+                                           ▼                       ▼
+                              ┌────────────────────┐   ┌───────────────────────┐
+                              │   EXPLORE MODE     │   │   MEASURE + TEST      │
+                              │                    │   │                       │
+                              │   Compare configs  │   │   1. Run MEASURE      │
+                              │   then MEASURE     │   │   2. Commit spec      │
+                              │   the winner       │   │   3. Test against it  │
+                              └────────────────────┘   └───────────────────────┘
+```
 
-### When to Use Transparent Mode
+**Summary table:**
 
-| Scenario                      | Recommendation                                  |
-|-------------------------------|-------------------------------------------------|
-| Debugging test failures       | Enable temporarily to understand the statistics |
-| Audit/compliance requirements | Enable in specific CI job for documentation     |
-| Onboarding new team members   | Enable to teach how PUnit works                 |
-| Investigating edge cases      | Enable to see full calculations                 |
-| Normal CI runs                | Keep disabled (default) for cleaner output      |
-
-### Configuration Precedence
-
-When multiple configuration sources specify transparent mode, the highest-priority source wins:
-
-1. `@ProbabilisticTest(transparentStats = true)` — per-test override (highest)
-2. `-Dpunit.stats.transparent=true` — system property
-3. `PUNIT_STATS_TRANSPARENT=true` — environment variable
-4. Default: `false` (lowest)
+| Your Situation                            | Approach             | Key Parameters                      |
+|-------------------------------------------|----------------------|-------------------------------------|
+| Have SLA/SLO threshold                    | SLA-Driven           | `minPassRate`, `targetSource`       |
+| Need to discover acceptable rate          | MEASURE → Spec-Test  | `useCase`, spec file                |
+| Want to compare models/prompts/configs    | EXPLORE first        | `samplesPerConfig`, `@FactorSource` |
+| Need detailed statistical output          | Transparent mode     | `transparentStats = true`           |
 
 ---
 
 ## Next Steps
 
-- See [README.md](../README.md) for full configuration reference
+- See [README.md](../README.md) for quick reference and configuration options
 - See [OPERATIONAL-FLOW.md](OPERATIONAL-FLOW.md) for detailed workflow documentation
 - See [STATISTICAL-COMPANION.md](STATISTICAL-COMPANION.md) for mathematical foundations
+- See [GLOSSARY.md](GLOSSARY.md) for term definitions
 - Explore examples in `src/test/java/org/javai/punit/examples/`

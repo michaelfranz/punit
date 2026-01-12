@@ -5,6 +5,7 @@ import java.util.Optional;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.TargetSource;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.spec.model.ExecutionSpecification;
 import org.javai.punit.spec.registry.SpecificationIntegrityException;
@@ -169,6 +170,10 @@ public class ConfigurationResolver {
         ExceptionHandling onException = annotation.onException();
         int maxExampleFailures = annotation.maxExampleFailures();
 
+        // Get provenance values (annotation-only, no override)
+        TargetSource targetSource = annotation.targetSource();
+        String contractRef = annotation.contractRef();
+
         return new ResolvedConfiguration(
                 effectiveSamples,
                 minPassRate,
@@ -178,7 +183,10 @@ public class ConfigurationResolver {
                 tokenBudget,
                 onBudgetExhausted,
                 onException,
-                maxExampleFailures
+                maxExampleFailures,
+                null, null, null, null,  // Statistical context (not resolved here)
+                targetSource,
+                contractRef
         );
     }
 
@@ -328,10 +336,13 @@ public class ConfigurationResolver {
             Double confidence,
             Double baselineRate,
             Integer baselineSamples,
-            String specId
+            String specId,
+            // Provenance metadata (annotation-only, no override)
+            TargetSource targetSource,
+            String contractRef
     ) {
         /**
-         * Constructor for backward compatibility - creates configuration without statistical context.
+         * Constructor for backward compatibility - creates configuration without statistical context or provenance.
          */
         public ResolvedConfiguration(
                 int samples,
@@ -345,7 +356,8 @@ public class ConfigurationResolver {
                 int maxExampleFailures) {
             this(samples, minPassRate, appliedMultiplier, timeBudgetMs, tokenCharge, tokenBudget,
                     onBudgetExhausted, onException, maxExampleFailures,
-                    null, null, null, null);
+                    null, null, null, null,
+                    TargetSource.UNSPECIFIED, "");
         }
 
         /**
@@ -381,6 +393,27 @@ public class ConfigurationResolver {
          */
         public boolean hasStatisticalContext() {
             return confidence != null && baselineRate != null && baselineSamples != null && specId != null;
+        }
+
+        /**
+         * Returns true if any provenance information is specified.
+         */
+        public boolean hasProvenance() {
+            return hasTargetSource() || hasContractRef();
+        }
+
+        /**
+         * Returns true if targetSource is specified (not UNSPECIFIED).
+         */
+        public boolean hasTargetSource() {
+            return targetSource != null && targetSource != TargetSource.UNSPECIFIED;
+        }
+
+        /**
+         * Returns true if contractRef is specified (not null or empty).
+         */
+        public boolean hasContractRef() {
+            return contractRef != null && !contractRef.isEmpty();
         }
     }
 

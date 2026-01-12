@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.TargetSource;
 import org.javai.punit.api.TokenChargeRecorder;
 import org.javai.punit.ptest.engine.FactorConsistencyValidator.ValidationResult;
 import org.javai.punit.api.FactorSource;
@@ -232,7 +233,10 @@ public class ProbabilisticTestExtension implements
 				// Pacing configuration
 				pacing,
 				// Transparent stats configuration
-				transparentStats
+				transparentStats,
+				// Provenance metadata
+				resolved.targetSource(),
+				resolved.contractRef()
 		);
 	}
 
@@ -825,6 +829,9 @@ public class ProbabilisticTestExtension implements
 					config.minPassRate() * 100));
 		}
 
+		// Append provenance if configured
+		appendProvenance(sb, config);
+
 		reason.filter(r -> r != TerminationReason.COMPLETED)
 				.ifPresent(r -> {
 					sb.append(String.format("  Termination: %s%n", r.getDescription()));
@@ -847,6 +854,21 @@ public class ProbabilisticTestExtension implements
 
 		// Print to stdout for visibility
 		System.out.println(sb);
+	}
+
+	/**
+	 * Appends provenance information to the verdict output if configured.
+	 *
+	 * <p>Provenance lines are added in order: targetSource, then contractRef.
+	 * Lines are only added if the respective value is set (not UNSPECIFIED/empty).
+	 */
+	private void appendProvenance(StringBuilder sb, TestConfiguration config) {
+		if (config.hasTargetSource()) {
+			sb.append(String.format("  Target source: %s%n", config.targetSource().name()));
+		}
+		if (config.hasContractRef()) {
+			sb.append(String.format("  Contract ref: %s%n", config.contractRef()));
+		}
 	}
 
 	/**
@@ -876,7 +898,9 @@ public class ProbabilisticTestExtension implements
 					baseline,
 					config.minPassRate(),
 					passed,
-					config.confidence() != null ? config.confidence() : 0.95
+					config.confidence() != null ? config.confidence() : 0.95,
+					config.targetSource() != null ? config.targetSource().name() : "UNSPECIFIED",
+					config.contractRef()
 			);
 		} else {
 			// Inline threshold mode (no baseline spec)
@@ -885,7 +909,9 @@ public class ProbabilisticTestExtension implements
 					aggregator.getSamplesExecuted(),
 					aggregator.getSuccesses(),
 					config.minPassRate(),
-					passed
+					passed,
+					config.targetSource() != null ? config.targetSource().name() : "UNSPECIFIED",
+					config.contractRef()
 			);
 		}
 
@@ -1027,7 +1053,10 @@ public class ProbabilisticTestExtension implements
 			// Pacing configuration
 			PacingConfiguration pacing,
 			// Transparent stats configuration
-			TransparentStatsConfig transparentStats
+			TransparentStatsConfig transparentStats,
+			// Provenance metadata
+			TargetSource targetSource,
+			String contractRef
 	) {
 		boolean hasMultiplier() {
 			return appliedMultiplier != 1.0;
@@ -1051,6 +1080,27 @@ public class ProbabilisticTestExtension implements
 
 		boolean hasTransparentStats() {
 			return transparentStats != null && transparentStats.enabled();
+		}
+
+		/**
+		 * Returns true if any provenance information is specified.
+		 */
+		boolean hasProvenance() {
+			return hasTargetSource() || hasContractRef();
+		}
+
+		/**
+		 * Returns true if targetSource is specified (not UNSPECIFIED).
+		 */
+		boolean hasTargetSource() {
+			return targetSource != null && targetSource != TargetSource.UNSPECIFIED;
+		}
+
+		/**
+		 * Returns true if contractRef is specified (not null or empty).
+		 */
+		boolean hasContractRef() {
+			return contractRef != null && !contractRef.isEmpty();
 		}
 
 		/**
