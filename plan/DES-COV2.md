@@ -195,6 +195,69 @@ When candidates have equal scores:
 2. **Declaration order**: Earlier-declared covariates prioritized
 3. **Recency**: More recent baseline preferred
 
+### 4.5 Temporal Matching Strategy
+
+For TEMPORAL covariates, the algorithm seeks the **closest fit** to the probabilistic test's runtime:
+
+#### TIME_OF_DAY Matching
+
+| Scenario | Match Result | Score |
+|----------|--------------|-------|
+| Test time falls **within** baseline window | `CONFORMS` | 3 |
+| Test time is **adjacent** to baseline window (within tolerance) | `PARTIALLY_CONFORMS` | 1 |
+| Test time is **distant** from baseline window | `DOES_NOT_CONFORM` | 0 |
+
+**Distance calculation:**
+```
+distance = min(
+    abs(test_time - baseline_window_start),
+    abs(test_time - baseline_window_end)
+)
+```
+
+When multiple baselines have `DOES_NOT_CONFORM`, select the one with **smallest temporal distance**.
+
+**Example:**
+```
+Baseline A: 09:00-10:00 Europe/London
+Baseline B: 14:00-15:00 Europe/London
+Test runs:  11:30 Europe/London
+
+Distance to A: 1h 30m (from 10:00)
+Distance to B: 2h 30m (to 14:00)
+→ Baseline A selected (closer)
+```
+
+#### WEEKDAY_VERSUS_WEEKEND Matching
+
+| Scenario | Match Result | Score |
+|----------|--------------|-------|
+| Same category (both weekday or both weekend) | `CONFORMS` | 3 |
+| Different category | `DOES_NOT_CONFORM` | 0 |
+
+**Day proximity for tie-breaking:**
+
+When multiple baselines share the same day category, prefer the baseline established on the **closest day** to the test's execution day.
+
+**Example:**
+```
+Test runs: Wednesday
+
+Baseline A: Established Monday (weekday)     → distance: 2 days
+Baseline B: Established Tuesday (weekday)    → distance: 1 day
+Baseline C: Established Saturday (weekend)   → category mismatch
+
+→ Baseline B selected (same category, closest day)
+```
+
+#### Combined Temporal Scoring
+
+When both `TIME_OF_DAY` and `WEEKDAY_VERSUS_WEEKEND` are declared:
+
+1. **Filter** by day category match (weekday/weekend must match if possible)
+2. **Rank** by time-of-day proximity among matching day-category candidates
+3. If no day-category match exists, fall back to time-of-day proximity alone with warning
+
 ---
 
 ## 5. Error Messages
@@ -354,9 +417,187 @@ The probabilistic test engine computes the same footprint and covariate value ha
 
 ---
 
-## 7. Design Rationale
+## 7. Statistical Reporting Language
 
-### 7.1 Why Hard Fail for CONFIGURATION?
+### 7.1 Principles
+
+The language used in statistical reports must:
+
+1. **Be category-sensitive** — Different covariate categories warrant different phrasing
+2. **Remain neutral on partial matches** — State facts without dictating interpretation
+3. **Leave interpretation to the evaluator** — The human reader decides significance
+4. **Be affirmative on full matches** — Confirm statistical validity when conditions align
+5. **Use scientific precision** — Avoid colloquial or emotive language
+
+### 7.2 Full Match (100% Covariate Conformance)
+
+When all declared covariates match between test and baseline:
+
+```
+COVARIATE CONFORMANCE: FULL
+
+All declared covariates match the selected baseline.
+Statistical comparison is performed under equivalent conditions.
+
+  ✓ llm_model: gpt-4.1-mini
+  ✓ time_of_day: 14:00-15:00 Europe/London
+  ✓ region: eu-west-1
+```
+
+**Language characteristics:**
+- Affirmative but factual ("equivalent conditions")
+- Does not claim the test result is therefore valid—only that conditions align
+- Lists matched covariates for transparency
+
+### 7.3 Partial Match (Some Covariates Differ)
+
+When some covariates differ, the report states the facts neutrally:
+
+```
+COVARIATE CONFORMANCE: PARTIAL
+
+The selected baseline was established under different conditions.
+Covariate differences are listed below for evaluation.
+
+  ✓ llm_model: gpt-4.1-mini
+  ⚠ time_of_day
+      Baseline: 14:00-15:00 Europe/London
+      Test:     09:30-10:00 Europe/London
+  ✓ region: eu-west-1
+```
+
+**Language characteristics:**
+- Factual statement of difference ("different conditions")
+- No judgment on whether this invalidates results
+- Phrase "for evaluation" delegates interpretation to the reader
+
+### 7.4 Category-Specific Language
+
+Each category uses tailored phrasing that reflects its nature:
+
+#### CONFIGURATION (Hard Gate — No Partial Match Possible)
+If a CONFIGURATION mismatch occurs, the test does not proceed. The error message (see Section 5) applies, not reporting language.
+
+#### TEMPORAL
+```
+⚠ time_of_day
+    Baseline: 14:00-15:00 Europe/London
+    Test:     09:30-10:00 Europe/London
+    
+    The test executed outside the baseline's temporal window.
+    Temporal factors may influence system behavior.
+```
+
+#### INFRASTRUCTURE
+```
+⚠ hosting_environment
+    Baseline: aws-production
+    Test:     local-dev
+    
+    Infrastructure differs from baseline conditions.
+    Resource availability and latency characteristics may vary.
+```
+
+#### EXTERNAL_DEPENDENCY
+```
+⚠ payment_gateway_version
+    Baseline: v2.3
+    Test:     v2.4
+    
+    External dependency version differs from baseline.
+    Third-party service behavior may have changed.
+```
+
+#### DATA_STATE
+```
+⚠ catalog_size
+    Baseline: 50000
+    Test:     75000
+    
+    Data state differs from baseline conditions.
+    Data volume or distribution may affect performance.
+```
+
+#### INFORMATIONAL
+INFORMATIONAL covariates are **not reported** in the conformance section. They appear only in the baseline metadata section for traceability:
+
+```
+BASELINE METADATA
+  Established: 2026-01-14 10:30 UTC
+  Samples: 1000
+  Run ID: exp-20260114-001
+  Operator: ci-pipeline
+```
+
+### 7.5 Summary Table
+
+| Match State | Header | Tone | Interpretation Guidance |
+|-------------|--------|------|-------------------------|
+| Full | `COVARIATE CONFORMANCE: FULL` | Affirmative | "equivalent conditions" |
+| Partial | `COVARIATE CONFORMANCE: PARTIAL` | Neutral | "for evaluation" |
+| None found | `NO COMPATIBLE BASELINE` | Directive | Guides to EXPLORE/MEASURE |
+
+### 7.6 Phrasing Patterns by Category
+
+| Category | Mismatch Phrase | Factor Phrase |
+|----------|-----------------|---------------|
+| TEMPORAL | "executed outside the baseline's temporal window" | "Temporal factors may influence system behavior" |
+| INFRASTRUCTURE | "Infrastructure differs from baseline conditions" | "Resource availability and latency characteristics may vary" |
+| EXTERNAL_DEPENDENCY | "External dependency version differs from baseline" | "Third-party service behavior may have changed" |
+| DATA_STATE | "Data state differs from baseline conditions" | "Data volume or distribution may affect performance" |
+
+### 7.7 Language to Avoid
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| "Test results may be invalid" | Prejudges interpretation | "Conditions differ" |
+| "Warning: mismatch detected" | Implies fault | "Covariate difference noted" |
+| "Baseline is stale" | Value judgment | "Baseline established under different conditions" |
+| "Results are unreliable" | Prejudges significance | "Evaluate in context of differences" |
+| "You should re-run" | Prescriptive | (Leave to evaluator) |
+
+### 7.8 Example: Complete Report Section
+
+```
+═══════════════════════════════════════════════════════════════════
+                      COVARIATE CONFORMANCE: PARTIAL
+═══════════════════════════════════════════════════════════════════
+
+The selected baseline was established under different conditions.
+Covariate differences are listed below for evaluation.
+
+MATCHED COVARIATES
+  ✓ llm_model: gpt-4.1-mini                           [CONFIGURATION]
+  ✓ region: eu-west-1                                 [INFRASTRUCTURE]
+
+DIFFERING COVARIATES
+  ⚠ time_of_day                                       [TEMPORAL]
+      Baseline: 14:00-15:00 Europe/London
+      Test:     09:30-10:00 Europe/London
+      
+      The test executed outside the baseline's temporal window.
+      Temporal factors may influence system behavior.
+
+  ⚠ catalog_size                                      [DATA_STATE]
+      Baseline: 50000
+      Test:     75000
+      
+      Data state differs from baseline conditions.
+      Data volume or distribution may affect performance.
+
+───────────────────────────────────────────────────────────────────
+BASELINE METADATA
+  File: ShoppingUseCase.measureSearch-20260114-1030-a1b2-c3d4.yaml
+  Established: 2026-01-14 10:30 UTC
+  Samples: 1000
+═══════════════════════════════════════════════════════════════════
+```
+
+---
+
+## 8. Design Rationale
+
+### 8.1 Why Hard Fail for CONFIGURATION?
 
 **Principle:** Use the right tool for the job.
 
@@ -375,7 +616,7 @@ Running a probabilistic test with a mismatched CONFIGURATION covariate is using 
 2. Decided to switch to gpt-3.5? → Run MEASURE to create baseline
 3. Running regression tests? → Probabilistic test matches configuration
 
-### 7.2 Why Soft Match for TEMPORAL?
+### 8.2 Why Soft Match for TEMPORAL?
 
 Environmental conditions vary legitimately:
 - Tests run at different times of day
@@ -387,7 +628,7 @@ Soft matching allows:
 - Developer to understand comparison context
 - Gradual baseline staleness without hard failures
 
-### 7.3 Why Ignore INFORMATIONAL?
+### 8.3 Why Ignore INFORMATIONAL?
 
 Some covariates exist purely for:
 - Audit trails (`run_id`, `operator`)
@@ -398,9 +639,9 @@ These should never affect baseline selection or generate warnings.
 
 ---
 
-## 8. Developer Experience: Covariate Value Resolution
+## 9. Developer Experience: Covariate Value Resolution
 
-### 8.1 Resolution Hierarchy
+### 9.1 Resolution Hierarchy
 
 Covariate values are resolved in the following order:
 
@@ -422,7 +663,7 @@ Covariate values are resolved in the following order:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 8.2 Naming Convention for System/Environment Properties
+### 9.2 Naming Convention for System/Environment Properties
 
 | Covariate Key         | System Property                                 | Environment Variable                            |
 |-----------------------|-------------------------------------------------|-------------------------------------------------|
@@ -430,7 +671,7 @@ Covariate values are resolved in the following order:
 | `region`              | `org.javai.punit.covariate.region`              | `ORG_JAVAI_PUNIT_COVARIATE_REGION`              |
 | `hosting_environment` | `org.javai.punit.covariate.hosting_environment` | `ORG_JAVAI_PUNIT_COVARIATE_HOSTING_ENVIRONMENT` |
 
-### 8.3 The @CovariateSource Annotation
+### 9.3 The @CovariateSource Annotation
 
 Developers provide covariate values via annotated instance methods:
 
@@ -472,7 +713,7 @@ public class ProductSearchUseCase {
 - **Operator control via deployment config**: Operators control values by setting `application.yml`, environment variables, etc.
 - **No override mechanism**: PUnit trusts the instance; operators control values at deployment level
 
-### 8.4 Return Types
+### 9.4 Return Types
 
 `@CovariateSource` methods may return:
 
@@ -496,7 +737,7 @@ public CovariateValue getBusinessHours() {
 }
 ```
 
-### 8.5 When Each Resolution Level Applies
+### 9.5 When Each Resolution Level Applies
 
 | Covariate        | Typical Source                     | Rationale                           |
 |------------------|------------------------------------|-------------------------------------|
@@ -507,7 +748,7 @@ public CovariateValue getBusinessHours() {
 | `time_of_day`    | Default resolver                   | PUnit captures execution time       |
 | `run_id`         | Sys/env prop                       | Operator sets for traceability      |
 
-### 8.6 Design Rationale: No Override Mechanism
+### 9.6 Design Rationale: No Override Mechanism
 
 **The instance is the source of truth.** If the developer provides a `@CovariateSource` method, that value is used.
 
@@ -533,9 +774,9 @@ public CovariateValue getBusinessHours() {
 
 ---
 
-## 9. Implementation Plan
+## 10. Implementation Plan
 
-### 9.1 New Components
+### 10.1 New Components
 
 | Component                     | Description                                          |
 |-------------------------------|------------------------------------------------------|
@@ -543,7 +784,7 @@ public CovariateValue getBusinessHours() {
 | `@Covariate` annotation       | For declaring custom covariates with category        |
 | `@CovariateSource` annotation | Marks instance methods that provide covariate values |
 
-### 9.2 Modified Components
+### 10.2 Modified Components
 
 | Component                       | Changes                                         |
 |---------------------------------|-------------------------------------------------|
@@ -554,7 +795,7 @@ public CovariateValue getBusinessHours() {
 | `NoCompatibleBaselineException` | Distinguish footprint vs configuration mismatch |
 | `CovariateWarningRenderer`      | Category-specific warning messages              |
 
-### 9.3 Test Coverage
+### 10.3 Test Coverage
 
 - CONFIGURATION mismatch causes hard fail
 - Soft-match categories generate appropriate warnings
@@ -566,9 +807,9 @@ public CovariateValue getBusinessHours() {
 
 ---
 
-## 10. Future Considerations
+## 11. Future Considerations
 
-### 10.1 Custom Matching Strategies
+### 11.1 Custom Matching Strategies
 
 Allow developers to specify matching behavior per covariate:
 ```java
@@ -579,7 +820,7 @@ Allow developers to specify matching behavior per covariate:
 )
 ```
 
-### 10.2 Configuration Tolerance
+### 11.2 Configuration Tolerance
 
 For some CONFIGURATION covariates, minor variations might be acceptable:
 ```java
@@ -590,7 +831,7 @@ For some CONFIGURATION covariates, minor variations might be acceptable:
 )
 ```
 
-### 10.3 Baseline Recommendation
+### 11.3 Baseline Recommendation
 
 When CONFIGURATION mismatch occurs, suggest the closest available baseline:
 ```
@@ -600,7 +841,7 @@ Closest available: llm_model=gpt-3.5-turbo (1 version difference)
 
 ---
 
-## 11. Glossary Additions
+## 12. Glossary Additions
 
 | Term                       | Definition                                                                                |
 |----------------------------|-------------------------------------------------------------------------------------------|
@@ -613,7 +854,7 @@ Closest available: llm_model=gpt-3.5-turbo (1 version difference)
 
 ---
 
-## 12. Acceptance Criteria
+## 13. Acceptance Criteria
 
 ### Category-Aware Selection
 - [ ] `CovariateCategory` enum implemented with six categories
