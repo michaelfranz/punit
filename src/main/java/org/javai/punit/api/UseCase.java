@@ -160,7 +160,13 @@ public @interface UseCase {
     StandardCovariate[] covariates() default {};
 
     /**
-     * Custom covariate keys for user-defined contextual factors.
+     * Custom covariate keys for user-defined contextual factors (legacy).
+     *
+     * <p><strong>Deprecated:</strong> Use {@link #categorizedCovariates()} instead
+     * to specify both key and category.
+     *
+     * <p>Covariates declared here are treated as having {@link CovariateCategory#INFRASTRUCTURE}
+     * category (soft match with warning on mismatch).
      *
      * <p>Custom covariates are resolved from (in order):
      * <ol>
@@ -183,7 +189,41 @@ public @interface UseCase {
      * }</pre>
      *
      * @return array of custom covariate keys (empty by default)
+     * @see #categorizedCovariates()
      */
     String[] customCovariates() default {};
+
+    /**
+     * Custom covariates with explicit categories.
+     *
+     * <p>Use this to declare custom covariates with their matching semantics:
+     * <ul>
+     *   <li>{@link CovariateCategory#CONFIGURATION}: Hard gate — fails if no match</li>
+     *   <li>{@link CovariateCategory#TEMPORAL}: Soft match with temporal-specific warning</li>
+     *   <li>{@link CovariateCategory#INFRASTRUCTURE}: Soft match with infrastructure warning</li>
+     *   <li>{@link CovariateCategory#EXTERNAL_DEPENDENCY}: Soft match for external services</li>
+     *   <li>{@link CovariateCategory#DATA_STATE}: Soft match for data context</li>
+     *   <li>{@link CovariateCategory#INFORMATIONAL}: Ignored in matching, for traceability only</li>
+     * </ul>
+     *
+     * <h3>Example</h3>
+     * <pre>{@code
+     * @UseCase(
+     *     value = "shopping.product.search",
+     *     covariates = { StandardCovariate.TIME_OF_DAY },
+     *     categorizedCovariates = {
+     *         @Covariate(key = "llm_model", category = CovariateCategory.CONFIGURATION),
+     *         @Covariate(key = "prompt_version", category = CovariateCategory.CONFIGURATION),
+     *         @Covariate(key = "run_id", category = CovariateCategory.INFORMATIONAL)
+     *     }
+     * )
+     * public class ShoppingUseCase { }
+     * }</pre>
+     *
+     * @return array of categorized covariates (empty by default)
+     * @see Covariate
+     * @see CovariateCategory
+     */
+    Covariate[] categorizedCovariates() default {};
 }
 

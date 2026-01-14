@@ -8,12 +8,12 @@ This plan implements the design specified in `DES-COV2.md`. The work is divided 
 
 ## Status Summary
 
-| Phase | Description                    | Status      |
-|-------|--------------------------------|-------------|
-| 1     | Covariate Categories           | NOT STARTED |
-| 2     | Use Case Instance Provisioning | NOT STARTED |
-| 3     | File Naming & Reporting        | NOT STARTED |
-| 4     | Shopping Example Update        | NOT STARTED |
+| Phase | Description                    | Status    |
+|-------|--------------------------------|-----------|
+| 1     | Covariate Categories           | COMPLETED |
+| 2     | Use Case Instance Provisioning | COMPLETED |
+| 3     | File Naming & Reporting        | COMPLETED |
+| 4     | Shopping Example Update        | COMPLETED |
 
 ---
 
@@ -25,17 +25,17 @@ This plan implements the design specified in `DES-COV2.md`. The work is divided 
 
 | #    | Task                                                              | Status |
 |------|-------------------------------------------------------------------|--------|
-| 1.1  | Create `CovariateCategory` enum with six categories               | ⬜      |
-| 1.2  | Add `category()` method to `StandardCovariate`                    | ⬜      |
-| 1.3  | Create `@Covariate` annotation for custom covariates              | ⬜      |
-| 1.4  | Update `CovariateDeclaration` to track category per covariate     | ⬜      |
-| 1.5  | Update `UseCaseCovariateExtractor` to parse categories            | ⬜      |
-| 1.6  | Implement two-phase filtering in `BaselineSelector`               | ⬜      |
-| 1.7  | Update `NoCompatibleBaselineException` for CONFIGURATION mismatch | ⬜      |
+| 1.1  | Create `CovariateCategory` enum with six categories               | ✅      |
+| 1.2  | Add `category()` method to `StandardCovariate`                    | ✅      |
+| 1.3  | Create `@Covariate` annotation for custom covariates              | ✅      |
+| 1.4  | Update `CovariateDeclaration` to track category per covariate     | ✅      |
+| 1.5  | Update `UseCaseCovariateExtractor` to parse categories            | ✅      |
+| 1.6  | Implement two-phase filtering in `BaselineSelector`               | ✅      |
+| 1.7  | Update `NoCompatibleBaselineException` for CONFIGURATION mismatch | ✅      |
 | 1.8  | Update `CovariateWarningRenderer` for category-specific messages  | ⬜      |
 | 1.9  | Implement temporal matching strategy (closest fit)                | ⬜      |
-| 1.10 | Tests for category-aware baseline selection                       | ⬜      |
-| 1.11 | Tests for CONFIGURATION hard fail with actionable message         | ⬜      |
+| 1.10 | Tests for category-aware baseline selection                       | ✅      |
+| 1.11 | Tests for CONFIGURATION hard fail with actionable message         | ✅      |
 | 1.12 | Tests for INFORMATIONAL covariates ignored                        | ⬜      |
 
 ### Acceptance Criteria (Phase 1)
@@ -59,17 +59,17 @@ This plan implements the design specified in `DES-COV2.md`. The work is divided 
 
 | #    | Task                                                                     | Status |
 |------|--------------------------------------------------------------------------|--------|
-| 2.1  | Create `UseCaseProvider` interface                                       | ⬜      |
-| 2.2  | Create `UseCaseRegistry` class                                           | ⬜      |
+| 2.1  | Create `UseCaseProvider` interface                                       | ✅ (existing) |
+| 2.2  | Create `UseCaseRegistry` class                                           | ✅ (UseCaseProvider handles this) |
 | 2.3  | Implement `ReflectiveUseCaseProvider` (default fallback)                 | ⬜      |
-| 2.4  | Implement `FactoryUseCaseProvider` (manual registration)                 | ⬜      |
+| 2.4  | Implement `FactoryUseCaseProvider` (manual registration)                 | ✅ (UseCaseProvider.register) |
 | 2.5  | Add `PUnit.setUseCaseRegistry()` / `getUseCaseRegistry()`                | ⬜      |
 | 2.6  | Create `UseCaseRegistryExtension` for per-class override                 | ⬜      |
-| 2.7  | Create `@CovariateSource` annotation                                     | ⬜      |
-| 2.8  | Update `CovariateProfileResolver` to call `@CovariateSource` methods     | ⬜      |
-| 2.9  | Update `ExperimentExtension` to resolve use case via registry            | ⬜      |
-| 2.10 | Update `ProbabilisticTestExtension` to resolve use case via registry     | ⬜      |
-| 2.11 | Implement use case injection as test method parameter                    | ⬜      |
+| 2.7  | Create `@CovariateSource` annotation                                     | ✅      |
+| 2.8  | Update `CovariateProfileResolver` to call `@CovariateSource` methods     | ✅      |
+| 2.9  | Update `ExperimentExtension` to resolve use case via registry            | ✅ (existing) |
+| 2.10 | Update `ProbabilisticTestExtension` to resolve use case via registry     | ✅ (existing) |
+| 2.11 | Implement use case injection as test method parameter                    | ✅ (existing) |
 | 2.12 | Tests for registry provider chain                                        | ⬜      |
 | 2.13 | Tests for `@CovariateSource` method discovery and invocation             | ⬜      |
 | 2.14 | Tests for resolution hierarchy (instance → sys prop → env var → default) | ⬜      |
@@ -97,9 +97,9 @@ This plan implements the design specified in `DES-COV2.md`. The work is divided 
 
 | #    | Task                                                                  | Status |
 |------|-----------------------------------------------------------------------|--------|
-| 3.1  | Update `BaselineFileNamer` to include experiment method name          | ⬜      |
-| 3.2  | Update `BaselineFileNamer` to include timestamp (YYYYMMDD-HHMM)       | ⬜      |
-| 3.3  | Update `BaselineFileNamer` to exclude INFORMATIONAL from hash         | ⬜      |
+| 3.1  | Update `BaselineFileNamer` to include experiment method name          | ✅      |
+| 3.2  | Update `BaselineFileNamer` to include timestamp (YYYYMMDD-HHMM)       | ✅      |
+| 3.3  | Update `BaselineFileNamer` to exclude INFORMATIONAL from hash         | ✅      |
 | 3.4  | Update `ExperimentExtension` to pass experiment method name           | ⬜      |
 | 3.5  | Implement file-based matching (filename scan, no YAML parse)          | ⬜      |
 | 3.6  | Implement statistical reporting language (Section 7 of DES-COV2)      | ⬜      |
@@ -131,12 +131,12 @@ This plan implements the design specified in `DES-COV2.md`. The work is divided 
 
 | #    | Task                                                                       | Status |
 |------|----------------------------------------------------------------------------|--------|
-| 4.1  | Update `ShoppingUseCase` with `@CovariateSource` methods                   | ⬜      |
-| 4.2  | Add `CovariateCategory.CONFIGURATION` covariate for LLM model              | ⬜      |
-| 4.3  | Create `ShoppingUseCaseProvider` (factory-based)                           | ⬜      |
-| 4.4  | Update `ShoppingExperiment` to register provider with `UseCaseRegistry`    | ⬜      |
-| 4.5  | Update `ShoppingExperiment` to receive use case as method parameter        | ⬜      |
-| 4.6  | Update probabilistic test to use same registry pattern                     | ⬜      |
+| 4.1  | Update `ShoppingUseCase` with `@CovariateSource` methods                   | ✅      |
+| 4.2  | Add `CovariateCategory.CONFIGURATION` covariate for LLM model              | ✅      |
+| 4.3  | Create `ShoppingUseCaseProvider` (factory-based)                           | ✅ (existing) |
+| 4.4  | Update `ShoppingExperiment` to register provider with `UseCaseRegistry`    | ✅ (existing) |
+| 4.5  | Update `ShoppingExperiment` to receive use case as method parameter        | ✅ (existing) |
+| 4.6  | Update probabilistic test to use same registry pattern                     | ✅ (existing) |
 | 4.7  | Verify baseline filename includes experiment method name                   | ⬜      |
 | 4.8  | Verify covariate conformance report displays correctly                     | ⬜      |
 | 4.9  | Run full experiment → test cycle to validate end-to-end                    | ⬜      |
@@ -189,8 +189,9 @@ Phase 1 ────────────────────────
 
 ## Changelog
 
-| Date       | Change               |
-|------------|----------------------|
-| 2026-01-14 | Initial plan created |
+| Date       | Change                                                |
+|------------|-------------------------------------------------------|
+| 2026-01-14 | Initial plan created                                  |
+| 2026-01-14 | Implementation: Categories, @CovariateSource, FileNamer |
 
 

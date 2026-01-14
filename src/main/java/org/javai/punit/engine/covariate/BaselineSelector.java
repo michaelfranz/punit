@@ -1,27 +1,34 @@
 package org.javai.punit.engine.covariate;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
+import org.javai.punit.api.CovariateCategory;
 import org.javai.punit.engine.covariate.BaselineSelectionTypes.BaselineCandidate;
 import org.javai.punit.engine.covariate.BaselineSelectionTypes.ConformanceDetail;
 import org.javai.punit.engine.covariate.BaselineSelectionTypes.CovariateScore;
 import org.javai.punit.engine.covariate.BaselineSelectionTypes.ScoredCandidate;
 import org.javai.punit.engine.covariate.BaselineSelectionTypes.SelectionResult;
+import org.javai.punit.model.CovariateDeclaration;
 import org.javai.punit.model.CovariateProfile;
 
 /**
  * Selects the best-matching baseline for a probabilistic test.
  *
- * <p>Selection algorithm:
+ * <p>Two-phase selection algorithm:
+ * <h3>Phase 1: Hard Gates</h3>
  * <ol>
- *   <li>Score each candidate by counting matching covariates</li>
+ *   <li>Filter by CONFIGURATION covariates (exact match required)</li>
+ *   <li>If no candidates remain, throw NoCompatibleBaselineException with guidance</li>
+ * </ol>
+ *
+ * <h3>Phase 2: Soft Matching</h3>
+ * <ol>
+ *   <li>Score remaining candidates by TEMPORAL, INFRASTRUCTURE, etc. covariates</li>
  *   <li>Rank by match count (more matches is better)</li>
- *   <li>Break ties using covariate declaration order (earlier covariates prioritized)</li>
- *   <li>Break remaining ties using recency (newer baseline preferred)</li>
- *   <li>Flag as ambiguous if top candidates have identical scores</li>
+ *   <li>Break ties using category priority, declaration order, recency</li>
+ *   <li>INFORMATIONAL covariates are ignored</li>
  * </ol>
  */
 public final class BaselineSelector {
@@ -45,26 +52,47 @@ public final class BaselineSelector {
     }
 
     /**
-     * Selects the best baseline from candidates.
+     * Selects the best baseline from candidates using category-aware matching.
      *
      * @param candidates baselines with matching footprint
      * @param testProfile the test's current covariate profile
+     * @param declaration the covariate declaration (for category info)
      * @return selection result including the chosen baseline and conformance info
+     * @throws NoCompatibleBaselineException if CONFIGURATION covariates don't match any baseline
      */
     public SelectionResult select(
             List<BaselineCandidate> candidates,
-            CovariateProfile testProfile) {
+            CovariateProfile testProfile,
+            CovariateDeclaration declaration) {
         
         Objects.requireNonNull(candidates, "candidates must not be null");
         Objects.requireNonNull(testProfile, "testProfile must not be null");
+        Objects.requireNonNull(declaration, "declaration must not be null");
 
         if (candidates.isEmpty()) {
             return SelectionResult.noMatch();
         }
 
-        // Score each candidate
-        var scored = candidates.stream()
-            .map(c -> new ScoredCandidate(c, score(c.covariateProfile(), testProfile)))
+        // Phase 1: Hard gate - filter by CONFIGURATION covariates
+        var configKeys = declaration.allKeys().stream()
+            .filter(key -> declaration.getCategory(key) == CovariateCategory.CONFIGURATION)
+            .toList();
+        
+        List<BaselineCandidate> configMatches = candidates;
+        if (!configKeys.isEmpty()) {
+            configMatches = candidates.stream()
+                .filter(c -> matchesConfigurationCovariates(c.covariateProfile(), testProfile, configKeys))
+                .toList();
+            
+            if (configMatches.isEmpty()) {
+                // Find what CONFIGURATION values are available for error message
+                throw buildConfigurationMismatchException(candidates, testProfile, configKeys);
+            }
+        }
+
+        // Phase 2: Soft matching - score by remaining covariates
+        var scored = configMatches.stream()
+            .map(c -> new ScoredCandidate(c, score(c.covariateProfile(), testProfile, declaration)))
             .sorted(this::compareScores)
             .toList();
 
@@ -80,17 +108,105 @@ public final class BaselineSelector {
         );
     }
 
-    private CovariateScore score(CovariateProfile baseline, CovariateProfile test) {
+    /**
+     * Legacy select method without category awareness.
+     *
+     * @param candidates baselines with matching footprint
+     * @param testProfile the test's current covariate profile
+     * @return selection result including the chosen baseline and conformance info
+     */
+    public SelectionResult select(
+            List<BaselineCandidate> candidates,
+            CovariateProfile testProfile) {
+        // Use empty declaration for backward compatibility (all covariates treated as INFRASTRUCTURE)
+        return select(candidates, testProfile, CovariateDeclaration.EMPTY);
+    }
+
+    private boolean matchesConfigurationCovariates(
+            CovariateProfile baseline, 
+            CovariateProfile test, 
+            List<String> configKeys) {
+        for (String key : configKeys) {
+            var baselineValue = baseline.get(key);
+            var testValue = test.get(key);
+            
+            if (baselineValue == null || testValue == null) {
+                return false;
+            }
+            
+            var matcher = matcherRegistry.getMatcher(key);
+            var result = matcher.match(baselineValue, testValue);
+            if (result != CovariateMatcher.MatchResult.CONFORMS) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private NoCompatibleBaselineException buildConfigurationMismatchException(
+            List<BaselineCandidate> candidates,
+            CovariateProfile testProfile,
+            List<String> configKeys) {
+        
+        // Build a descriptive footprint for error message
+        var testConfigSignature = new StringBuilder();
+        for (String key : configKeys) {
+            var testValue = testProfile.get(key);
+            testConfigSignature.append(key).append("=")
+                   .append(testValue != null ? testValue.toCanonicalString() : "<not set>")
+                   .append(" ");
+        }
+        
+        var availableFootprints = new ArrayList<String>();
+        var seen = new java.util.HashSet<String>();
+        for (var candidate : candidates) {
+            var configSignature = new StringBuilder();
+            for (String key : configKeys) {
+                var value = candidate.covariateProfile().get(key);
+                configSignature.append(key).append("=")
+                              .append(value != null ? value.toCanonicalString() : "<not set>")
+                              .append(" ");
+            }
+            var sig = configSignature.toString().trim();
+            if (seen.add(sig)) {
+                availableFootprints.add(sig);
+            }
+        }
+        
+        return NoCompatibleBaselineException.configurationMismatch(
+            "CONFIGURATION", 
+            testConfigSignature.toString().trim(), 
+            availableFootprints);
+    }
+
+    private CovariateScore score(CovariateProfile baseline, CovariateProfile test, CovariateDeclaration declaration) {
         var details = new ArrayList<ConformanceDetail>();
         int matchCount = 0;
 
         for (String key : baseline.orderedKeys()) {
+            var category = declaration.getCategory(key);
+            
+            // Skip INFORMATIONAL covariates in scoring
+            if (category == CovariateCategory.INFORMATIONAL) {
+                continue;
+            }
+            
+            // Skip CONFIGURATION covariates (already filtered in phase 1)
+            if (category == CovariateCategory.CONFIGURATION) {
+                var baselineValue = baseline.get(key);
+                var testValue = test.get(key);
+                // Add as CONFORMS since we already filtered
+                details.add(new ConformanceDetail(key, baselineValue, testValue, 
+                    CovariateMatcher.MatchResult.CONFORMS));
+                matchCount++;
+                continue;
+            }
+
             var baselineValue = baseline.get(key);
             var testValue = test.get(key);
 
             CovariateMatcher.MatchResult result;
             if (testValue == null) {
-                // Covariate not present in test profile - doesn't conform
                 result = CovariateMatcher.MatchResult.DOES_NOT_CONFORM;
                 testValue = new org.javai.punit.model.CovariateValue.StringValue("<missing>");
             } else {

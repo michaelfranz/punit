@@ -20,43 +20,49 @@ public enum StandardCovariate {
     /**
      * Weekday vs weekend classification.
      *
+     * <p><strong>Category:</strong> TEMPORAL
      * <p><strong>Resolution:</strong> Current date → "Mo-Fr" or "Sa-So"
      * <p><strong>Matching:</strong> Exact string match between baseline and test
      */
-    WEEKDAY_VERSUS_WEEKEND("weekday_vs_weekend"),
+    WEEKDAY_VERSUS_WEEKEND("weekday_vs_weekend", CovariateCategory.TEMPORAL),
 
     /**
      * Time of day window.
      *
+     * <p><strong>Category:</strong> TEMPORAL
      * <p><strong>Resolution:</strong> Experiment execution interval (start to end time with timezone)
      * <p><strong>Matching:</strong> Current time falls within baseline's recorded interval
      *
      * <p>The value is a time range (e.g., "14:30-14:45 Europe/London") representing
      * the window during which samples should ideally be taken for statistical robustness.
      */
-    TIME_OF_DAY("time_of_day"),
+    TIME_OF_DAY("time_of_day", CovariateCategory.TEMPORAL),
 
     /**
      * System timezone.
      *
+     * <p><strong>Category:</strong> INFRASTRUCTURE
      * <p><strong>Resolution:</strong> System default timezone
      * <p><strong>Matching:</strong> Exact string match
      */
-    TIMEZONE("timezone"),
+    TIMEZONE("timezone", CovariateCategory.INFRASTRUCTURE),
 
     /**
      * Deployment region.
      *
+     * <p><strong>Category:</strong> INFRASTRUCTURE
      * <p><strong>Resolution:</strong> System property {@code punit.region} or
      * environment variable {@code PUNIT_REGION}
      * <p><strong>Matching:</strong> Case-insensitive string match
      */
-    REGION("region");
+    REGION("region", CovariateCategory.INFRASTRUCTURE);
 
     private final String key;
+    private final CovariateCategory category;
 
-    StandardCovariate(String key) {
+    StandardCovariate(String key, CovariateCategory category) {
         this.key = key;
+        this.category = category;
     }
 
     /**
@@ -73,6 +79,23 @@ public enum StandardCovariate {
      */
     public String key() {
         return key;
+    }
+
+    /**
+     * Returns the category of this covariate.
+     *
+     * <p>The category determines matching behavior:
+     * <ul>
+     *   <li>TEMPORAL/INFRASTRUCTURE: Soft match with warnings</li>
+     *   <li>CONFIGURATION: Hard gate (not applicable to standard covariates)</li>
+     *   <li>INFORMATIONAL: Ignored in matching</li>
+     * </ul>
+     *
+     * @return the covariate category
+     * @see CovariateCategory
+     */
+    public CovariateCategory category() {
+        return category;
     }
 }
 

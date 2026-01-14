@@ -3,6 +3,9 @@ package org.javai.punit.examples.shopping.usecase;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.javai.punit.api.Covariate;
+import org.javai.punit.api.CovariateCategory;
+import org.javai.punit.api.CovariateSource;
 import org.javai.punit.api.FactorSetter;
 import org.javai.punit.api.StandardCovariate;
 import org.javai.punit.api.UseCase;
@@ -48,7 +51,13 @@ import org.javai.punit.model.UseCaseResult;
  * @see org.javai.punit.api.UseCaseProvider
  * @see UseCaseContract
  */
-@UseCase(covariates = { StandardCovariate.WEEKDAY_VERSUS_WEEKEND, StandardCovariate.TIME_OF_DAY, StandardCovariate.REGION })
+@UseCase(
+    covariates = { StandardCovariate.WEEKDAY_VERSUS_WEEKEND, StandardCovariate.TIME_OF_DAY, StandardCovariate.REGION },
+    categorizedCovariates = {
+        @Covariate(key = "llm_model", category = CovariateCategory.CONFIGURATION),
+        @Covariate(key = "temperature", category = CovariateCategory.CONFIGURATION)
+    }
+)
 public class ShoppingUseCase implements UseCaseContract {
 
     private ShoppingAssistant assistant;
@@ -80,9 +89,25 @@ public class ShoppingUseCase implements UseCaseContract {
 
     /**
      * Returns the model name for this use case configuration.
+     *
+     * <p>This method is annotated with {@code @CovariateSource} to provide the
+     * value for the "llm_model" covariate during baseline creation and test execution.
+     * This ensures that baselines are matched to tests using the same LLM model.
      */
+    @CovariateSource("llm_model")
     public String getModel() {
         return model;
+    }
+
+    /**
+     * Returns the temperature setting for this use case configuration.
+     *
+     * <p>This method is annotated with {@code @CovariateSource} to provide the
+     * value for the "temperature" covariate during baseline creation and test execution.
+     */
+    @CovariateSource("temperature")
+    public String getTemperatureAsString() {
+        return String.valueOf(temperature);
     }
 
     /**

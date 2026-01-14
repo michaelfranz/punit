@@ -1,8 +1,12 @@
 package org.javai.punit.engine.covariate;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
+import org.javai.punit.api.Covariate;
+import org.javai.punit.api.CovariateCategory;
 import org.javai.punit.api.StandardCovariate;
 import org.javai.punit.api.UseCase;
 import org.javai.punit.model.CovariateDeclaration;
@@ -27,13 +31,20 @@ public final class UseCaseCovariateExtractor {
         }
 
         StandardCovariate[] standard = annotation.covariates();
-        String[] custom = annotation.customCovariates();
+        String[] legacyCustom = annotation.customCovariates();
+        Covariate[] categorized = annotation.categorizedCovariates();
 
-        if (standard.length == 0 && custom.length == 0) {
+        if (standard.length == 0 && legacyCustom.length == 0 && categorized.length == 0) {
             return CovariateDeclaration.EMPTY;
         }
 
-        return new CovariateDeclaration(List.of(standard), List.of(custom));
+        // Convert @Covariate array to map
+        Map<String, CovariateCategory> categorizedMap = new HashMap<>();
+        for (Covariate cov : categorized) {
+            categorizedMap.put(cov.key(), cov.category());
+        }
+
+        return CovariateDeclaration.of(standard, legacyCustom, categorizedMap);
     }
 }
 

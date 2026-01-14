@@ -73,5 +73,17 @@ public interface CovariateResolutionContext {
      * @return the value, or empty if not set
      */
     Optional<String> getPunitEnvironment(String key);
+
+    /**
+     * Returns the use case instance for @CovariateSource method invocation.
+     *
+     * <p>If a use case instance is available, @CovariateSource methods
+     * on it can be invoked to resolve covariate values.
+     *
+     * @return the use case instance, or empty if not available
+     */
+    default Optional<Object> getUseCaseInstance() {
+        return Optional.empty();
+    }
 }
 

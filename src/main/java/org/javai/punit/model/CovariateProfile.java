@@ -150,6 +150,18 @@ public final class CovariateProfile {
         return hashes;
     }
 
+    /**
+     * Computes a hash for a single covariate key-value pair.
+     *
+     * @param key the covariate key
+     * @param value the covariate value
+     * @return 4-character hex hash
+     */
+    public String computeSingleValueHash(String key, CovariateValue value) {
+        var hash = sha256(key + "=" + value.toCanonicalString());
+        return hash.substring(0, Math.min(4, hash.length()));
+    }
+
     private static String sha256(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
