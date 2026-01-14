@@ -14,7 +14,7 @@ Of course, non-determinism has always existed. Network timeouts, race conditions
 
 ### The LLM Inflection Point
 
-Large Language Models fundamentally challenge this paradigm. Their non-determinism is not a bug to fix but an **intrinsic characteristic of the technology**. When a model uses a temperature > 0, or when slight prompt variations produce different outputs, this is the system working as designed. The same input genuinely produces different outputs, and the distribution of those outputs *is* the system's behavior.
+Large Language Models fundamentally challenge this paradigm. Their non-determinism is not a bug to fix but an **intrinsic characteristic of the technology**. Even with identical input parameters, a model will likely produce different outputs. This is the system working as designed. The same input genuinely produces different outputs, and the distribution of those outputs *is* the system's behavior.
 
 This represents a qualitative shift in the testing challenge:
 
