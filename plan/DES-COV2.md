@@ -201,11 +201,11 @@ For TEMPORAL covariates, the algorithm seeks the **closest fit** to the probabil
 
 #### TIME_OF_DAY Matching
 
-| Scenario | Match Result | Score |
-|----------|--------------|-------|
-| Test time falls **within** baseline window | `CONFORMS` | 3 |
-| Test time is **adjacent** to baseline window (within tolerance) | `PARTIALLY_CONFORMS` | 1 |
-| Test time is **distant** from baseline window | `DOES_NOT_CONFORM` | 0 |
+| Scenario                                                        | Match Result         | Score |
+|-----------------------------------------------------------------|----------------------|-------|
+| Test time falls **within** baseline window                      | `CONFORMS`           | 3     |
+| Test time is **adjacent** to baseline window (within tolerance) | `PARTIALLY_CONFORMS` | 1     |
+| Test time is **distant** from baseline window                   | `DOES_NOT_CONFORM`   | 0     |
 
 **Distance calculation:**
 ```
@@ -230,10 +230,10 @@ Distance to B: 2h 30m (to 14:00)
 
 #### WEEKDAY_VERSUS_WEEKEND Matching
 
-| Scenario | Match Result | Score |
-|----------|--------------|-------|
-| Same category (both weekday or both weekend) | `CONFORMS` | 3 |
-| Different category | `DOES_NOT_CONFORM` | 0 |
+| Scenario                                     | Match Result       | Score |
+|----------------------------------------------|--------------------|-------|
+| Same category (both weekday or both weekend) | `CONFORMS`         | 3     |
+| Different category                           | `DOES_NOT_CONFORM` | 0     |
 
 **Day proximity for tie-breaking:**
 
@@ -322,13 +322,13 @@ When both `TIME_OF_DAY` and `WEEKDAY_VERSUS_WEEKEND` are declared:
 
 ### 6.2 Component Breakdown
 
-| Component | Purpose | Example |
-|-----------|---------|---------|
-| `UseCaseId` | Group files by use case class | `ShoppingUseCase` |
-| `MethodName` | Distinguish experiment methods | `searchProducts` |
-| `YYYYMMDD-HHMM` | Temporal ordering (sortable) | `20260114-1030` |
-| `FootprintHash` | Hash of factors + covariate declaration | `a1b2` |
-| `CovHash1-CovHash2...` | Covariate value hashes (declaration order) | `c3d4-e5f6` |
+| Component              | Purpose                                    | Example           |
+|------------------------|--------------------------------------------|-------------------|
+| `UseCaseId`            | Group files by use case class              | `ShoppingUseCase` |
+| `MethodName`           | Distinguish experiment methods             | `searchProducts`  |
+| `YYYYMMDD-HHMM`        | Temporal ordering (sortable)               | `20260114-1030`   |
+| `FootprintHash`        | Hash of factors + covariate declaration    | `a1b2`            |
+| `CovHash1-CovHash2...` | Covariate value hashes (declaration order) | `c3d4-e5f6`       |
 
 ### 6.3 Examples
 
@@ -341,24 +341,24 @@ ShoppingUseCase.measureCart-20260114-1030-a1b2-c3d4-e5f6.yaml    ← Different m
 
 ### 6.4 Design Goals
 
-| Goal | How Achieved |
-|------|--------------|
-| **Grouped by use case** | `UseCaseId.` prefix ensures related files sort together |
-| **Multiple methods supported** | Method name included after use case ID |
-| **Temporal ordering** | Timestamp before hashes → alphabetical sort = chronological order |
-| **Diffable** | Sort by name, compare adjacent files to see progression |
-| **Unique by covariates** | Value hashes ensure distinct configurations create distinct files |
+| Goal                           | How Achieved                                                      |
+|--------------------------------|-------------------------------------------------------------------|
+| **Grouped by use case**        | `UseCaseId.` prefix ensures related files sort together           |
+| **Multiple methods supported** | Method name included after use case ID                            |
+| **Temporal ordering**          | Timestamp before hashes → alphabetical sort = chronological order |
+| **Diffable**                   | Sort by name, compare adjacent files to see progression           |
+| **Unique by covariates**       | Value hashes ensure distinct configurations create distinct files |
 
 ### 6.5 What Gets Hashed in Filename
 
-| Category            | In Filename Hash? | Rationale |
-|---------------------|-------------------|-----------|
-| CONFIGURATION       | ✅ Yes | Different config = different baseline |
-| TEMPORAL            | ✅ Yes | Different conditions = different baseline for selection |
-| INFRASTRUCTURE      | ✅ Yes | Different environment = different baseline |
-| EXTERNAL_DEPENDENCY | ✅ Yes | Different external state = different baseline |
-| DATA_STATE          | ✅ Yes | Different data context = different baseline |
-| **INFORMATIONAL**   | ❌ **No** | Traceability only; not used for baseline differentiation |
+| Category            | In Filename Hash? | Rationale                                                |
+|---------------------|-------------------|----------------------------------------------------------|
+| CONFIGURATION       | ✅ Yes             | Different config = different baseline                    |
+| TEMPORAL            | ✅ Yes             | Different conditions = different baseline for selection  |
+| INFRASTRUCTURE      | ✅ Yes             | Different environment = different baseline               |
+| EXTERNAL_DEPENDENCY | ✅ Yes             | Different external state = different baseline            |
+| DATA_STATE          | ✅ Yes             | Different data context = different baseline              |
+| **INFORMATIONAL**   | ❌ **No**          | Traceability only; not used for baseline differentiation |
 
 ### 6.6 Overwrite Behavior
 
@@ -531,30 +531,30 @@ BASELINE METADATA
 
 ### 7.5 Summary Table
 
-| Match State | Header | Tone | Interpretation Guidance |
-|-------------|--------|------|-------------------------|
-| Full | `COVARIATE CONFORMANCE: FULL` | Affirmative | "equivalent conditions" |
-| Partial | `COVARIATE CONFORMANCE: PARTIAL` | Neutral | "for evaluation" |
-| None found | `NO COMPATIBLE BASELINE` | Directive | Guides to EXPLORE/MEASURE |
+| Match State | Header                           | Tone        | Interpretation Guidance   |
+|-------------|----------------------------------|-------------|---------------------------|
+| Full        | `COVARIATE CONFORMANCE: FULL`    | Affirmative | "equivalent conditions"   |
+| Partial     | `COVARIATE CONFORMANCE: PARTIAL` | Neutral     | "for evaluation"          |
+| None found  | `NO COMPATIBLE BASELINE`         | Directive   | Guides to EXPLORE/MEASURE |
 
 ### 7.6 Phrasing Patterns by Category
 
-| Category | Mismatch Phrase | Factor Phrase |
-|----------|-----------------|---------------|
-| TEMPORAL | "executed outside the baseline's temporal window" | "Temporal factors may influence system behavior" |
-| INFRASTRUCTURE | "Infrastructure differs from baseline conditions" | "Resource availability and latency characteristics may vary" |
-| EXTERNAL_DEPENDENCY | "External dependency version differs from baseline" | "Third-party service behavior may have changed" |
-| DATA_STATE | "Data state differs from baseline conditions" | "Data volume or distribution may affect performance" |
+| Category            | Mismatch Phrase                                     | Factor Phrase                                                |
+|---------------------|-----------------------------------------------------|--------------------------------------------------------------|
+| TEMPORAL            | "executed outside the baseline's temporal window"   | "Temporal factors may influence system behavior"             |
+| INFRASTRUCTURE      | "Infrastructure differs from baseline conditions"   | "Resource availability and latency characteristics may vary" |
+| EXTERNAL_DEPENDENCY | "External dependency version differs from baseline" | "Third-party service behavior may have changed"              |
+| DATA_STATE          | "Data state differs from baseline conditions"       | "Data volume or distribution may affect performance"         |
 
 ### 7.7 Language to Avoid
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| "Test results may be invalid" | Prejudges interpretation | "Conditions differ" |
-| "Warning: mismatch detected" | Implies fault | "Covariate difference noted" |
-| "Baseline is stale" | Value judgment | "Baseline established under different conditions" |
-| "Results are unreliable" | Prejudges significance | "Evaluate in context of differences" |
-| "You should re-run" | Prescriptive | (Leave to evaluator) |
+| Avoid                         | Why                      | Use Instead                                       |
+|-------------------------------|--------------------------|---------------------------------------------------|
+| "Test results may be invalid" | Prejudges interpretation | "Conditions differ"                               |
+| "Warning: mismatch detected"  | Implies fault            | "Covariate difference noted"                      |
+| "Baseline is stale"           | Value judgment           | "Baseline established under different conditions" |
+| "Results are unreliable"      | Prejudges significance   | "Evaluate in context of differences"              |
+| "You should re-run"           | Prescriptive             | (Leave to evaluator)                              |
 
 ### 7.8 Example: Complete Report Section
 
@@ -774,28 +774,267 @@ public CovariateValue getBusinessHours() {
 
 ---
 
-## 10. Implementation Plan
+## 10. Use Case Instance Provisioning
 
-### 10.1 New Components
+### 10.1 The Problem
 
-| Component                     | Description                                          |
-|-------------------------------|------------------------------------------------------|
-| `CovariateCategory` enum      | Six categories as defined above                      |
-| `@Covariate` annotation       | For declaring custom covariates with category        |
-| `@CovariateSource` annotation | Marks instance methods that provide covariate values |
+To call `@CovariateSource` methods, PUnit needs a use case **instance**. But:
+- PUnit currently references only the use case **class** (`@Experiment(useCase = X.class)`)
+- The instance is created inside the experiment/test body
+- Different applications instantiate use cases differently (DI, manual, etc.)
 
-### 10.2 Modified Components
+### 10.2 Design Principle
 
-| Component                       | Changes                                         |
-|---------------------------------|-------------------------------------------------|
-| `StandardCovariate`             | Add `category()` method                         |
-| `CovariateDeclaration`          | Track category for each covariate               |
-| `CovariateResolverRegistry`     | Support `@CovariateSource` method discovery     |
-| `BaselineSelector`              | Two-phase algorithm with category-aware logic   |
-| `NoCompatibleBaselineException` | Distinguish footprint vs configuration mismatch |
-| `CovariateWarningRenderer`      | Category-specific warning messages              |
+**PUnit has no dependency on Spring, Guice, or any DI framework.**
 
-### 10.3 Test Coverage
+Integration with these frameworks is achieved through:
+- A simple `UseCaseProvider` interface (in PUnit core)
+- Framework-specific implementations (in user code)
+- Separate documentation for each framework
+
+### 10.3 UseCaseProvider Interface
+
+```java
+/**
+ * Provides use case instances for experiments and tests.
+ * Implementations vary by application architecture.
+ */
+public interface UseCaseProvider {
+    
+    /**
+     * Returns an instance of the specified use case class.
+     * The instance must be fully initialized (dependencies injected, etc.).
+     */
+    <T> T getInstance(Class<T> useCaseClass);
+    
+    /**
+     * Returns true if this provider can supply the given use case class.
+     */
+    boolean supports(Class<?> useCaseClass);
+}
+```
+
+### 10.4 UseCaseRegistry
+
+```java
+/**
+ * Registry of use case providers.
+ * PUnit consults this to obtain use case instances.
+ */
+public class UseCaseRegistry {
+    
+    private final List<UseCaseProvider> providers = new ArrayList<>();
+    
+    public UseCaseRegistry register(UseCaseProvider provider) {
+        providers.add(0, provider);  // Most recently added takes priority
+        return this;
+    }
+    
+    public <T> T getInstance(Class<T> useCaseClass) {
+        for (UseCaseProvider provider : providers) {
+            if (provider.supports(useCaseClass)) {
+                return provider.getInstance(useCaseClass);
+            }
+        }
+        throw new NoUseCaseProviderException(useCaseClass);
+    }
+    
+    /**
+     * Creates a registry with the reflective fallback provider.
+     */
+    public static UseCaseRegistry withDefaults() {
+        return new UseCaseRegistry()
+            .register(new ReflectiveUseCaseProvider());
+    }
+}
+```
+
+### 10.5 Built-in Providers
+
+#### ReflectiveUseCaseProvider (Default Fallback)
+
+```java
+public class ReflectiveUseCaseProvider implements UseCaseProvider {
+    
+    @Override
+    public <T> T getInstance(Class<T> useCaseClass) {
+        try {
+            return useCaseClass.getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new UseCaseInstantiationException(useCaseClass, e);
+        }
+    }
+    
+    @Override
+    public boolean supports(Class<?> useCaseClass) {
+        try {
+            useCaseClass.getDeclaredConstructor();
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+}
+```
+
+#### FactoryUseCaseProvider (Manual Registration)
+
+```java
+public class FactoryUseCaseProvider implements UseCaseProvider {
+    
+    private final Map<Class<?>, Supplier<?>> factories = new HashMap<>();
+    
+    public <T> FactoryUseCaseProvider register(Class<T> useCaseClass, Supplier<T> factory) {
+        factories.put(useCaseClass, factory);
+        return this;
+    }
+    
+    @Override
+    public <T> T getInstance(Class<T> useCaseClass) {
+        Supplier<?> factory = factories.get(useCaseClass);
+        if (factory == null) {
+            throw new NoUseCaseProviderException(useCaseClass);
+        }
+        return useCaseClass.cast(factory.get());
+    }
+    
+    @Override
+    public boolean supports(Class<?> useCaseClass) {
+        return factories.containsKey(useCaseClass);
+    }
+}
+```
+
+### 10.6 Global Registry Configuration
+
+The primary mechanism for configuring the registry is via a global static method:
+
+```java
+// In test setup, base test class, or @BeforeAll
+PUnit.setUseCaseRegistry(
+    UseCaseRegistry.withDefaults()
+        .register(new FactoryUseCaseProvider()
+            .register(ShoppingUseCase.class, () -> new ShoppingUseCase(mockLlm)))
+);
+```
+
+**Provider priority:** Providers are consulted in reverse registration order (most recent first). The `ReflectiveUseCaseProvider` (from `withDefaults()`) serves as a fallback.
+
+### 10.7 Per-Test Override (Optional)
+
+For fine-grained control, a test class may declare a registry field:
+
+```java
+@ExtendWith(PUnitExtension.class)
+public class ShoppingExperiment {
+    
+    @RegisterExtension
+    static UseCaseRegistryExtension registry = UseCaseRegistryExtension.builder()
+        .register(ShoppingUseCase.class, () -> new ShoppingUseCase(specialConfig))
+        .build();
+    
+    @Experiment(useCase = ShoppingUseCase.class)
+    void measureSearch(ShoppingUseCase uc, ResultCaptor captor) { ... }
+}
+```
+
+**Resolution order:**
+1. Check for `@RegisterExtension UseCaseRegistryExtension` in test class → use if present
+2. Fall back to global `PUnit.getUseCaseRegistry()`
+
+### 10.8 How PUnit Obtains the Instance
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  @Experiment(useCase = ShoppingUseCase.class)                       │
+│  void measureSearch(ShoppingUseCase uc, ResultCaptor captor)        │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────────┐
+                    │  PUnit resolves 'uc'    │
+                    │  parameter              │
+                    └────────────┬────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────┐
+                    │  UseCaseRegistry        │
+                    │  .getInstance(          │
+                    │    ShoppingUseCase)     │
+                    └────────────┬────────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              ▼                  ▼                  ▼
+       ┌────────────┐     ┌────────────┐     ┌────────────┐
+       │  Factory   │     │   (DI)     │     │ Reflective │
+       │  Provider  │     │  Provider  │     │  Provider  │
+       └────────────┘     └────────────┘     └────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────┐
+                    │  Use case instance      │
+                    │  (fully initialized)    │
+                    ├─────────────────────────┤
+                    │  → @CovariateSource     │
+                    │    methods callable     │
+                    │  → Functionality        │
+                    │    invokable            │
+                    └─────────────────────────┘
+```
+
+### 10.9 Framework Integration
+
+PUnit provides the interfaces. Users provide framework-specific implementations.
+
+| Framework | Implementation | Documentation |
+|-----------|----------------|---------------|
+| Spring Boot | `SpringUseCaseProvider` | `docs/USERGUIDE-SPRING.md` |
+| Google Guice | `GuiceUseCaseProvider` | `docs/USERGUIDE-GUICE.md` |
+| Plain Java | `FactoryUseCaseProvider` | (Core user guide) |
+
+### 10.10 Instance Lifecycle
+
+| Scope | Behavior | Use When |
+|-------|----------|----------|
+| Per-invocation | New instance for each sample | Stateless use cases, isolation needed |
+| Cached | Same instance reused | Expensive initialization, stateless |
+
+The `UseCaseProvider` implementation controls this. The `FactoryUseCaseProvider` creates per-invocation by default (calls supplier each time).
+
+---
+
+## 11. Implementation Plan
+
+### 11.1 New Components
+
+| Component                       | Description                                          |
+|---------------------------------|------------------------------------------------------|
+| `CovariateCategory` enum        | Six categories as defined above                      |
+| `@Covariate` annotation         | For declaring custom covariates with category        |
+| `@CovariateSource` annotation   | Marks instance methods that provide covariate values |
+| `UseCaseProvider` interface     | Abstraction for obtaining use case instances         |
+| `UseCaseRegistry` class         | Registry of providers, consulted by PUnit            |
+| `ReflectiveUseCaseProvider`     | Default provider using no-arg constructor            |
+| `FactoryUseCaseProvider`        | Provider with manual factory registration            |
+| `UseCaseRegistryExtension`      | JUnit extension for per-class registry override      |
+| `NoUseCaseProviderException`    | Thrown when no provider can supply a use case        |
+
+### 11.2 Modified Components
+
+| Component                       | Changes                                              |
+|---------------------------------|------------------------------------------------------|
+| `StandardCovariate`             | Add `category()` method                              |
+| `CovariateDeclaration`          | Track category for each covariate                    |
+| `CovariateResolverRegistry`     | Support `@CovariateSource` method discovery          |
+| `BaselineSelector`              | Two-phase algorithm with category-aware logic        |
+| `NoCompatibleBaselineException` | Distinguish footprint vs configuration mismatch      |
+| `CovariateWarningRenderer`      | Category-specific warning messages                   |
+| `PUnit` class                   | Add `setUseCaseRegistry()` / `getUseCaseRegistry()`  |
+| `ExperimentExtension`           | Resolve use case instance via registry               |
+| `ProbabilisticTestExtension`    | Resolve use case instance via registry               |
+| `BaselineFileNamer`             | Include experiment method name in filename           |
+
+### 11.3 Test Coverage
 
 - CONFIGURATION mismatch causes hard fail
 - Soft-match categories generate appropriate warnings
@@ -807,9 +1046,9 @@ public CovariateValue getBusinessHours() {
 
 ---
 
-## 11. Future Considerations
+## 12. Future Considerations
 
-### 11.1 Custom Matching Strategies
+### 12.1 Custom Matching Strategies
 
 Allow developers to specify matching behavior per covariate:
 ```java
@@ -820,7 +1059,7 @@ Allow developers to specify matching behavior per covariate:
 )
 ```
 
-### 11.2 Configuration Tolerance
+### 12.2 Configuration Tolerance
 
 For some CONFIGURATION covariates, minor variations might be acceptable:
 ```java
@@ -831,7 +1070,7 @@ For some CONFIGURATION covariates, minor variations might be acceptable:
 )
 ```
 
-### 11.3 Baseline Recommendation
+### 12.3 Baseline Recommendation
 
 When CONFIGURATION mismatch occurs, suggest the closest available baseline:
 ```
@@ -841,7 +1080,7 @@ Closest available: llm_model=gpt-3.5-turbo (1 version difference)
 
 ---
 
-## 12. Glossary Additions
+## 13. Glossary Additions
 
 | Term                       | Definition                                                                                |
 |----------------------------|-------------------------------------------------------------------------------------------|
@@ -851,10 +1090,12 @@ Closest available: llm_model=gpt-3.5-turbo (1 version difference)
 | **Configuration Mismatch** | When a CONFIGURATION-category covariate differs between test and all available baselines  |
 | **@CovariateSource**       | Annotation marking an instance method that provides a covariate's value                   |
 | **Resolution Hierarchy**   | The order in which covariate values are resolved: instance → sys prop → env var → default |
+| **UseCaseProvider**        | Interface for supplying use case instances; implementations vary by app architecture      |
+| **UseCaseRegistry**        | Central registry of providers; PUnit consults this to obtain use case instances           |
 
 ---
 
-## 13. Acceptance Criteria
+## 14. Acceptance Criteria
 
 ### Category-Aware Selection
 - [ ] `CovariateCategory` enum implemented with six categories
@@ -878,6 +1119,17 @@ Closest available: llm_model=gpt-3.5-turbo (1 version difference)
 - [ ] INFORMATIONAL covariates excluded from filename hash
 - [ ] Same filename → overwrite (newer baseline replaces older)
 - [ ] Multiple experiment methods produce distinct filenames
+
+### Use Case Instance Provisioning
+- [ ] `UseCaseProvider` interface implemented
+- [ ] `UseCaseRegistry` implemented with provider chain
+- [ ] `ReflectiveUseCaseProvider` implemented (default fallback)
+- [ ] `FactoryUseCaseProvider` implemented (manual registration)
+- [ ] `PUnit.setUseCaseRegistry()` / `getUseCaseRegistry()` static methods
+- [ ] `UseCaseRegistryExtension` for per-class override
+- [ ] `ExperimentExtension` obtains use case via registry
+- [ ] `ProbabilisticTestExtension` obtains use case via registry
+- [ ] Use case instance injected as test method parameter
 
 ### General
 - [ ] All existing tests continue to pass
