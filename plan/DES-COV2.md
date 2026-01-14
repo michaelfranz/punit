@@ -333,6 +333,25 @@ The **experiment method name** (not the use case method) appears in the filename
 - Factor variations within an experiment share a common prefix
 - Temporal sorting works within each experiment method
 
+### 6.8 File-Based Matching (Performance Optimization)
+
+The probabilistic test engine computes the same footprint and covariate value hashes that the experiment did. Because these values are encoded directly in the filename, the engine can perform **rapid baseline selection by scanning filenames alone**—without opening or parsing any YAML files.
+
+**Matching algorithm:**
+1. List files in specs directory matching `<UseCaseId>.*`
+2. Parse filenames to extract footprint hash and covariate hashes
+3. Filter candidates where footprint matches (exact)
+4. Filter candidates where CONFIGURATION covariate hashes match (hard gate)
+5. Score remaining candidates by covariate hash matches (soft match)
+6. Only open the best-matching file(s) to load baseline data
+
+**Benefits:**
+- **O(n) filename scans** instead of O(n) file reads + YAML parsing
+- Scales well with large baseline repositories
+- File contents only accessed for the selected baseline(s)
+
+**Note:** The timestamp in the filename is used for tie-breaking (prefer most recent) but does not participate in the matching algorithm itself.
+
 ---
 
 ## 7. Design Rationale
