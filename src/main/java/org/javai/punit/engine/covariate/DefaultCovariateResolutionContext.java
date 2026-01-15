@@ -18,6 +18,7 @@ public final class DefaultCovariateResolutionContext implements CovariateResolut
     private final Instant experimentEndTime;
     private final ZoneId systemTimezone;
     private final Map<String, String> punitEnvironment;
+    private final Object useCaseInstance;
 
     private DefaultCovariateResolutionContext(Builder builder) {
         this.now = builder.now != null ? builder.now : Instant.now();
@@ -25,6 +26,7 @@ public final class DefaultCovariateResolutionContext implements CovariateResolut
         this.experimentEndTime = builder.experimentEndTime;
         this.systemTimezone = builder.systemTimezone != null ? builder.systemTimezone : ZoneId.systemDefault();
         this.punitEnvironment = builder.punitEnvironment != null ? Map.copyOf(builder.punitEnvironment) : Map.of();
+        this.useCaseInstance = builder.useCaseInstance;
     }
 
     /**
@@ -83,6 +85,11 @@ public final class DefaultCovariateResolutionContext implements CovariateResolut
         return Optional.ofNullable(punitEnvironment.get(key));
     }
 
+    @Override
+    public Optional<Object> getUseCaseInstance() {
+        return Optional.ofNullable(useCaseInstance);
+    }
+
     /**
      * Builder for {@link DefaultCovariateResolutionContext}.
      */
@@ -92,6 +99,7 @@ public final class DefaultCovariateResolutionContext implements CovariateResolut
         private Instant experimentEndTime;
         private ZoneId systemTimezone;
         private Map<String, String> punitEnvironment;
+        private Object useCaseInstance;
 
         private Builder() {
         }
@@ -161,6 +169,17 @@ public final class DefaultCovariateResolutionContext implements CovariateResolut
          */
         public Builder punitEnvironment(Map<String, String> punitEnvironment) {
             this.punitEnvironment = punitEnvironment;
+            return this;
+        }
+
+        /**
+         * Sets the use case instance for @CovariateSource method invocation.
+         *
+         * @param useCaseInstance the use case instance
+         * @return this builder
+         */
+        public Builder useCaseInstance(Object useCaseInstance) {
+            this.useCaseInstance = useCaseInstance;
             return this;
         }
 

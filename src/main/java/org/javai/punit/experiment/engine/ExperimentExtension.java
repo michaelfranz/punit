@@ -934,9 +934,17 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
                     : Instant.now().minusSeconds(60); // fallback
                 Instant endTime = aggregator.getEndTime();
                 
+                // Get use case instance from provider for @CovariateSource resolution
+                Object useCaseInstance = null;
+                Optional<UseCaseProvider> providerOpt = findUseCaseProvider(context);
+                if (providerOpt.isPresent()) {
+                    useCaseInstance = providerOpt.get().getCurrentInstance(useCaseClass);
+                }
+                
                 DefaultCovariateResolutionContext resolutionContext = 
                     DefaultCovariateResolutionContext.builder()
                         .experimentTiming(startTime, endTime)
+                        .useCaseInstance(useCaseInstance)
                         .build();
                 
                 CovariateProfileResolver resolver = new CovariateProfileResolver();
