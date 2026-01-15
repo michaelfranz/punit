@@ -49,14 +49,22 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
         this(TransparentStatsConfig.supportsUnicode(), config.detailLevel());
     }
 
-    @Override
-    public String render(StatisticalExplanation explanation) {
+    /**
+     * Result of rendering containing title and body for PUnitReporter.
+     */
+    public record RenderResult(String title, String body) {}
+
+    /**
+     * Renders the explanation and returns title and body separately.
+     *
+     * @param explanation the statistical explanation to render
+     * @return a RenderResult containing title and body
+     */
+    public RenderResult renderForReporter(StatisticalExplanation explanation) {
+        String title = "STATISTICAL ANALYSIS: " + explanation.testName();
         StringBuilder sb = new StringBuilder();
 
-        // Header
-        renderHeader(sb, explanation.testName());
-
-        // Sections
+        // Sections (no header/footer - PUnitReporter handles those)
         renderHypothesisSection(sb, explanation.hypothesis());
         renderObservedDataSection(sb, explanation.observed());
         renderBaselineReferenceSection(sb, explanation.baseline());
@@ -64,9 +72,22 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
         renderVerdictSection(sb, explanation.verdict());
         renderProvenanceSection(sb, explanation.provenance());
 
-        // Footer
-        renderFooter(sb);
+        return new RenderResult(title, sb.toString().trim());
+    }
 
+    @Override
+    public String render(StatisticalExplanation explanation) {
+        RenderResult result = renderForReporter(explanation);
+        // For backwards compatibility, include a simple header
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n");
+        sb.append(symbols.singleLine(LINE_WIDTH)).append("\n");
+        sb.append(result.title()).append("\n");
+        sb.append(symbols.singleLine(LINE_WIDTH)).append("\n");
+        sb.append("\n");
+        sb.append(result.body());
+        sb.append("\n");
+        sb.append(symbols.singleLine(LINE_WIDTH)).append("\n");
         return sb.toString();
     }
 
@@ -85,18 +106,6 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
     // ═══════════════════════════════════════════════════════════════════════════
     // SECTION RENDERERS
     // ═══════════════════════════════════════════════════════════════════════════
-
-    private void renderHeader(StringBuilder sb, String testName) {
-        sb.append("\n");
-        sb.append(symbols.doubleLine(LINE_WIDTH)).append("\n");
-        sb.append("STATISTICAL ANALYSIS: ").append(testName).append("\n");
-        sb.append(symbols.doubleLine(LINE_WIDTH)).append("\n");
-        sb.append("\n");
-    }
-
-    private void renderFooter(StringBuilder sb) {
-        sb.append(symbols.doubleLine(LINE_WIDTH)).append("\n");
-    }
 
     private void renderHypothesisSection(StringBuilder sb, StatisticalExplanation.HypothesisStatement hypothesis) {
         sb.append("HYPOTHESIS TEST\n");

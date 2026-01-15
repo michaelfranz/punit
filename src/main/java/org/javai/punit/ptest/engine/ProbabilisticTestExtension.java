@@ -12,6 +12,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ProbabilisticTest;
@@ -44,7 +46,9 @@ import org.javai.punit.statistics.transparent.BaselineData;
 import org.javai.punit.statistics.transparent.ConsoleExplanationRenderer;
 import org.javai.punit.statistics.transparent.StatisticalExplanation;
 import org.javai.punit.statistics.transparent.StatisticalExplanationBuilder;
+import org.javai.punit.statistics.transparent.StatisticalExplanationBuilder.CovariateMisalignment;
 import org.javai.punit.statistics.transparent.TransparentStatsConfig;
+import org.javai.punit.reporting.PUnitReporter;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionConfigurationException;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -81,6 +85,10 @@ public class ProbabilisticTestExtension implements
 
 	private static final ExtensionContext.Namespace NAMESPACE =
 			ExtensionContext.Namespace.create(ProbabilisticTestExtension.class);
+
+	private static final Logger logger = LogManager.getLogger(ProbabilisticTestExtension.class);
+	private static final PUnitReporter reporter = new PUnitReporter();
+	private static final ProbabilisticTestValidator testValidator = new ProbabilisticTestValidator();
 
 	private static final String AGGREGATOR_KEY = "aggregator";
 	private static final String CONFIG_KEY = "config";
@@ -174,9 +182,14 @@ public class ProbabilisticTestExtension implements
 		ConfigurationResolver.ResolvedConfiguration resolved;
 		try {
 			resolved = configResolver.resolve(annotation, testMethod.getName());
+		} catch (ProbabilisticTestConfigurationException e) {
+			throw new ExtensionConfigurationException(e.getMessage(), e);
 		} catch (IllegalArgumentException e) {
 			throw new ExtensionConfigurationException(e.getMessage(), e);
 		}
+		
+		// Log configuration mode for clarity
+		logConfigurationMode(testMethod.getName(), resolved);
 
 		// Detect token charging mode
 		boolean hasTokenRecorderParam = hasTokenChargeRecorderParameter(testMethod);
@@ -320,7 +333,7 @@ public class ProbabilisticTestExtension implements
 					factorSourceAnnotation, testMethod.getDeclaringClass());
 		} catch (Exception e) {
 			// Could not resolve factor source - log warning and continue
-			System.err.println("Warning: Could not resolve factor source for consistency check: " + e.getMessage());
+			logger.warn("Warning: Could not resolve factor source for consistency check: {}", e.getMessage());
 			return;
 		}
 
@@ -344,10 +357,9 @@ public class ProbabilisticTestExtension implements
 
 		// Log the result
 		if (result.shouldWarn()) {
-			System.err.println(result.formatForLog());
+			logger.warn(result.formatForLog());
 		} else if (result.isMatch()) {
 			// Optionally log successful validation (can be verbose, so using debug-level equivalent)
-			// System.out.println(result.formatForLog());
 		}
 		// NOT_APPLICABLE results are silently ignored
 	}
@@ -863,30 +875,26 @@ public class ProbabilisticTestExtension implements
 		// Check if termination was due to budget exhaustion (regardless of FAIL vs EVALUATE_PARTIAL behavior)
 		boolean isBudgetExhausted = reason.map(TerminationReason::isBudgetExhaustion).orElse(false);
 
+		String title = passed ? "VERDICT: PASS" : "VERDICT: FAIL";
 		StringBuilder sb = new StringBuilder();
-		sb.append("\n");
-		sb.append("═══════════════════════════════════════════════════════════════\n");
-
+		sb.append(testName).append("\n");
 		if (passed) {
-			sb.append(String.format("PUnit PASSED: %s%n", testName));
-			sb.append(String.format("  Observed pass rate: %.1f%% (%d/%d) >= min pass rate: %.1f%%%n",
+			sb.append(String.format("Observed pass rate: %.1f%% (%d/%d) >= min pass rate: %.1f%%",
 					aggregator.getObservedPassRate() * 100,
 					aggregator.getSuccesses(),
 					aggregator.getSamplesExecuted(),
 					config.minPassRate() * 100));
 		} else if (isBudgetExhausted) {
-			sb.append(String.format("PUnit FAILED: %s%n", testName));
-			sb.append(String.format("  Samples executed: %d of %d (budget exhausted before completion)%n",
+			sb.append(String.format("Samples executed: %d of %d (budget exhausted before completion)%n",
 					aggregator.getSamplesExecuted(),
 					config.samples()));
-			sb.append(String.format("  Pass rate at termination: %.1f%% (%d/%d), required: %.1f%%%n",
+			sb.append(String.format("Pass rate at termination: %.1f%% (%d/%d), required: %.1f%%",
 					aggregator.getObservedPassRate() * 100,
 					aggregator.getSuccesses(),
 					aggregator.getSamplesExecuted(),
 					config.minPassRate() * 100));
 		} else {
-			sb.append(String.format("PUnit FAILED: %s%n", testName));
-			sb.append(String.format("  Observed pass rate: %.1f%% (%d/%d) < min pass rate: %.1f%%%n",
+			sb.append(String.format("Observed pass rate: %.1f%% (%d/%d) < min pass rate: %.1f%%",
 					aggregator.getObservedPassRate() * 100,
 					aggregator.getSuccesses(),
 					aggregator.getSamplesExecuted(),
@@ -898,26 +906,24 @@ public class ProbabilisticTestExtension implements
 
 		reason.filter(r -> r != TerminationReason.COMPLETED)
 				.ifPresent(r -> {
-					sb.append(String.format("  Termination: %s%n", r.getDescription()));
+					sb.append(String.format("%nTermination: %s", r.getDescription()));
 					String details = aggregator.getTerminationDetails();
 					if (details != null && !details.isEmpty()) {
-						sb.append(String.format("  Details: %s%n", details));
+						sb.append(String.format("%nDetails: %s", details));
 					}
 					// For IMPOSSIBILITY, show what was needed
 					if (r == TerminationReason.IMPOSSIBILITY) {
 						int required = (int) Math.ceil(config.samples() * config.minPassRate());
 						int remaining = config.samples() - aggregator.getSamplesExecuted();
 						int maxPossible = aggregator.getSuccesses() + remaining;
-						sb.append(String.format("  Analysis: Needed %d successes, maximum possible is %d%n",
+						sb.append(String.format("%nAnalysis: Needed %d successes, maximum possible is %d",
 								required, maxPossible));
 					}
 				});
 
-		sb.append(String.format("  Elapsed: %dms%n", aggregator.getElapsedMs()));
-		sb.append("═══════════════════════════════════════════════════════════════\n");
-
-		// Print to stdout for visibility
-		System.out.println(sb);
+		sb.append(String.format("%nElapsed: %dms", aggregator.getElapsedMs()));
+		// Log verdict summary
+		reporter.reportInfo(title, sb.toString());
 
 		// Print expiration warning if applicable
 		printExpirationWarning(context, config.hasTransparentStats());
@@ -949,10 +955,42 @@ public class ProbabilisticTestExtension implements
 			return;
 		}
 
-		String warning = ExpirationWarningRenderer.render(spec, status);
+		var warning = ExpirationWarningRenderer.renderWarning(spec, status);
 		if (!warning.isEmpty()) {
-			System.out.println(warning);
+			reporter.reportWarn(warning.title(), warning.body());
 		}
+	}
+
+	/**
+	 * Logs the configuration mode to make it crystal clear how PUnit is operating.
+	 *
+	 * <p>This log message appears at the start of test execution and explicitly states:
+	 * <ul>
+	 *   <li>Whether a spec is being used (and which one)</li>
+	 *   <li>Where the threshold is coming from</li>
+	 *   <li>Key configuration values</li>
+	 * </ul>
+	 */
+	private void logConfigurationMode(String testName, ConfigurationResolver.ResolvedConfiguration resolved) {
+		StringBuilder sb = new StringBuilder();
+		sb.append("Test: ").append(testName).append("\n");
+		
+		if (resolved.specId() != null) {
+			sb.append("Mode: SPEC-DRIVEN\n");
+			sb.append("Spec: ").append(resolved.specId()).append("\n");
+			sb.append("Threshold: ").append(String.format("%.1f%%", resolved.minPassRate() * 100));
+			sb.append(" (derived from baseline)\n");
+		} else {
+			sb.append("Mode: EXPLICIT THRESHOLD\n");
+			sb.append("Threshold: ").append(String.format("%.1f%%", resolved.minPassRate() * 100));
+			if (resolved.thresholdOrigin() != null && resolved.thresholdOrigin() != ThresholdOrigin.UNSPECIFIED) {
+				sb.append(" (").append(resolved.thresholdOrigin().name()).append(")");
+			}
+			sb.append("\n");
+		}
+		sb.append("Samples: ").append(resolved.samples());
+		
+		reporter.reportInfo("CONFIGURATION", sb.toString());
 	}
 
 	/**
@@ -985,13 +1023,16 @@ public class ProbabilisticTestExtension implements
 
 		StatisticalExplanationBuilder builder = new StatisticalExplanationBuilder();
 		
-		// Build the explanation based on whether we have statistical context
+		// Check for covariate misalignments
+		List<CovariateMisalignment> misalignments = extractMisalignments(context);
+		
+		// Build the explanation based on whether we have a spec (baseline data)
 		StatisticalExplanation explanation;
 		String thresholdOriginName = config.thresholdOrigin() != null ? config.thresholdOrigin().name() : "UNSPECIFIED";
-		if (config.hasStatisticalContext()) {
-			// Convert spec data to BaselineData (avoiding dependency on spec package from statistics)
-			BaselineData baseline = loadBaselineData(config.specId());
-			
+		BaselineData baseline = loadBaselineData(config.specId());
+		
+		if (baseline.hasData()) {
+			// Spec-driven mode: use baseline data for statistical context
 			explanation = builder.build(
 					testName,
 					aggregator.getSamplesExecuted(),
@@ -999,30 +1040,47 @@ public class ProbabilisticTestExtension implements
 					baseline,
 					config.minPassRate(),
 					passed,
-				config.confidence() != null ? config.confidence() : 0.95,
+					config.confidence() != null ? config.confidence() : 0.95,
 					thresholdOriginName,
-				config.contractRef()
-		);
-	} else {
-		// Inline threshold mode (no baseline spec)
-		explanation = builder.buildWithInlineThreshold(
-				testName,
-				aggregator.getSamplesExecuted(),
-				aggregator.getSuccesses(),
-				config.minPassRate(),
-				passed,
-				thresholdOriginName,
-				config.contractRef()
-		);
+					config.contractRef(),
+					misalignments
+			);
+		} else {
+			// Inline threshold mode (no baseline spec)
+			explanation = builder.buildWithInlineThreshold(
+					testName,
+					aggregator.getSamplesExecuted(),
+					aggregator.getSuccesses(),
+					config.minPassRate(),
+					passed,
+					thresholdOriginName,
+					config.contractRef()
+			);
 		}
 
 		// Render and print
 		ConsoleExplanationRenderer renderer = new ConsoleExplanationRenderer(config.transparentStats());
-		String rendered = renderer.render(explanation);
-		System.out.println(rendered);
+		var rendered = renderer.renderForReporter(explanation);
+		reporter.reportInfo(rendered.title(), rendered.body());
 
 		// Print expiration warning (verbose=true for transparent stats mode)
 		printExpirationWarning(context, true);
+	}
+	
+	/**
+	 * Extracts covariate misalignments from the selection result, if present.
+	 */
+	private List<CovariateMisalignment> extractMisalignments(ExtensionContext context) {
+		SelectionResult result = getSelectionResult(context);
+		if (result == null || !result.hasNonConformance()) {
+			return List.of();
+		}
+		return result.nonConformingDetails().stream()
+				.map(d -> new CovariateMisalignment(
+						d.covariateKey(),
+						d.baselineValue().toCanonicalString(),
+						d.testValue().toCanonicalString()))
+				.toList();
 	}
 
 	/**
@@ -1107,6 +1165,12 @@ public class ProbabilisticTestExtension implements
 				.orElse(null);
 	}
 
+	private ExtensionContext.Store getMethodStore(ExtensionContext context) {
+		return context.getParent()
+				.map(parent -> parent.getStore(NAMESPACE))
+				.orElse(context.getStore(NAMESPACE));
+	}
+
 	/**
 	 * Prepares baseline selection data for lazy covariate-aware selection.
 	 *
@@ -1184,9 +1248,10 @@ public class ProbabilisticTestExtension implements
 
 	/**
 	 * Resolves baseline selection lazily during the first sample invocation.
+	 * Also validates the test configuration after baseline selection.
 	 */
 	private void ensureBaselineSelected(ExtensionContext context) {
-		ExtensionContext.Store store = context.getStore(NAMESPACE);
+		ExtensionContext.Store store = getMethodStore(context);
 		SelectionResult existing = store.get(SELECTION_RESULT_KEY, SelectionResult.class);
 		if (existing != null) {
 			return;
@@ -1194,6 +1259,8 @@ public class ProbabilisticTestExtension implements
 
 		PendingBaselineSelection pending = store.get(PENDING_SELECTION_KEY, PendingBaselineSelection.class);
 		if (pending == null) {
+			// No pending selection - validate without baseline
+			validateTestConfiguration(context, null);
 			return;
 		}
 
@@ -1203,16 +1270,38 @@ public class ProbabilisticTestExtension implements
 			// Store the selected spec and selection result
 			store.put(SPEC_KEY, result.selected().spec());
 
-			// Log the selected baseline file for traceability
-			logSelectedBaseline(result.selected().filename(), pending.specId());
+			// Validate test configuration now that we have the selected baseline
+			validateTestConfiguration(context, result.selected().spec());
 
-			// Log warning if non-conforming covariates exist
-			if (result.hasNonConformance()) {
-				logCovariateNonConformanceWarning(result, pending.specId());
-			}
+			// Log baseline selection result (single consolidated report)
+			logBaselineSelectionResult(result, pending.specId());
 
 			return result;
 		}, SelectionResult.class);
+	}
+
+	/**
+	 * Validates the probabilistic test configuration using the selected baseline.
+	 *
+	 * @param context the extension context
+	 * @param selectedBaseline the selected baseline (null if none)
+	 * @throws ExtensionConfigurationException if validation fails
+	 */
+	private void validateTestConfiguration(ExtensionContext context, ExecutionSpecification selectedBaseline) {
+		Method testMethod = context.getRequiredTestMethod();
+		ProbabilisticTest annotation = testMethod.getAnnotation(ProbabilisticTest.class);
+		
+		if (annotation == null) {
+			return; // Not a probabilistic test
+		}
+		
+		ProbabilisticTestValidator.ValidationResult validation = 
+				testValidator.validate(annotation, selectedBaseline, testMethod.getName());
+		
+		if (!validation.valid()) {
+			String errors = String.join("\n\n", validation.errors());
+			throw new ExtensionConfigurationException(errors);
+		}
 	}
 
 	private SelectionResult performBaselineSelection(ExtensionContext context, PendingBaselineSelection pending) {
@@ -1250,13 +1339,51 @@ public class ProbabilisticTestExtension implements
 	}
 
 	/**
-	 * Logs the selected baseline file for traceability.
+	 * Logs the baseline selection result with appropriate title based on match quality.
+	 *
+	 * <p>Titles used:
+	 * <ul>
+	 *   <li>{@code BASELINE: MATCH FOUND} - All covariates match exactly</li>
+	 *   <li>{@code BASELINE: APPROXIMATE MATCH FOUND} - Some covariates differ</li>
+	 * </ul>
 	 */
-	private void logSelectedBaseline(String filename, String specId) {
-		System.out.println("\n┌─ BASELINE SELECTED ──────────────────────────────────────────────────────┐");
-		System.out.println("│ Use case: " + specId);
-		System.out.println("│ Baseline: " + filename);
-		System.out.println("└──────────────────────────────────────────────────────────────────────────┘\n");
+	private void logBaselineSelectionResult(SelectionResult result, String specId) {
+		boolean isApproximate = result.hasNonConformance() || result.ambiguous();
+		String title = isApproximate ? "BASELINE: APPROXIMATE MATCH FOUND" : "BASELINE: MATCH FOUND";
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("Use case: ").append(specId).append("\n");
+		sb.append("Baseline: ").append(result.selected().filename());
+
+		// Add non-conformance details if present
+		var nonConforming = result.nonConformingDetails();
+		if (!nonConforming.isEmpty()) {
+			sb.append("\n\nThe following covariates do not match the baseline:\n");
+			for (var detail : nonConforming) {
+				sb.append("  - ").append(detail.covariateKey());
+				sb.append(": baseline=").append(detail.baselineValue().toCanonicalString());
+				sb.append(", test=").append(detail.testValue().toCanonicalString());
+				sb.append("\n");
+			}
+			sb.append("\nStatistical comparison may be less reliable.\n");
+			sb.append("Consider running a new MEASURE experiment under current conditions.");
+		}
+
+		// Add ambiguity note if applicable
+		if (result.ambiguous()) {
+			if (!nonConforming.isEmpty()) {
+				sb.append("\n");
+			} else {
+				sb.append("\n\n");
+			}
+			sb.append("Note: Multiple equally-suitable baselines existed. Selection may be non-deterministic.");
+		}
+
+		if (isApproximate) {
+			reporter.reportWarn(title, sb.toString());
+		} else {
+			reporter.reportInfo(title, sb.toString());
+		}
 	}
 
 	/**
@@ -1321,35 +1448,6 @@ public class ProbabilisticTestExtension implements
 		}
 	}
 
-	/**
-	 * Logs a warning about covariate non-conformance.
-	 */
-	private void logCovariateNonConformanceWarning(SelectionResult result, String specId) {
-		var nonConforming = result.nonConformingDetails();
-		if (nonConforming.isEmpty()) {
-			return;
-		}
-
-		StringBuilder sb = new StringBuilder();
-		sb.append("\n┌─ COVARIATE NON-CONFORMANCE WARNING ─────────────────────────────────────┐\n");
-		sb.append("│ Baseline: ").append(result.selected().filename()).append("\n");
-		sb.append("│ Use case: ").append(specId).append("\n");
-		sb.append("├──────────────────────────────────────────────────────────────────────────┤\n");
-		sb.append("│ The following covariates do not match the baseline:                      \n");
-
-		for (var detail : nonConforming) {
-			sb.append("│   • ").append(detail.covariateKey()).append(":\n");
-			sb.append("│       baseline: ").append(detail.baselineValue().toCanonicalString()).append("\n");
-			sb.append("│       test:     ").append(detail.testValue().toCanonicalString()).append("\n");
-		}
-
-		sb.append("├──────────────────────────────────────────────────────────────────────────┤\n");
-		sb.append("│ Statistical comparison may be less reliable when covariates differ.      \n");
-		sb.append("│ Consider running a new MEASURE experiment under current conditions.      \n");
-		sb.append("└──────────────────────────────────────────────────────────────────────────┘\n");
-
-		System.err.println(sb);
-	}
 
 	/**
 	 * Applies pacing delay before sample execution if pacing is configured.
@@ -1384,7 +1482,7 @@ public class ProbabilisticTestExtension implements
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			// Don't fail the test, just log and continue
-			System.err.println("Pacing delay interrupted");
+			logger.warn("Pacing delay interrupted");
 		}
 	}
 

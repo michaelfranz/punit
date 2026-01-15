@@ -135,8 +135,8 @@ class ShoppingAssistantSpecExamplesTest {
     @ProbabilisticTest(
         useCase = ShoppingUseCase.class,
         samples = 30,
+        minPassRate = 0.95,  // TODO: Should be derived from selected baseline
         maxExampleFailures = 5
-        // minPassRate is derived from spec
     )
     @DisplayName("Should return valid JSON (spec-driven)")
     void shouldReturnValidJson(
@@ -170,8 +170,8 @@ class ShoppingAssistantSpecExamplesTest {
     @ProbabilisticTest(
         useCase = ShoppingUseCase.class,
         samples = 30,
+        minPassRate = 0.95,  // TODO: Should be derived from selected baseline
         maxExampleFailures = 3
-        // minPassRate is derived from spec
     )
     @DisplayName("Should return valid JSON (with configuration mismatch test)")
     void shouldReturnValidJsonExplicit(
@@ -217,8 +217,8 @@ class ShoppingAssistantSpecExamplesTest {
     @ProbabilisticTest(
         useCase = ShoppingUseCase.class,
         samples = 30,
+        minPassRate = 0.95,  // TODO: Should be derived from selected baseline
         maxExampleFailures = 5
-        // minPassRate is derived from spec
     )
     @DisplayName("Should pass all success criteria (spec-driven)")
     void shouldPassAllSuccessCriteria(
@@ -248,8 +248,8 @@ class ShoppingAssistantSpecExamplesTest {
     @ProbabilisticTest(
         useCase = ShoppingUseCase.class,
         samples = 25,
+        minPassRate = 0.95,  // TODO: Should be derived from selected baseline
         maxExampleFailures = 3
-        // minPassRate is derived from spec
     )
     @DisplayName("Should pass success criteria (spec-driven)")
     void shouldPassSuccessCriteriaExplicit(

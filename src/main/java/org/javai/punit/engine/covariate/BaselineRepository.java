@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import org.javai.punit.engine.covariate.BaselineSelectionTypes.BaselineCandidate;
 import org.javai.punit.model.CovariateProfile;
@@ -21,6 +23,8 @@ import org.javai.punit.spec.registry.SpecificationLoader;
  * matching a use case and filters by footprint.
  */
 public final class BaselineRepository {
+
+    private static final Logger logger = LogManager.getLogger(BaselineRepository.class);
 
     private final Path specsRoot;
 
@@ -91,7 +95,7 @@ public final class BaselineRepository {
                  .forEach(path -> loadCandidate(path, expectedFootprint, candidates));
         } catch (IOException e) {
             // Log warning but return empty list
-            System.err.println("Warning: Failed to scan specs directory: " + e.getMessage());
+            logger.warn("Warning: Failed to scan specs directory: {}", e.getMessage());
         }
 
         return candidates;
@@ -173,7 +177,7 @@ public final class BaselineRepository {
             
         } catch (Exception e) {
             // Skip files that fail to load
-            System.err.println("Warning: Failed to load baseline " + path + ": " + e.getMessage());
+            logger.warn("Warning: Failed to load baseline {}: {}", path, e.getMessage());
         }
     }
 

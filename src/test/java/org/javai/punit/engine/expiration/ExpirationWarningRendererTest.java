@@ -51,11 +51,10 @@ class ExpirationWarningRendererTest {
             var spec = createSpec(policy);
             var status = ExpirationStatus.expiringSoon(Duration.ofDays(7), 0.23);
             
-            String result = ExpirationWarningRenderer.render(spec, status);
+            var result = ExpirationWarningRenderer.renderWarning(spec, status);
             
-            assertThat(result)
-                .contains("Baseline expires soon")
-                .contains("7 days");
+            assertThat(result.title()).isEqualTo("BASELINE EXPIRES SOON");
+            assertThat(result.body()).contains("7 days");
         }
 
         @Test
@@ -75,21 +74,20 @@ class ExpirationWarningRendererTest {
         }
 
         @Test
-        @DisplayName("should render Expired with prominent box and remediation")
+        @DisplayName("should render Expired with prominent warning and remediation")
         void shouldRenderExpired() {
             var endTime = Instant.now().minus(Duration.ofDays(35));
             var policy = ExpirationPolicy.of(30, endTime);
             var spec = createSpec(policy);
             var status = ExpirationStatus.expired(Duration.ofDays(5));
             
-            String result = ExpirationWarningRenderer.render(spec, status);
+            var result = ExpirationWarningRenderer.renderWarning(spec, status);
             
-            assertThat(result)
-                .contains("BASELINE EXPIRED")
+            assertThat(result.title()).isEqualTo("BASELINE EXPIRED");
+            assertThat(result.body())
                 .contains("Validity period:    30 days")
                 .contains("5 days ago")
-                .contains("potentially stale empirical data")
-                .contains("════");  // Box characters
+                .contains("potentially stale empirical data");
         }
     }
 

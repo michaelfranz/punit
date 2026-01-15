@@ -1,6 +1,7 @@
 package org.javai.punit.ptest.engine;
 
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.spec.model.ExecutionSpecification;
 import org.javai.punit.statistics.OperationalApproach;
 
 import java.util.ArrayList;
@@ -34,6 +35,24 @@ import java.util.List;
  * @see ProbabilisticTest
  */
 public class OperationalApproachResolver {
+
+    private final ProbabilisticTestValidator validator;
+
+    /**
+     * Creates a resolver with a new validator instance.
+     */
+    public OperationalApproachResolver() {
+        this(new ProbabilisticTestValidator());
+    }
+
+    /**
+     * Creates a resolver with the specified validator (for testing).
+     *
+     * @param validator the validator to use
+     */
+    public OperationalApproachResolver(ProbabilisticTestValidator validator) {
+        this.validator = validator;
+    }
 
     /**
      * Result of resolving an operational approach.
@@ -79,14 +98,56 @@ public class OperationalApproachResolver {
      * @param hasSpec Whether a spec reference was provided
      * @return The resolved approach with computed values
      * @throws ProbabilisticTestConfigurationException if parameters are invalid
+     * @deprecated Use {@link #resolve(ProbabilisticTest, ExecutionSpecification, String)} instead
      */
+    @Deprecated
     public ResolvedApproach resolve(ProbabilisticTest annotation, boolean hasSpec) {
+        return resolveInternal(annotation, hasSpec);
+    }
+
+    /**
+     * Resolves the operational approach from annotation parameters with full validation.
+     *
+     * <p>This method first validates the configuration using {@link ProbabilisticTestValidator},
+     * then determines which operational approach to use.
+     *
+     * @param annotation The annotation to resolve
+     * @param selectedBaseline The selected baseline (null if none)
+     * @param testName The test method name (for error messages)
+     * @return The resolved approach with computed values
+     * @throws ProbabilisticTestConfigurationException if validation fails or parameters are invalid
+     */
+    public ResolvedApproach resolve(
+            ProbabilisticTest annotation,
+            ExecutionSpecification selectedBaseline,
+            String testName) {
+        
+        // Step 1: Validate using ProbabilisticTestValidator
+        ProbabilisticTestValidator.ValidationResult validation = 
+                validator.validate(annotation, selectedBaseline, testName);
+        
+        if (!validation.valid()) {
+            throw new ProbabilisticTestConfigurationException(
+                    formatValidationErrors(validation.errors()));
+        }
+        
+        // Step 2: Determine operational approach
+        boolean hasSpec = selectedBaseline != null;
+        return resolveInternal(annotation, hasSpec);
+    }
+
+    /**
+     * Internal resolution logic (shared by both resolve methods).
+     */
+    private ResolvedApproach resolveInternal(ProbabilisticTest annotation, boolean hasSpec) {
         // Detect which approach parameters are set
         boolean hasSampleSizeFirst = isValidDouble(annotation.thresholdConfidence());
         boolean hasConfidenceFirst = isConfidenceFirstComplete(annotation);
         boolean hasThresholdFirst = isValidDouble(annotation.minPassRate());
         
         // Check for partial Confidence-First (common mistake)
+        // Note: Also validated by ProbabilisticTestValidator, but kept here for
+        // backward compatibility with the deprecated resolve(annotation, hasSpec) method
         if (isConfidenceFirstPartial(annotation)) {
             throw createPartialConfidenceFirstError(annotation);
         }
@@ -111,6 +172,26 @@ public class OperationalApproachResolver {
             // Spec-less mode: only Threshold-First is valid
             return resolveSpeclessMode(annotation, hasSampleSizeFirst, hasConfidenceFirst, hasThresholdFirst);
         }
+    }
+
+    /**
+     * Formats validation errors into a single error message.
+     */
+    private String formatValidationErrors(List<String> errors) {
+        if (errors.size() == 1) {
+            return errors.get(0);
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("Multiple validation errors:\n\n");
+        for (int i = 0; i < errors.size(); i++) {
+            sb.append("─── Error ").append(i + 1).append(" ───\n");
+            sb.append(errors.get(i));
+            if (i < errors.size() - 1) {
+                sb.append("\n\n");
+            }
+        }
+        return sb.toString();
     }
 
     /**

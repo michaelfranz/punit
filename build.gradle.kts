@@ -71,11 +71,16 @@ dependencies {
     
     // Apache Commons Statistics - for statistical calculations (confidence intervals, distributions)
     implementation("org.apache.commons:commons-statistics-distribution:1.2")
+
+    // Log4j 2 - structured logging for runtime output
+    implementation("org.apache.logging.log4j:log4j-api:2.23.1")
+    runtimeOnly("org.apache.logging.log4j:log4j-core:2.23.1")
     
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.junit.platform:junit-platform-testkit")
     testImplementation("org.assertj:assertj-core:3.27.6")
+    testImplementation("org.apache.logging.log4j:log4j-core:2.23.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     
@@ -100,6 +105,12 @@ tasks.named("processExperimentResources") {
 
 tasks.named("processTestResources") {
     dependsOn("processExperimentResources")
+}
+
+tasks.processResources {
+    filesMatching("punit.properties") {
+        expand("version" to project.version)
+    }
 }
 
 tasks.test {

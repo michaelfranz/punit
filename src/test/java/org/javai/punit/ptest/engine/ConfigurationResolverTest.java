@@ -294,13 +294,13 @@ class ConfigurationResolverTest {
     }
 
     @Test
-    void usesDefaultMinPassRateWhenNaNAndNoUseCase() {
-        // When minPassRate is NaN and there's no useCase, should use default (0.95)
+    void throwsExceptionWhenNoMinPassRateAndNoUseCase() {
+        // When minPassRate is NaN and there's no useCase, should throw configuration error
         ProbabilisticTest annotation = createAnnotationWithNaNMinPassRate(100);
         
-        ConfigurationResolver.ResolvedConfiguration config = resolver.resolve(annotation, "testMethod");
-        
-        assertThat(config.minPassRate()).isEqualTo(ConfigurationResolver.DEFAULT_MIN_PASS_RATE);
+        assertThatThrownBy(() -> resolver.resolve(annotation, "testMethod"))
+                .isInstanceOf(ProbabilisticTestConfigurationException.class)
+                .hasMessageContaining("No Threshold Specified");
     }
 
     /**

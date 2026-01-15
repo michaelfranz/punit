@@ -1,6 +1,17 @@
 package org.javai.punit.ptest.engine;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.Appender;
+import org.apache.logging.log4j.core.Layout;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.logging.log4j.core.config.Property;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.javai.punit.api.ThresholdOrigin;
+import org.javai.punit.reporting.PUnitReporter;
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ProvenanceContractRefOnlyTest;
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ProvenanceEmpiricalSourceTest;
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ProvenancePolicySourceTest;
@@ -10,12 +21,15 @@ import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ProvenanceThreshol
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ProvenanceUnspecifiedTest;
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.ProvenanceWithBothTest;
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.AlwaysPassingTest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.testkit.engine.EngineTestKit;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,6 +46,38 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProvenanceTest {
 
     private static final String JUNIT_ENGINE_ID = "junit-jupiter";
+    private static final String PUNIT_REPORTER_LOGGER = PUnitReporter.class.getName();
+    
+    private TestAppender testAppender;
+    private LoggerConfig targetLoggerConfig;
+    
+    @BeforeEach
+    void setUp() {
+        LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
+        Configuration config = ctx.getConfiguration();
+        
+        // Get or create the PUnitReporter logger config
+        targetLoggerConfig = config.getLoggerConfig(PUNIT_REPORTER_LOGGER);
+        if (!targetLoggerConfig.getName().equals(PUNIT_REPORTER_LOGGER)) {
+            targetLoggerConfig = new LoggerConfig(PUNIT_REPORTER_LOGGER, Level.INFO, false);
+            config.addLogger(PUNIT_REPORTER_LOGGER, targetLoggerConfig);
+        }
+        
+        testAppender = new TestAppender("TestAppender");
+        testAppender.start();
+        targetLoggerConfig.addAppender(testAppender, Level.INFO, null);
+        ctx.updateLoggers();
+    }
+    
+    @AfterEach
+    void tearDown() {
+        if (testAppender != null) {
+            LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
+            targetLoggerConfig.removeAppender(testAppender.getName());
+            testAppender.stop();
+            ctx.updateLoggers();
+        }
+    }
 
     @Test
     void noProvenanceSet_verdictDoesNotIncludeProvenance() {
@@ -161,22 +207,44 @@ class ProvenanceTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Captures stdout output from running a test class.
+     * Captures Log4j output from running a test class.
      */
     private String captureTestOutput(Class<?> testClass) {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        testAppender.clear();
         
-        try {
-            System.setOut(new PrintStream(baos));
-            
-            EngineTestKit.engine(JUNIT_ENGINE_ID)
-                    .selectors(DiscoverySelectors.selectClass(testClass))
-                    .execute();
-            
-            return baos.toString();
-        } finally {
-            System.setOut(originalOut);
+        EngineTestKit.engine(JUNIT_ENGINE_ID)
+                .selectors(DiscoverySelectors.selectClass(testClass))
+                .execute();
+        
+        return testAppender.getOutput();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TEST APPENDER
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * A simple Log4j appender that captures log messages for testing.
+     */
+    private static class TestAppender extends AbstractAppender {
+        
+        private final List<String> messages = new ArrayList<>();
+        
+        protected TestAppender(String name) {
+            super(name, null, PatternLayout.createDefaultLayout(), true, Property.EMPTY_ARRAY);
+        }
+        
+        @Override
+        public void append(org.apache.logging.log4j.core.LogEvent event) {
+            messages.add(event.getMessage().getFormattedMessage());
+        }
+        
+        public void clear() {
+            messages.clear();
+        }
+        
+        public String getOutput() {
+            return String.join("\n", messages);
         }
     }
 }

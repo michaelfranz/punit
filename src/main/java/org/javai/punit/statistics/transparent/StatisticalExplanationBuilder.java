@@ -1,6 +1,7 @@
 package org.javai.punit.statistics.transparent;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.javai.punit.statistics.BinomialProportionEstimator;
 import org.javai.punit.statistics.ProportionEstimate;
@@ -30,6 +31,19 @@ public class StatisticalExplanationBuilder {
     public StatisticalExplanationBuilder(BinomialProportionEstimator estimator) {
         this.estimator = estimator;
     }
+
+    /**
+     * Represents a covariate misalignment between baseline and test conditions.
+     *
+     * @param covariateKey the name of the misaligned covariate
+     * @param baselineValue the covariate value in the baseline
+     * @param testValue the covariate value at test time
+     */
+    public record CovariateMisalignment(
+            String covariateKey,
+            String baselineValue,
+            String testValue
+    ) {}
 
     /**
      * Builds a complete statistical explanation.
@@ -79,12 +93,43 @@ public class StatisticalExplanationBuilder {
             double confidenceLevel,
             String thresholdOriginName,
             String contractRef) {
+        return build(testName, samples, successes, baseline, threshold, passed, confidenceLevel,
+                thresholdOriginName, contractRef, Collections.emptyList());
+    }
+
+    /**
+     * Builds a complete statistical explanation with provenance and covariate misalignment info.
+     *
+     * @param testName The name of the test
+     * @param samples Number of samples executed
+     * @param successes Number of successful samples
+     * @param baseline The baseline data (may be null or empty for legacy tests)
+     * @param threshold The pass/fail threshold
+     * @param passed Whether the test passed
+     * @param confidenceLevel The confidence level used (e.g., 0.95)
+     * @param thresholdOriginName The name of the threshold origin (e.g., "SLA", "SLO")
+     * @param contractRef Human-readable reference to the source document
+     * @param misalignments List of covariate misalignments (may be empty)
+     * @return A complete statistical explanation
+     */
+    public StatisticalExplanation build(
+            String testName,
+            int samples,
+            int successes,
+            BaselineData baseline,
+            double threshold,
+            boolean passed,
+            double confidenceLevel,
+            String thresholdOriginName,
+            String contractRef,
+            List<CovariateMisalignment> misalignments) {
 
         BaselineData effectiveBaseline = baseline != null ? baseline : BaselineData.empty();
         StatisticalExplanation.Provenance provenance = new StatisticalExplanation.Provenance(
                 thresholdOriginName != null ? thresholdOriginName : "UNSPECIFIED",
                 contractRef != null ? contractRef : ""
         );
+        List<CovariateMisalignment> effectiveMisalignments = misalignments != null ? misalignments : Collections.emptyList();
         
         return new StatisticalExplanation(
                 testName,
@@ -92,7 +137,8 @@ public class StatisticalExplanationBuilder {
                 buildObservedData(samples, successes),
                 buildBaselineReference(effectiveBaseline, threshold, confidenceLevel),
                 buildInference(samples, successes, confidenceLevel),
-                buildVerdict(passed, samples, successes, threshold, effectiveBaseline, confidenceLevel, thresholdOriginName),
+                buildVerdict(passed, samples, successes, threshold, effectiveBaseline, confidenceLevel, 
+                        thresholdOriginName, effectiveMisalignments),
                 provenance
         );
     }
@@ -308,6 +354,19 @@ public class StatisticalExplanationBuilder {
             BaselineData baseline,
             double confidenceLevel,
             String thresholdOriginName) {
+        return buildVerdict(passed, samples, successes, threshold, baseline, confidenceLevel,
+                thresholdOriginName, Collections.emptyList());
+    }
+
+    private StatisticalExplanation.VerdictInterpretation buildVerdict(
+            boolean passed,
+            int samples,
+            int successes,
+            double threshold,
+            BaselineData baseline,
+            double confidenceLevel,
+            String thresholdOriginName,
+            List<CovariateMisalignment> misalignments) {
 
         double observedRate = samples > 0 ? (double) successes / samples : 0.0;
         String technicalResult = passed ? "PASS" : "FAIL";
@@ -337,7 +396,7 @@ public class StatisticalExplanationBuilder {
                     framing.failText);
         }
 
-        List<String> caveats = buildCaveats(samples, observedRate, threshold);
+        List<String> caveats = buildCaveats(samples, observedRate, threshold, misalignments);
 
         return new StatisticalExplanation.VerdictInterpretation(
                 passed,
@@ -421,7 +480,30 @@ public class StatisticalExplanationBuilder {
     private record VerdictFraming(String passText, String failText) {}
 
     private List<String> buildCaveats(int samples, double observedRate, double threshold) {
+        return buildCaveats(samples, observedRate, threshold, Collections.emptyList());
+    }
+
+    private List<String> buildCaveats(int samples, double observedRate, double threshold,
+            List<CovariateMisalignment> misalignments) {
         List<String> caveats = new ArrayList<>();
+
+        // Covariate misalignment caveat (listed first as it affects baseline validity)
+        if (misalignments != null && !misalignments.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Covariate misalignment detected: the test conditions differ from the baseline. ");
+            sb.append("Misaligned covariates: ");
+            for (int i = 0; i < misalignments.size(); i++) {
+                if (i > 0) {
+                    sb.append(", ");
+                }
+                CovariateMisalignment m = misalignments.get(i);
+                sb.append(m.covariateKey());
+                sb.append(" (baseline=").append(m.baselineValue());
+                sb.append(", test=").append(m.testValue()).append(")");
+            }
+            sb.append(". Statistical comparison may be less reliable.");
+            caveats.add(sb.toString());
+        }
 
         // Sample size caveat
         if (samples < 30) {

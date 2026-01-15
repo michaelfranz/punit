@@ -13,7 +13,7 @@ import org.javai.punit.spec.model.ExecutionSpecification;
  *
  * <p>Produces formatted warning messages based on expiration status:
  * <ul>
- *   <li><strong>Expired</strong>: Prominent box format with remediation guidance</li>
+ *   <li><strong>Expired</strong>: Prominent warning with remediation guidance</li>
  *   <li><strong>Expiring imminently</strong>: Warning format with urgency</li>
  *   <li><strong>Expiring soon</strong>: Informational format</li>
  * </ul>
@@ -30,15 +30,27 @@ public final class ExpirationWarningRenderer {
     }
 
     /**
+     * Result of rendering an expiration warning.
+     *
+     * @param title the warning title for the PUnit header
+     * @param body the warning body content
+     */
+    public record WarningContent(String title, String body) {
+        public boolean isEmpty() {
+            return title == null || title.isEmpty();
+        }
+    }
+
+    /**
      * Renders an expiration warning for the given status.
      *
      * @param spec the execution specification containing the expiration policy
      * @param status the expiration status
-     * @return the rendered warning, or empty string if no warning is needed
+     * @return the rendered warning content, or empty content if no warning is needed
      */
-    public static String render(ExecutionSpecification spec, ExpirationStatus status) {
+    public static WarningContent renderWarning(ExecutionSpecification spec, ExpirationStatus status) {
         if (status == null || !status.requiresWarning()) {
-            return "";
+            return new WarningContent("", "");
         }
 
         return switch (status) {
@@ -48,67 +60,73 @@ public final class ExpirationWarningRenderer {
                 renderExpiringImminently(spec.getExpirationPolicy(), imminent);
             case ExpirationStatus.ExpiringSoon soon -> 
                 renderExpiringSoon(spec.getExpirationPolicy(), soon);
-            default -> "";
+            default -> new WarningContent("", "");
         };
+    }
+
+    /**
+     * Renders an expiration warning for the given status.
+     *
+     * @param spec the execution specification containing the expiration policy
+     * @param status the expiration status
+     * @return the rendered warning, or empty string if no warning is needed
+     * @deprecated Use {@link #renderWarning(ExecutionSpecification, ExpirationStatus)} instead
+     */
+    @Deprecated
+    public static String render(ExecutionSpecification spec, ExpirationStatus status) {
+        WarningContent content = renderWarning(spec, status);
+        if (content.isEmpty()) {
+            return "";
+        }
+        return content.title() + "\n" + content.body();
     }
 
     /**
      * Renders a prominent warning for an expired baseline.
      */
-    private static String renderExpired(ExpirationPolicy policy, ExpirationStatus.Expired status) {
-        return String.format("""
-            ════════════════════════════════════════════════════════════
-            ⚠️  BASELINE EXPIRED
-            ════════════════════════════════════════════════════════════
-            
+    private static WarningContent renderExpired(ExpirationPolicy policy, ExpirationStatus.Expired status) {
+        String body = String.format("""
             The baseline used for statistical inference has expired.
             
-              Baseline created:   %s
-              Validity period:    %d days
-              Expiration date:    %s
-              Expired:            %s ago
+            Baseline created:   %s
+            Validity period:    %d days
+            Expiration date:    %s
+            Expired:            %s ago
             
             Statistical inference is based on potentially stale empirical data.
-            Consider running a fresh MEASURE experiment to update the baseline.
-            
-            ════════════════════════════════════════════════════════════
-            """,
+            Consider running a fresh MEASURE experiment to update the baseline.""",
             formatInstant(policy.baselineEndTime()),
             policy.expiresInDays(),
             formatInstant(policy.expirationTime().orElse(null)),
             formatDuration(status.expiredAgo())
         );
+        return new WarningContent("BASELINE EXPIRED", body);
     }
 
     /**
      * Renders a warning for imminent expiration.
      */
-    private static String renderExpiringImminently(
+    private static WarningContent renderExpiringImminently(
             ExpirationPolicy policy, ExpirationStatus.ExpiringImminently status) {
-        return String.format("""
-            ⚠️  BASELINE EXPIRING IMMINENTLY
-            
+        String body = String.format("""
             Baseline expires in %s (on %s).
-            Schedule a MEASURE experiment to refresh the baseline.
-            """,
+            Schedule a MEASURE experiment to refresh the baseline.""",
             formatDuration(status.remaining()),
             formatInstant(policy.expirationTime().orElse(null))
         );
+        return new WarningContent("BASELINE EXPIRING IMMINENTLY", body);
     }
 
     /**
      * Renders an informational message for approaching expiration.
      */
-    private static String renderExpiringSoon(
+    private static WarningContent renderExpiringSoon(
             ExpirationPolicy policy, ExpirationStatus.ExpiringSoon status) {
-        return String.format("""
-            ℹ️  Baseline expires soon
-            
-            Baseline expires in %s (on %s).
-            """,
+        String body = String.format("Baseline expires in %s (on %s).",
             formatDuration(status.remaining()),
             formatInstant(policy.expirationTime().orElse(null))
         );
+        return new WarningContent("BASELINE EXPIRES SOON", body);
     }
 
     /**
@@ -153,4 +171,3 @@ public final class ExpirationWarningRenderer {
         return instant.atZone(ZoneId.systemDefault()).format(DATE_FORMATTER);
     }
 }
-

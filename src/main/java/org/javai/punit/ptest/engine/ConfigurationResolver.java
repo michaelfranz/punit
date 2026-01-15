@@ -2,6 +2,8 @@ package org.javai.punit.ptest.engine;
 
 import java.lang.reflect.Method;
 import java.util.Optional;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ProbabilisticTest;
@@ -28,6 +30,8 @@ import org.javai.punit.spec.registry.SpecificationRegistry;
  * without code changes.
  */
 public class ConfigurationResolver {
+
+    private static final Logger logger = LogManager.getLogger(ConfigurationResolver.class);
 
     // System property names
     public static final String PROP_SAMPLES = "punit.samples";
@@ -133,11 +137,49 @@ public class ConfigurationResolver {
             } else if (envValue != null && !envValue.isEmpty()) {
                 minPassRate = Double.parseDouble(envValue.trim());
             } else if (hasSpec) {
-                // Try to load minPassRate from spec
+                // Spec-driven mode: load minPassRate from spec (fail if not found)
                 minPassRate = loadMinPassRateFromSpec(specIdOpt.get());
             } else {
-                // Legacy mode (no spec): use default
-                minPassRate = DEFAULT_MIN_PASS_RATE;
+                // No explicit threshold AND no spec → configuration error
+                throw new ProbabilisticTestConfigurationException(String.format("""
+                    
+                    ═══════════════════════════════════════════════════════════════════════════
+                    ❌ PROBABILISTIC TEST CONFIGURATION ERROR: No Threshold Specified
+                    ═══════════════════════════════════════════════════════════════════════════
+                    
+                    Test: %s
+                    
+                    @ProbabilisticTest requires you to specify how to determine the pass/fail
+                    threshold. You have two options:
+                    
+                    ───────────────────────────────────────────────────────────────────────────
+                    OPTION 1: Spec-Driven (Recommended)
+                    ───────────────────────────────────────────────────────────────────────────
+                    
+                    Reference a use case that has baseline data. The threshold is derived
+                    automatically from empirical measurements.
+                    
+                    @ProbabilisticTest(
+                        useCase = MyUseCase.class,  // Spec provides threshold
+                        samples = 100
+                    )
+                    
+                    ───────────────────────────────────────────────────────────────────────────
+                    OPTION 2: Explicit Threshold (Spec-less)
+                    ───────────────────────────────────────────────────────────────────────────
+                    
+                    Specify an explicit minPassRate. Use this when you have a known SLA/SLO
+                    or when baseline data is not available.
+                    
+                    @ProbabilisticTest(
+                        samples = 100,
+                        minPassRate = 0.95,              // Explicit threshold
+                        thresholdOrigin = ThresholdOrigin.SLA,
+                        contractRef = "SLA-2024-001"
+                    )
+                    
+                    ═══════════════════════════════════════════════════════════════════════════
+                    """, contextName));
             }
         }
 
@@ -448,14 +490,72 @@ public class ConfigurationResolver {
      * Loads the minPassRate from a specification file.
      *
      * @param specId the specification ID (the use case ID)
-     * @return the minPassRate from the spec, or default if spec not found
+     * @return the minPassRate from the spec
      * @throws SpecificationIntegrityException if spec file fails integrity validation
+     * @throws ProbabilisticTestConfigurationException if spec not found or minPassRate invalid
      */
     private double loadMinPassRateFromSpec(String specId) {
-        return loadSpec(specId)
-                .map(ExecutionSpecification::getMinPassRate)
-                .filter(mpr -> mpr > 0 && mpr <= 1.0)
-                .orElse(DEFAULT_MIN_PASS_RATE);
+        ExecutionSpecification spec = loadSpec(specId)
+                .orElseThrow(() -> new ProbabilisticTestConfigurationException(String.format("""
+                    
+                    ═══════════════════════════════════════════════════════════════════════════
+                    ❌ SPECIFICATION NOT FOUND
+                    ═══════════════════════════════════════════════════════════════════════════
+                    
+                    A use case was specified but no matching spec file could be found.
+                    
+                    Use case ID: %s
+                    Expected spec file: punit-specs/%s.yaml
+                    
+                    ───────────────────────────────────────────────────────────────────────────
+                    WHY THIS MATTERS
+                    ───────────────────────────────────────────────────────────────────────────
+                    
+                    When you reference a use case without an explicit minPassRate, PUnit needs
+                    to load the spec file to derive the threshold from baseline data.
+                    
+                    ───────────────────────────────────────────────────────────────────────────
+                    HOW TO FIX
+                    ───────────────────────────────────────────────────────────────────────────
+                    
+                    Option 1: Create the spec file by running a MEASURE experiment
+                    
+                      @Experiment(mode = ExperimentMode.MEASURE)
+                      void measureBaseline(...) { ... }
+                    
+                    Option 2: Use an explicit threshold (spec-less mode)
+                    
+                      @ProbabilisticTest(
+                          samples = 100,
+                          minPassRate = 0.95  // Explicit threshold, no spec needed
+                      )
+                    
+                    ═══════════════════════════════════════════════════════════════════════════
+                    """, specId, specId)));
+        
+        double minPassRate = spec.getMinPassRate();
+        if (minPassRate <= 0 || minPassRate > 1.0) {
+            throw new ProbabilisticTestConfigurationException(String.format("""
+                    
+                    ═══════════════════════════════════════════════════════════════════════════
+                    ❌ INVALID SPEC: Missing or Invalid minPassRate
+                    ═══════════════════════════════════════════════════════════════════════════
+                    
+                    The spec file was found but does not contain a valid minPassRate.
+                    
+                    Spec ID: %s
+                    minPassRate in spec: %s
+                    
+                    The minPassRate must be a value between 0 (exclusive) and 1.0 (inclusive).
+                    
+                    This usually means the spec file was created without baseline data.
+                    Run a MEASURE experiment to generate baseline data and approve the results.
+                    
+                    ═══════════════════════════════════════════════════════════════════════════
+                    """, specId, minPassRate <= 0 ? "(not set)" : String.valueOf(minPassRate)));
+        }
+        
+        return minPassRate;
     }
 
     /**
@@ -483,7 +583,7 @@ public class ConfigurationResolver {
             return Optional.empty();
         } catch (Exception e) {
             // Log warning but don't fail
-            System.err.println("Warning: Failed to load spec " + specId + ": " + e.getMessage());
+            logger.warn("Warning: Failed to load spec {}: {}", specId, e.getMessage());
             return Optional.empty();
         }
     }

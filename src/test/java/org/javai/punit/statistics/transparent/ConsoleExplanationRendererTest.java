@@ -113,7 +113,8 @@ class ConsoleExplanationRendererTest {
             
             String output = renderer.render(explanation);
             
-            assertThat(output).contains("═");
+            // Uses single-line horizontal character for section dividers
+            assertThat(output).contains("─");
         }
 
         @Test

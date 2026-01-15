@@ -1,7 +1,8 @@
 package org.javai.punit.ptest.engine;
 
-import java.io.PrintStream;
 import java.time.Instant;
+
+import org.javai.punit.reporting.PUnitReporter;
 
 /**
  * Generates pre-flight reports for pacing-enabled test execution.
@@ -13,30 +14,27 @@ import java.time.Instant;
  *   <li>Estimated duration and completion time</li>
  *   <li>Feasibility warnings if constraints conflict</li>
  * </ul>
+ *
+ * <p>All output is delegated to {@link PUnitReporter} for consistent formatting.
  */
 public class PacingReporter {
 
-    private static final String BOX_TOP = "╔════════════════════════════════════════════════════════════════════╗";
-    private static final String BOX_DIVIDER = "╠════════════════════════════════════════════════════════════════════╣";
-    private static final String BOX_BOTTOM = "╚════════════════════════════════════════════════════════════════════╝";
-    private static final int BOX_WIDTH = 68; // Inner width (excluding borders and padding spaces)
-
-    private final PrintStream out;
+    private final PUnitReporter reporter;
 
     /**
-     * Creates a reporter that writes to System.out.
+     * Creates a reporter using the default PUnitReporter.
      */
     public PacingReporter() {
-        this(System.out);
+        this(new PUnitReporter());
     }
 
     /**
-     * Creates a reporter that writes to the specified stream.
+     * Creates a reporter using the specified PUnitReporter.
      *
-     * @param out the output stream
+     * @param reporter the reporter to use for output
      */
-    public PacingReporter(PrintStream out) {
-        this.out = out;
+    public PacingReporter(PUnitReporter reporter) {
+        this.reporter = reporter;
     }
 
     /**
@@ -49,66 +47,56 @@ public class PacingReporter {
      */
     public void printPreFlightReport(String testName, int samples, PacingConfiguration pacing, Instant startTime) {
         if (!pacing.hasPacing()) {
-            // No pacing configured - no report needed
             return;
         }
 
-        out.println();
-        out.println(BOX_TOP);
-        printLine("PUnit Test: " + truncate(testName, BOX_WIDTH - 12));
-        out.println(BOX_DIVIDER);
+        StringBuilder sb = new StringBuilder();
+        sb.append(testName).append("\n");
+        sb.append("Samples requested: ").append(samples).append("\n\n");
 
-        // Samples
-        printLine("Samples requested:     " + samples);
-
-        // Pacing constraints
-        printLine("Pacing constraints:");
+        sb.append("Pacing constraints:\n");
         if (pacing.maxRequestsPerMinute() > 0) {
-            printLine("  • Max requests/min:  " + formatNumber(pacing.maxRequestsPerMinute()) + " RPM");
+            sb.append("  • Max requests/min: ").append(formatNumber(pacing.maxRequestsPerMinute())).append(" RPM\n");
         }
         if (pacing.maxRequestsPerSecond() > 0) {
-            printLine("  • Max requests/sec:  " + formatNumber(pacing.maxRequestsPerSecond()) + " RPS");
+            sb.append("  • Max requests/sec: ").append(formatNumber(pacing.maxRequestsPerSecond())).append(" RPS\n");
         }
         if (pacing.maxRequestsPerHour() > 0) {
-            printLine("  • Max requests/hour: " + formatNumber(pacing.maxRequestsPerHour()) + " RPH");
+            sb.append("  • Max requests/hour: ").append(formatNumber(pacing.maxRequestsPerHour())).append(" RPH\n");
         }
         if (pacing.maxConcurrentRequests() > 1) {
-            printLine("  • Max concurrent:    " + pacing.maxConcurrentRequests());
+            sb.append("  • Max concurrent: ").append(pacing.maxConcurrentRequests()).append("\n");
         }
         if (pacing.minMsPerSample() > 0) {
-            printLine("  • Min delay/sample:  " + pacing.minMsPerSample() + "ms (explicit)");
+            sb.append("  • Min delay/sample: ").append(pacing.minMsPerSample()).append("ms (explicit)\n");
         } else if (pacing.effectiveMinDelayMs() > 0) {
-            printLine("  • Min delay/sample:  " + pacing.effectiveMinDelayMs() + "ms (" + pacing.delaySource() + ")");
+            sb.append("  • Min delay/sample: ").append(pacing.effectiveMinDelayMs()).append("ms (").append(pacing.delaySource()).append(")\n");
         }
 
-        out.println(BOX_DIVIDER);
-
-        // Computed execution plan
-        printLine("Computed execution plan:");
+        sb.append("\nComputed execution plan:\n");
         if (pacing.isConcurrent()) {
-            printLine("  • Concurrency:         " + pacing.effectiveConcurrency() + " workers");
+            sb.append("  • Concurrency: ").append(pacing.effectiveConcurrency()).append(" workers\n");
         } else {
-            printLine("  • Concurrency:         sequential");
+            sb.append("  • Concurrency: sequential\n");
         }
         if (pacing.effectiveMinDelayMs() > 0) {
             if (pacing.isConcurrent()) {
                 long perWorkerDelay = pacing.effectiveMinDelayMs() * pacing.effectiveConcurrency();
-                printLine("  • Inter-request delay: " + perWorkerDelay + "ms per worker (staggered)");
+                sb.append("  • Inter-request delay: ").append(perWorkerDelay).append("ms per worker (staggered)\n");
             } else {
-                printLine("  • Inter-request delay: " + pacing.effectiveMinDelayMs() + "ms");
+                sb.append("  • Inter-request delay: ").append(pacing.effectiveMinDelayMs()).append("ms\n");
             }
         }
-        printLine("  • Effective throughput: " + pacing.formattedThroughput());
-        printLine("  • Estimated duration:  " + pacing.formattedDuration());
+        sb.append("  • Effective throughput: ").append(pacing.formattedThroughput()).append("\n");
+        sb.append("  • Estimated duration: ").append(pacing.formattedDuration()).append("\n");
 
         Instant completionTime = pacing.estimatedCompletionTime(startTime);
-        printLine("  • Estimated completion: " + pacing.formatTime(completionTime));
+        sb.append("  • Estimated completion: ").append(pacing.formatTime(completionTime)).append("\n");
 
-        out.println(BOX_DIVIDER);
-        printLine("Started: " + pacing.formatTime(startTime));
-        printLine("Proceeding with execution...");
-        out.println(BOX_BOTTOM);
-        out.println();
+        sb.append("\nStarted: ").append(pacing.formatTime(startTime)).append("\n");
+        sb.append("Proceeding with execution...");
+
+        reporter.reportInfo("EXECUTION PLAN", sb.toString());
     }
 
     /**
@@ -124,43 +112,23 @@ public class PacingReporter {
         }
 
         if (pacing.estimatedDurationMs() > timeBudgetMs) {
-            out.println();
-            out.println("⚠ WARNING: Pacing conflict detected");
-            out.printf("  • %d samples at current pacing would take ~%s%n",
-                    samples, pacing.formattedDuration());
-            out.printf("  • Time budget is %s (timeBudgetMs = %d)%n",
-                    formatDuration(timeBudgetMs), timeBudgetMs);
-            out.println("  • Options:");
+            StringBuilder sb = new StringBuilder();
+            sb.append("• ").append(samples).append(" samples at current pacing would take ~")
+              .append(pacing.formattedDuration()).append("\n");
+            sb.append("• Time budget is ").append(formatDuration(timeBudgetMs))
+              .append(" (timeBudgetMs = ").append(timeBudgetMs).append(")\n\n");
+            sb.append("Options:\n");
 
-            // Calculate how many samples would fit
             long estimatedPerSampleMs = pacing.estimatedDurationMs() / samples;
             if (estimatedPerSampleMs > 0) {
                 int maxSamples = (int) (timeBudgetMs / estimatedPerSampleMs);
-                out.printf("    1. Reduce sample count to ~%d%n", maxSamples);
+                sb.append("  1. Reduce sample count to ~").append(maxSamples).append("\n");
             }
-            out.printf("    2. Increase time budget to %s%n",
-                    formatDuration(pacing.estimatedDurationMs() + 10000)); // Add 10s buffer
-            out.println("    3. Relax pacing constraints (increase rate limits)");
-            out.println();
-        }
-    }
+            sb.append("  2. Increase time budget to ").append(formatDuration(pacing.estimatedDurationMs() + 10000)).append("\n");
+            sb.append("  3. Relax pacing constraints (increase rate limits)");
 
-    /**
-     * Prints a line within the box, padded appropriately.
-     */
-    private void printLine(String content) {
-        String truncated = truncate(content, BOX_WIDTH);
-        out.printf("║ %-" + BOX_WIDTH + "s ║%n", truncated);
-    }
-
-    /**
-     * Truncates a string to the specified length.
-     */
-    private String truncate(String s, int maxLength) {
-        if (s.length() <= maxLength) {
-            return s;
+            reporter.reportWarn("PACING CONFLICT", sb.toString());
         }
-        return s.substring(0, maxLength - 3) + "...";
     }
 
     /**
@@ -191,4 +159,3 @@ public class PacingReporter {
         }
     }
 }
-

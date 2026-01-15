@@ -41,24 +41,25 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <h2>Pre-Flight Report</h2>
  * <p>When pacing is configured, PUnit prints an execution plan before starting:
  * <pre>
- * ╔══════════════════════════════════════════════════════════════════╗
- * ║ PUnit Test: shouldReturnValidJsonWithRateLimit                   ║
- * ╠══════════════════════════════════════════════════════════════════╣
- * ║ Samples requested:     50                                        ║
- * ║ Pacing constraints:                                              ║
- * ║   • Max requests/min:  60 RPM                                    ║
- * ║   • Min delay/sample:  1000ms (derived from 60 RPM)              ║
- * ╠══════════════════════════════════════════════════════════════════╣
- * ║ Computed execution plan:                                         ║
- * ║   • Concurrency:         sequential                              ║
- * ║   • Inter-request delay: 1000ms                                  ║
- * ║   • Effective throughput: 60 samples/min                         ║
- * ║   • Estimated duration:  50s                                     ║
- * ║   • Estimated completion: 14:23:45                               ║
- * ╠══════════════════════════════════════════════════════════════════╣
- * ║ Started: 14:22:55                                                ║
- * ║ Proceeding with execution...                                     ║
- * ╚══════════════════════════════════════════════════════════════════╝
+ * ═ PUnit V0.1.0 ═══════════════════════════════════════════════════════════════
+ * PUnit Test: shouldReturnValidJsonWithRateLimit
+ *
+ * Samples requested: 50
+ *
+ * Pacing constraints:
+ *   • Max requests/min: 60 RPM
+ *   • Min delay/sample: 1000ms (derived from 60 RPM)
+ *
+ * Computed execution plan:
+ *   • Concurrency: sequential
+ *   • Inter-request delay: 1000ms
+ *   • Effective throughput: 60 samples/min
+ *   • Estimated duration: 50s
+ *   • Estimated completion: 14:23:45
+ *
+ * Started: 14:22:55
+ * Proceeding with execution...
+ * ═ PUnit V0.1.0 ═══════════════════════════════════════════════════════════════
  * </pre>
  *
  * <h2>Environment Overrides</h2>
