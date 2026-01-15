@@ -1227,6 +1227,8 @@ public class ProbabilisticTestExtension implements
 		));
 	}
 
+	private static final String BASELINE_RESOLVED_KEY = "baselineResolved";
+
 	/**
 	 * Resolves baseline selection lazily during the first sample invocation.
 	 * Also validates the test configuration after baseline selection and derives
@@ -1234,8 +1236,10 @@ public class ProbabilisticTestExtension implements
 	 */
 	private void ensureBaselineSelected(ExtensionContext context) {
 		ExtensionContext.Store store = getMethodStore(context);
-		SelectionResult existing = store.get(SELECTION_RESULT_KEY, SelectionResult.class);
-		if (existing != null) {
+		
+		// Check if we've already processed baseline selection (with or without a baseline)
+		Boolean alreadyResolved = store.get(BASELINE_RESOLVED_KEY, Boolean.class);
+		if (Boolean.TRUE.equals(alreadyResolved)) {
 			return;
 		}
 
@@ -1245,6 +1249,8 @@ public class ProbabilisticTestExtension implements
 			validateTestConfiguration(context, null);
 			// Log configuration for explicit threshold mode
 			logFinalConfiguration(context);
+			// Mark as resolved to prevent repeated logging
+			store.put(BASELINE_RESOLVED_KEY, Boolean.TRUE);
 			return;
 		}
 
@@ -1267,6 +1273,9 @@ public class ProbabilisticTestExtension implements
 			// Then log configuration (now that minPassRate is known)
 			logFinalConfiguration(context);
 
+			// Mark as resolved
+			store.put(BASELINE_RESOLVED_KEY, Boolean.TRUE);
+
 			return result;
 		}, SelectionResult.class);
 	}
@@ -1287,12 +1296,30 @@ public class ProbabilisticTestExtension implements
 		
 		StringBuilder sb = new StringBuilder();
 		
-		if (config.specId() != null) {
+		// Determine if threshold is from a normative source (SLA/SLO/POLICY)
+		boolean isNormativeThreshold = config.thresholdOrigin() == ThresholdOrigin.SLA
+				|| config.thresholdOrigin() == ThresholdOrigin.SLO
+				|| config.thresholdOrigin() == ThresholdOrigin.POLICY;
+		
+		if (isNormativeThreshold) {
+			// Threshold is explicitly specified from a normative source
+			sb.append(PUnitReporter.labelValueLn("Mode:", config.thresholdOrigin().name() + "-DRIVEN"));
+			if (config.specId() != null) {
+				sb.append(PUnitReporter.labelValueLn("Use Case:", config.specId()));
+			}
+			sb.append(PUnitReporter.labelValueLn("Threshold:", 
+					String.format("%.1f%% (%s)", config.minPassRate() * 100, config.thresholdOrigin().name())));
+			if (config.contractRef() != null && !config.contractRef().isEmpty()) {
+				sb.append(PUnitReporter.labelValueLn("Contract:", config.contractRef()));
+			}
+		} else if (config.specId() != null) {
+			// Threshold derived from baseline spec
 			sb.append(PUnitReporter.labelValueLn("Mode:", "SPEC-DRIVEN"));
 			sb.append(PUnitReporter.labelValueLn("Spec:", config.specId()));
 			sb.append(PUnitReporter.labelValueLn("Threshold:", 
 					String.format("%.1f%% (derived from baseline)", config.minPassRate() * 100)));
 		} else {
+			// Explicit threshold without spec
 			sb.append(PUnitReporter.labelValueLn("Mode:", "EXPLICIT THRESHOLD"));
 			String thresholdNote = "";
 			if (config.thresholdOrigin() != null && config.thresholdOrigin() != ThresholdOrigin.UNSPECIFIED) {
