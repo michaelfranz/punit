@@ -16,6 +16,7 @@ import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.ThresholdOrigin;
 import org.javai.punit.api.TokenChargeRecorder;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.ptest.engine.FactorConsistencyValidator.ValidationResult;
 import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.HashableFactorSource;
@@ -216,7 +217,7 @@ public class ProbabilisticTestExtension implements
 		}
 
 		// Load and store spec for expiration checking (with covariate-aware baseline selection)
-		loadBaselineWithCovariateSelection(annotation, resolved.specId(), store);
+		loadBaselineWithCovariateSelection(annotation, resolved.specId(), store, context);
 
 		// Print pre-flight report if pacing is configured
 		if (pacing.hasPacing()) {
@@ -1119,11 +1120,13 @@ public class ProbabilisticTestExtension implements
 	 * @param annotation the test annotation
 	 * @param specId the resolved spec ID (may be null)
 	 * @param store the extension context store
+	 * @param context the extension context (for accessing UseCaseProvider)
 	 */
 	private void loadBaselineWithCovariateSelection(
 			ProbabilisticTest annotation,
 			String specId,
-			ExtensionContext.Store store) {
+			ExtensionContext.Store store,
+			ExtensionContext context) {
 
 		if (specId == null) {
 			return;
@@ -1160,8 +1163,17 @@ public class ProbabilisticTestExtension implements
 			throw new NoCompatibleBaselineException(specId, footprint, availableFootprints);
 		}
 
+		// Get use case instance from provider for @CovariateSource resolution
+		Object useCaseInstance = null;
+		Optional<UseCaseProvider> providerOpt = findUseCaseProvider(context);
+		if (providerOpt.isPresent()) {
+			useCaseInstance = providerOpt.get().getCurrentInstance(useCaseClass);
+		}
+
 		// Resolve the test's current covariate profile (using current time as test execution time)
-		DefaultCovariateResolutionContext resolutionContext = DefaultCovariateResolutionContext.forNow();
+		DefaultCovariateResolutionContext resolutionContext = DefaultCovariateResolutionContext.builder()
+			.useCaseInstance(useCaseInstance)
+			.build();
 		CovariateProfile testProfile = covariateProfileResolver.resolve(declaration, resolutionContext);
 
 		// Select the best-matching baseline (category-aware)
@@ -1177,10 +1189,41 @@ public class ProbabilisticTestExtension implements
 		store.put(SPEC_KEY, result.selected().spec());
 		store.put(SELECTION_RESULT_KEY, result);
 
+		// Log the selected baseline file for traceability
+		logSelectedBaseline(result.selected().filename(), specId);
+
 		// Log warning if non-conforming covariates exist
 		if (result.hasNonConformance()) {
 			logCovariateNonConformanceWarning(result, specId);
 		}
+	}
+
+	/**
+	 * Logs the selected baseline file for traceability.
+	 */
+	private void logSelectedBaseline(String filename, String specId) {
+		System.out.println("\n┌─ BASELINE SELECTED ──────────────────────────────────────────────────────┐");
+		System.out.println("│ Use case: " + specId);
+		System.out.println("│ Baseline: " + filename);
+		System.out.println("└──────────────────────────────────────────────────────────────────────────┘\n");
+	}
+
+	/**
+	 * Finds the UseCaseProvider in the test instance.
+	 */
+	private Optional<UseCaseProvider> findUseCaseProvider(ExtensionContext context) {
+		Object testInstance = context.getRequiredTestInstance();
+		for (java.lang.reflect.Field field : testInstance.getClass().getDeclaredFields()) {
+			if (UseCaseProvider.class.isAssignableFrom(field.getType())) {
+				field.setAccessible(true);
+				try {
+					return Optional.of((UseCaseProvider) field.get(testInstance));
+				} catch (IllegalAccessException e) {
+					// Continue searching
+				}
+			}
+		}
+		return Optional.empty();
 	}
 
 	/**

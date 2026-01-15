@@ -45,7 +45,8 @@ public record CovariateDeclaration(
 
     public CovariateDeclaration {
         standardCovariates = List.copyOf(standardCovariates);
-        customCovariates = Map.copyOf(customCovariates);
+        // Use LinkedHashMap to preserve insertion order, then wrap in unmodifiable map
+        customCovariates = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(customCovariates));
     }
 
     /**
