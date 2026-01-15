@@ -625,10 +625,11 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         }
         
         // Report progress
-        reportProgress(extensionContext, aggregator, sample, annotation.mode().getEffectiveSampleSize(annotation.samples()));
+        int effectiveSamples = annotation.mode().getEffectiveSampleSize(annotation.samples());
+        reportProgress(extensionContext, aggregator, sample, effectiveSamples);
         
         // Check if this is the last sample
-        if (sample >= annotation.samples() || terminated.get()) {
+        if (sample >= effectiveSamples || terminated.get()) {
             if (!terminated.get()) {
                 aggregator.setCompleted();
             }

@@ -270,12 +270,20 @@ public class StatisticalExplanationBuilder {
             double threshold,
             double confidenceLevel) {
 
-        if (!baseline.hasData()) {
+        // No baseline spec at all - use inline threshold mode
+        if (!baseline.hasBaselineSpec()) {
             return buildInlineThresholdBaselineReference(threshold);
         }
 
-        String derivation = buildThresholdDerivation(baseline.baselineSamples(), baseline.baselineSuccesses(), 
-                baseline.baselineRate(), threshold, confidenceLevel);
+        // Have baseline spec, may or may not have empirical data
+        String derivation;
+        if (baseline.hasEmpiricalData()) {
+            derivation = buildThresholdDerivation(baseline.baselineSamples(), baseline.baselineSuccesses(), 
+                    baseline.baselineRate(), threshold, confidenceLevel);
+        } else {
+            // Baseline spec exists but without empirical data - threshold is from requirements
+            derivation = "Threshold from baseline specification (no empirical basis)";
+        }
 
         return new StatisticalExplanation.BaselineReference(
                 baseline.sourceFile(),
@@ -374,7 +382,8 @@ public class StatisticalExplanationBuilder {
 
         String plainEnglish;
         if (passed) {
-            if (baseline != null && baseline.hasData()) {
+            if (baseline != null && baseline.hasEmpiricalData()) {
+                // Have empirical baseline data - can reference baseline expectation
                 plainEnglish = String.format(
                         "The observed success rate of %.1f%% is consistent with the baseline expectation of %.1f%%. " +
                         "%s",
@@ -382,6 +391,7 @@ public class StatisticalExplanationBuilder {
                         baseline.baselineRate() * 100,
                         framing.passText);
             } else {
+                // No empirical data (inline threshold or baseline without empirical basis)
                 plainEnglish = String.format(
                         "The observed success rate of %.1f%% meets the required threshold of %.1f%%. %s",
                         observedRate * 100,

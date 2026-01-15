@@ -200,7 +200,7 @@ public class ShoppingExperiment {
     @Experiment(
         mode = ExperimentMode.MEASURE,
         useCase = ShoppingUseCase.class,
-        // samples = 1000, not necessary because MEASURE mode implies a default sample size
+        //samples = 1000, // not necessary because MEASURE mode implies a default sample size
         tokenBudget = 500000,
         timeBudgetMs = 600000,
         experimentId = "shopping-search-realistic-v1"

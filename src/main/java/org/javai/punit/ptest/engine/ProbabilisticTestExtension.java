@@ -188,8 +188,8 @@ public class ProbabilisticTestExtension implements
 			throw new ExtensionConfigurationException(e.getMessage(), e);
 		}
 		
-		// Log configuration mode for clarity
-		logConfigurationMode(testMethod.getName(), resolved);
+		// Note: Configuration logging moved to ensureBaselineSelected() so that
+		// derived minPassRate from baseline is available for accurate reporting.
 
 		// Detect token charging mode
 		boolean hasTokenRecorderParam = hasTokenChargeRecorderParameter(testMethod);
@@ -389,6 +389,11 @@ public class ProbabilisticTestExtension implements
 											ReflectiveInvocationContext<Method> invocationContext,
 											ExtensionContext extensionContext) throws Throwable {
 
+		// Ensure baseline selection is resolved lazily before first sample.
+		// This must happen BEFORE getting config, as it may derive minPassRate from baseline.
+		ensureBaselineSelected(extensionContext);
+
+		// Now get components - config may have been updated with derived minPassRate
 		SampleResultAggregator aggregator = getAggregator(extensionContext);
 		TestConfiguration config = getConfiguration(extensionContext);
 		EarlyTerminationEvaluator evaluator = getEvaluator(extensionContext);
@@ -406,9 +411,6 @@ public class ProbabilisticTestExtension implements
 			invocation.skip();
 			return;
 		}
-
-		// Ensure baseline selection is resolved lazily before first sample
-		ensureBaselineSelected(extensionContext);
 
 		// Pre-sample budget checks (suite → class → method precedence)
 		Optional<TerminationReason> preSampleTermination = checkAllBudgetsBeforeSample(
@@ -962,38 +964,6 @@ public class ProbabilisticTestExtension implements
 	}
 
 	/**
-	 * Logs the configuration mode to make it crystal clear how PUnit is operating.
-	 *
-	 * <p>This log message appears at the start of test execution and explicitly states:
-	 * <ul>
-	 *   <li>Whether a spec is being used (and which one)</li>
-	 *   <li>Where the threshold is coming from</li>
-	 *   <li>Key configuration values</li>
-	 * </ul>
-	 */
-	private void logConfigurationMode(String testName, ConfigurationResolver.ResolvedConfiguration resolved) {
-		StringBuilder sb = new StringBuilder();
-		
-		if (resolved.specId() != null) {
-			sb.append(PUnitReporter.labelValueLn("Mode:", "SPEC-DRIVEN"));
-			sb.append(PUnitReporter.labelValueLn("Spec:", resolved.specId()));
-			sb.append(PUnitReporter.labelValueLn("Threshold:", 
-					String.format("%.1f%% (derived from baseline)", resolved.minPassRate() * 100)));
-		} else {
-			sb.append(PUnitReporter.labelValueLn("Mode:", "EXPLICIT THRESHOLD"));
-			String thresholdNote = "";
-			if (resolved.thresholdOrigin() != null && resolved.thresholdOrigin() != ThresholdOrigin.UNSPECIFIED) {
-				thresholdNote = " (" + resolved.thresholdOrigin().name() + ")";
-			}
-			sb.append(PUnitReporter.labelValueLn("Threshold:", 
-					String.format("%.1f%%%s", resolved.minPassRate() * 100, thresholdNote)));
-		}
-		sb.append(PUnitReporter.labelValue("Samples:", String.valueOf(resolved.samples())));
-		
-		reporter.reportInfo("CONFIGURATION FOR TEST: " + testName, sb.toString());
-	}
-
-	/**
 	 * Appends provenance information to the verdict output if configured.
 	 *
 	 * <p>Provenance lines are added in order: thresholdOrigin, then contractRef.
@@ -1026,13 +996,17 @@ public class ProbabilisticTestExtension implements
 		// Check for covariate misalignments
 		List<CovariateMisalignment> misalignments = extractMisalignments(context);
 		
-		// Build the explanation based on whether we have a spec (baseline data)
+		// Build the explanation based on whether we have a selected baseline
 		StatisticalExplanation explanation;
 		String thresholdOriginName = config.thresholdOrigin() != null ? config.thresholdOrigin().name() : "UNSPECIFIED";
-		BaselineData baseline = loadBaselineData(config.specId());
 		
-		if (baseline.hasData()) {
-			// Spec-driven mode: use baseline data for statistical context
+		// Check if we have a selected baseline spec (not just empirical data)
+		ExecutionSpecification selectedSpec = getSpec(context);
+		boolean hasSelectedBaseline = selectedSpec != null;
+		BaselineData baseline = hasSelectedBaseline ? loadBaselineDataFromContext(context) : BaselineData.empty();
+		
+		if (hasSelectedBaseline) {
+			// Spec-driven mode: threshold derived from baseline
 			explanation = builder.build(
 					testName,
 					aggregator.getSamplesExecuted(),
@@ -1084,23 +1058,30 @@ public class ProbabilisticTestExtension implements
 	}
 
 	/**
-	 * Loads baseline data from a spec for transparent stats reporting.
+	 * Loads baseline data from the already-selected baseline in the context.
+	 *
+	 * <p>This uses the baseline that was selected during covariate-aware matching,
+	 * not a fresh lookup from the spec registry.
 	 */
-	private BaselineData loadBaselineData(String specId) {
-		if (specId == null) {
+	private BaselineData loadBaselineDataFromContext(ExtensionContext context) {
+		ExecutionSpecification spec = getSpec(context);
+		if (spec == null) {
 			return BaselineData.empty();
 		}
 		
-		return configResolver.loadSpec(specId)
-				.map(spec -> new BaselineData(
-						specId + ".yaml",
-						spec.getEmpiricalBasis() != null 
-								? spec.getEmpiricalBasis().generatedAt() 
-								: spec.getGeneratedAt(),
-						spec.getBaselineSamples(),
-						spec.getBaselineSuccesses()
-				))
-				.orElse(BaselineData.empty());
+		// Get the actual filename from the selection result if available
+		SelectionResult result = getSelectionResult(context);
+		String filename = result != null ? result.selected().filename() : spec.getUseCaseId() + ".yaml";
+		
+		// Use fromSpec to indicate this data comes from a selected baseline
+		return BaselineData.fromSpec(
+				filename,
+				spec.getEmpiricalBasis() != null 
+						? spec.getEmpiricalBasis().generatedAt() 
+						: spec.getGeneratedAt(),
+				spec.getBaselineSamples(),
+				spec.getBaselineSuccesses()
+		);
 	}
 
 	// ========== Store Access Helpers ==========
@@ -1262,6 +1243,8 @@ public class ProbabilisticTestExtension implements
 		if (pending == null) {
 			// No pending selection - validate without baseline
 			validateTestConfiguration(context, null);
+			// Log configuration for explicit threshold mode
+			logFinalConfiguration(context);
 			return;
 		}
 
@@ -1278,11 +1261,49 @@ public class ProbabilisticTestExtension implements
 			// Derive minPassRate from baseline if not explicitly specified
 			deriveMinPassRateFromBaseline(store, baseline);
 
-			// Log baseline selection result (single consolidated report)
+			// Log baseline selection result first (so user sees what baseline was used)
 			logBaselineSelectionResult(result, pending.specId());
+
+			// Then log configuration (now that minPassRate is known)
+			logFinalConfiguration(context);
 
 			return result;
 		}, SelectionResult.class);
+	}
+
+	/**
+	 * Logs the final test configuration after baseline selection and minPassRate derivation.
+	 */
+	private void logFinalConfiguration(ExtensionContext context) {
+		TestConfiguration config = getConfiguration(context);
+		if (config == null) {
+			return;
+		}
+		
+		String testName = context.getParent()
+				.flatMap(ExtensionContext::getTestMethod)
+				.map(java.lang.reflect.Method::getName)
+				.orElse(context.getDisplayName());
+		
+		StringBuilder sb = new StringBuilder();
+		
+		if (config.specId() != null) {
+			sb.append(PUnitReporter.labelValueLn("Mode:", "SPEC-DRIVEN"));
+			sb.append(PUnitReporter.labelValueLn("Spec:", config.specId()));
+			sb.append(PUnitReporter.labelValueLn("Threshold:", 
+					String.format("%.1f%% (derived from baseline)", config.minPassRate() * 100)));
+		} else {
+			sb.append(PUnitReporter.labelValueLn("Mode:", "EXPLICIT THRESHOLD"));
+			String thresholdNote = "";
+			if (config.thresholdOrigin() != null && config.thresholdOrigin() != ThresholdOrigin.UNSPECIFIED) {
+				thresholdNote = " (" + config.thresholdOrigin().name() + ")";
+			}
+			sb.append(PUnitReporter.labelValueLn("Threshold:", 
+					String.format("%.1f%%%s", config.minPassRate() * 100, thresholdNote)));
+		}
+		sb.append(PUnitReporter.labelValue("Samples:", String.valueOf(config.samples())));
+		
+		reporter.reportInfo("CONFIGURATION FOR TEST: " + testName, sb.toString());
 	}
 
 	/**
