@@ -1172,7 +1172,7 @@ public class ProbabilisticTestExtension implements
 		// Find baseline candidates with matching footprint
 		List<BaselineCandidate> candidates = baselineRepository.findCandidates(specId, footprint);
 
-		// Store pending selection (even if empty)
+		// Store pending selection for lazy resolution (even if empty)
 		store.put(PENDING_SELECTION_KEY, new PendingBaselineSelection(
 				specId,
 				useCaseClass,
