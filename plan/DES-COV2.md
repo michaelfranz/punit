@@ -191,7 +191,7 @@ for (Covariate cov : softMatchCovariates) {
 ### 4.4 Tie-Breaking
 
 When candidates have equal scores:
-1. **Category priority**: TEMPORAL matches valued over INFRASTRUCTURE over EXTERNAL_DEPENDENCY over DATA_STATE
+1. **Category priority**: TEMPORAL matches valued over INFRASTRUCTURE/OPERATIONAL over EXTERNAL_DEPENDENCY over DATA_STATE
 2. **Declaration order**: Earlier-declared covariates prioritized
 3. **Recency**: More recent baseline preferred
 

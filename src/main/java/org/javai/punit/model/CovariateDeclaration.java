@@ -4,12 +4,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
 import org.javai.punit.api.CovariateCategory;
 import org.javai.punit.api.StandardCovariate;
 
@@ -113,11 +111,10 @@ public record CovariateDeclaration(
      * <ol>
      *   <li>Standard covariate category (from enum)</li>
      *   <li>Categorized covariate map</li>
-     *   <li>Legacy custom covariate → INFRASTRUCTURE (default)</li>
      * </ol>
      *
      * @param key the covariate key
-     * @return the category, or INFRASTRUCTURE if not found
+     * @return the category, or OPERATIONAL if not found
      */
     public CovariateCategory getCategory(String key) {
         // Check standard covariates
@@ -131,14 +128,9 @@ public record CovariateDeclaration(
         if (categorizedCovariates.containsKey(key)) {
             return categorizedCovariates.get(key);
         }
-        
-        // Legacy custom covariates default to INFRASTRUCTURE
-        if (customCovariates.contains(key)) {
-            return CovariateCategory.INFRASTRUCTURE;
-        }
-        
-        // Unknown covariate - default to INFRASTRUCTURE
-        return CovariateCategory.INFRASTRUCTURE;
+
+        // Unknown covariate - default to OPERATIONAL
+        return CovariateCategory.OPERATIONAL;
     }
 
     /**

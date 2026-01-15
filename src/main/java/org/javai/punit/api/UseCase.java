@@ -201,6 +201,7 @@ public @interface UseCase {
      *   <li>{@link CovariateCategory#CONFIGURATION}: Hard gate — fails if no match</li>
      *   <li>{@link CovariateCategory#TEMPORAL}: Soft match with temporal-specific warning</li>
      *   <li>{@link CovariateCategory#INFRASTRUCTURE}: Soft match with infrastructure warning</li>
+     *   <li>{@link CovariateCategory#OPERATIONAL}: Soft match with operational warning</li>
      *   <li>{@link CovariateCategory#EXTERNAL_DEPENDENCY}: Soft match for external services</li>
      *   <li>{@link CovariateCategory#DATA_STATE}: Soft match for data context</li>
      *   <li>{@link CovariateCategory#INFORMATIONAL}: Ignored in matching, for traceability only</li>

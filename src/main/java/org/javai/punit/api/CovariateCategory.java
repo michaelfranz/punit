@@ -52,12 +52,22 @@ public enum CovariateCategory {
     /**
      * Execution environment characteristics.
      *
-     * <p>Examples: cloud_provider, instance_type, region, timezone
+     * <p>Examples: cloud_provider, instance_type
      *
      * <p><strong>Matching:</strong> Soft match — test proceeds with warning on mismatch
      * <p><strong>Report language:</strong> "Resource availability and latency characteristics may vary"
      */
     INFRASTRUCTURE,
+
+    /**
+     * Execution operational characteristics.
+     *
+     * <p>Examples: region, timezone
+     *
+     * <p><strong>Matching:</strong> Soft match — test proceeds with warning on mismatch
+     * <p><strong>Report language:</strong> "Resource availability and latency characteristics may vary"
+     */
+    OPERATIONAL,
 
     /**
      * Data state affecting behavior.

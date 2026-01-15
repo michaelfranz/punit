@@ -41,21 +41,21 @@ public enum StandardCovariate {
     /**
      * System timezone.
      *
-     * <p><strong>Category:</strong> INFRASTRUCTURE
+     * <p><strong>Category:</strong> OPERATIONAL
      * <p><strong>Resolution:</strong> System default timezone
      * <p><strong>Matching:</strong> Exact string match
      */
-    TIMEZONE("timezone", CovariateCategory.INFRASTRUCTURE),
+    TIMEZONE("timezone", CovariateCategory.OPERATIONAL),
 
     /**
      * Deployment region.
      *
-     * <p><strong>Category:</strong> INFRASTRUCTURE
+     * <p><strong>Category:</strong> OPERATIONAL
      * <p><strong>Resolution:</strong> System property {@code punit.region} or
      * environment variable {@code PUNIT_REGION}
      * <p><strong>Matching:</strong> Case-insensitive string match
      */
-    REGION("region", CovariateCategory.INFRASTRUCTURE);
+    REGION("region", CovariateCategory.OPERATIONAL);
 
     private final String key;
     private final CovariateCategory category;
