@@ -1132,6 +1132,15 @@ public class ProbabilisticTestExtension implements
 			return;
 		}
 
+		// If minPassRate is explicitly set in the annotation, skip covariate-aware selection.
+		// The user is using inline threshold mode, not spec-driven mode.
+		double annotationMinPassRate = annotation.minPassRate();
+		if (!Double.isNaN(annotationMinPassRate)) {
+			// Inline threshold mode - just load the spec for metadata (if needed)
+			configResolver.loadSpec(specId).ifPresent(spec -> store.put(SPEC_KEY, spec));
+			return;
+		}
+
 		// Get the use case class from annotation
 		Class<?> useCaseClass = annotation.useCase();
 		if (useCaseClass == null || useCaseClass == Void.class) {
@@ -1164,10 +1173,15 @@ public class ProbabilisticTestExtension implements
 		}
 
 		// Get use case instance from provider for @CovariateSource resolution
+		// The provider must be a static field with factory registered in @BeforeAll
 		Object useCaseInstance = null;
 		Optional<UseCaseProvider> providerOpt = findUseCaseProvider(context);
-		if (providerOpt.isPresent()) {
-			useCaseInstance = providerOpt.get().getCurrentInstance(useCaseClass);
+		if (providerOpt.isPresent() && providerOpt.get().isRegistered(useCaseClass)) {
+			try {
+				useCaseInstance = providerOpt.get().getInstance(useCaseClass);
+			} catch (IllegalStateException e) {
+				// Factory not registered - covariate resolution will use fallback (sys props / env vars)
+			}
 		}
 
 		// Resolve the test's current covariate profile (using current time as test execution time)
@@ -1209,20 +1223,56 @@ public class ProbabilisticTestExtension implements
 	}
 
 	/**
-	 * Finds the UseCaseProvider in the test instance.
+	 * Finds the UseCaseProvider, checking both static and instance fields.
+	 *
+	 * <p>For covariate-aware baseline selection, the provider MUST be a static field
+	 * with factory registration in {@code @BeforeAll}. This ensures the provider
+	 * is available during {@code provideTestTemplateInvocationContexts}, which runs
+	 * before test instances are created.
+	 *
+	 * <p>Search order:
+	 * <ol>
+	 *   <li>Static fields on the test class (preferred for covariate selection)</li>
+	 *   <li>Instance fields on the test instance (if available)</li>
+	 * </ol>
 	 */
 	private Optional<UseCaseProvider> findUseCaseProvider(ExtensionContext context) {
-		Object testInstance = context.getRequiredTestInstance();
-		for (java.lang.reflect.Field field : testInstance.getClass().getDeclaredFields()) {
-			if (UseCaseProvider.class.isAssignableFrom(field.getType())) {
-				field.setAccessible(true);
-				try {
-					return Optional.of((UseCaseProvider) field.get(testInstance));
-				} catch (IllegalAccessException e) {
-					// Continue searching
+		// First, check static fields on the test class
+		Optional<Class<?>> testClassOpt = context.getTestClass();
+		if (testClassOpt.isPresent()) {
+			Class<?> testClass = testClassOpt.get();
+			for (java.lang.reflect.Field field : testClass.getDeclaredFields()) {
+				if (UseCaseProvider.class.isAssignableFrom(field.getType()) 
+						&& java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+					field.setAccessible(true);
+					try {
+						UseCaseProvider provider = (UseCaseProvider) field.get(null);
+						if (provider != null) {
+							return Optional.of(provider);
+						}
+					} catch (IllegalAccessException e) {
+						// Continue searching
+					}
 				}
 			}
 		}
+
+		// Fall back to instance fields (if test instance exists)
+		Optional<Object> testInstanceOpt = context.getTestInstance();
+		if (testInstanceOpt.isPresent()) {
+			Object testInstance = testInstanceOpt.get();
+			for (java.lang.reflect.Field field : testInstance.getClass().getDeclaredFields()) {
+				if (UseCaseProvider.class.isAssignableFrom(field.getType())) {
+					field.setAccessible(true);
+					try {
+						return Optional.of((UseCaseProvider) field.get(testInstance));
+					} catch (IllegalAccessException e) {
+						// Continue searching
+					}
+				}
+			}
+		}
+
 		return Optional.empty();
 	}
 

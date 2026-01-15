@@ -184,7 +184,8 @@ public class ConfigurationResolver {
                 onBudgetExhausted,
                 onException,
                 maxExampleFailures,
-                null, null, null, null,  // Statistical context (not resolved here)
+                null, null, null,  // confidence, baselineRate, baselineSamples (not resolved here)
+                specIdOpt.orElse(null),  // specId from use case class
                 thresholdOrigin,
                 contractRef
         );

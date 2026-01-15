@@ -160,11 +160,12 @@ class ProbabilisticTestExtensionCovariateTest {
     }
 
     static class TestSubjects {
-        @ProbabilisticTest(samples = 10, useCase = UseCaseWithCovariates.class)
+        // Note: Using minPassRate to avoid spec lookup (these are unit tests, not integration tests)
+        @ProbabilisticTest(samples = 10, minPassRate = 0.95, useCase = UseCaseWithCovariates.class)
         public void testWithCovariateUseCase() {
         }
 
-        @ProbabilisticTest(samples = 10, useCase = UseCaseWithoutCovariates.class)
+        @ProbabilisticTest(samples = 10, minPassRate = 0.95, useCase = UseCaseWithoutCovariates.class)
         public void testWithoutCovariateUseCase() {
         }
     }
