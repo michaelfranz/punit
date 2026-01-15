@@ -13,6 +13,9 @@ import org.javai.punit.model.CovariateValue;
  */
 public final class TimeOfDayMatcher implements CovariateMatcher {
 
+    // Allow a 30-minute buffer for the match
+    static final int LENIENCY_MINUTES = 30;
+
     @Override
     public MatchResult match(CovariateValue baselineValue, CovariateValue testValue) {
         if (!(baselineValue instanceof CovariateValue.TimeWindowValue baseline)) {
@@ -24,8 +27,8 @@ public final class TimeOfDayMatcher implements CovariateMatcher {
             return MatchResult.DOES_NOT_CONFORM;
         }
 
-        // Check if test time falls within baseline window
-        if (isWithinWindow(testTime, baseline.start(), baseline.end())) {
+        // Check if test time falls within baseline window +/- 30 minutes
+        if (isWithinWindow(testTime, baseline.start().minusMinutes(LENIENCY_MINUTES), baseline.end().plusMinutes(LENIENCY_MINUTES))) {
             return MatchResult.CONFORMS;
         }
 
@@ -37,10 +40,10 @@ public final class TimeOfDayMatcher implements CovariateMatcher {
             // Use start time as the point-in-time for matching
             return tw.start();
         }
-        if (testValue instanceof CovariateValue.StringValue sv) {
+        if (testValue instanceof CovariateValue.StringValue(String value)) {
             // Try to parse as time window format
             try {
-                var parsed = CovariateValue.TimeWindowValue.parse(sv.value());
+                var parsed = CovariateValue.TimeWindowValue.parse(value);
                 return parsed.start();
             } catch (Exception e) {
                 return null;

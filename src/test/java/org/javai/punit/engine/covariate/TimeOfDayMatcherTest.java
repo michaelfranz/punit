@@ -80,16 +80,17 @@ class TimeOfDayMatcherTest {
     class OutsideWindowTests {
 
         @Test
-        @DisplayName("time before window should not conform")
+        @DisplayName("time before window (including leniency) should not conform")
         void timeBeforeWindowShouldNotConform() {
             var baseline = new CovariateValue.TimeWindowValue(
                 LocalTime.of(9, 0),
                 LocalTime.of(17, 0),
                 ZoneId.of("UTC")
             );
+            // With 30-min leniency, effective start is 08:30, so 08:29 should not conform
             var test = new CovariateValue.TimeWindowValue(
-                LocalTime.of(8, 59),
-                LocalTime.of(8, 59),
+                LocalTime.of(8, 30).minusMinutes(1),
+                LocalTime.of(8, 30).minusMinutes(1),
                 ZoneId.of("UTC")
             );
             
@@ -97,20 +98,98 @@ class TimeOfDayMatcherTest {
         }
 
         @Test
-        @DisplayName("time after window should not conform")
+        @DisplayName("time after window (including leniency) should not conform")
         void timeAfterWindowShouldNotConform() {
             var baseline = new CovariateValue.TimeWindowValue(
                 LocalTime.of(9, 0),
                 LocalTime.of(17, 0),
                 ZoneId.of("UTC")
             );
+            // With 30-min leniency, effective end is 17:30, so 17:31 should not conform
             var test = new CovariateValue.TimeWindowValue(
-                LocalTime.of(17, 1),
-                LocalTime.of(17, 1),
+                LocalTime.of(17, 30).plusMinutes(1),
+                LocalTime.of(17, 30).plusMinutes(1),
                 ZoneId.of("UTC")
             );
             
             assertThat(matcher.match(baseline, test)).isEqualTo(MatchResult.DOES_NOT_CONFORM);
+        }
+    }
+
+    @Nested
+    @DisplayName("leniency")
+    class LeniencyTests {
+
+        @Test
+        @DisplayName("time within leniency before window start should conform")
+        void timeWithinLeniencyBeforeStartShouldConform() {
+            var baseline = new CovariateValue.TimeWindowValue(
+                LocalTime.of(9, 0),
+                LocalTime.of(17, 0),
+                ZoneId.of("UTC")
+            );
+            // 08:45 is 15 minutes before window start, within 30-min leniency
+            var test = new CovariateValue.TimeWindowValue(
+                LocalTime.of(8, 45),
+                LocalTime.of(8, 45),
+                ZoneId.of("UTC")
+            );
+            
+            assertThat(matcher.match(baseline, test)).isEqualTo(MatchResult.CONFORMS);
+        }
+
+        @Test
+        @DisplayName("time within leniency after window end should conform")
+        void timeWithinLeniencyAfterEndShouldConform() {
+            var baseline = new CovariateValue.TimeWindowValue(
+                LocalTime.of(9, 0),
+                LocalTime.of(17, 0),
+                ZoneId.of("UTC")
+            );
+            // 17:15 is 15 minutes after window end, within 30-min leniency
+            var test = new CovariateValue.TimeWindowValue(
+                LocalTime.of(17, 15),
+                LocalTime.of(17, 15),
+                ZoneId.of("UTC")
+            );
+            
+            assertThat(matcher.match(baseline, test)).isEqualTo(MatchResult.CONFORMS);
+        }
+
+        @Test
+        @DisplayName("time at exact leniency boundary before start should conform")
+        void timeAtExactLeniencyBoundaryBeforeStartShouldConform() {
+            var baseline = new CovariateValue.TimeWindowValue(
+                LocalTime.of(9, 0),
+                LocalTime.of(17, 0),
+                ZoneId.of("UTC")
+            );
+            // Exactly at the leniency boundary (09:00 - 30 min = 08:30)
+            var test = new CovariateValue.TimeWindowValue(
+                LocalTime.of(9, 0).minusMinutes(TimeOfDayMatcher.LENIENCY_MINUTES),
+                LocalTime.of(9, 0).minusMinutes(TimeOfDayMatcher.LENIENCY_MINUTES),
+                ZoneId.of("UTC")
+            );
+            
+            assertThat(matcher.match(baseline, test)).isEqualTo(MatchResult.CONFORMS);
+        }
+
+        @Test
+        @DisplayName("time at exact leniency boundary after end should conform")
+        void timeAtExactLeniencyBoundaryAfterEndShouldConform() {
+            var baseline = new CovariateValue.TimeWindowValue(
+                LocalTime.of(9, 0),
+                LocalTime.of(17, 0),
+                ZoneId.of("UTC")
+            );
+            // Exactly at the leniency boundary (17:00 + 30 min = 17:30)
+            var test = new CovariateValue.TimeWindowValue(
+                LocalTime.of(17, 0).plusMinutes(TimeOfDayMatcher.LENIENCY_MINUTES),
+                LocalTime.of(17, 0).plusMinutes(TimeOfDayMatcher.LENIENCY_MINUTES),
+                ZoneId.of("UTC")
+            );
+            
+            assertThat(matcher.match(baseline, test)).isEqualTo(MatchResult.CONFORMS);
         }
     }
 
