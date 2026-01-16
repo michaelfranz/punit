@@ -118,7 +118,7 @@ class OptimizationOrchestratorTest {
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())
-                .mutator(new NoOpMutator<>())  // No actual change
+                .mutator(new NoOpFactorMutator<>())  // No actual change
                 .terminationPolicy(new OptimizationCompositeTerminationPolicy(
                         new OptimizationMaxIterationsPolicy(20),
                         new OptimizationNoImprovementPolicy(3)
@@ -178,7 +178,7 @@ class OptimizationOrchestratorTest {
                 .scorer(aggregate -> {
                     throw new ScoringException("Scoring failed");
                 })
-                .mutator(new NoOpMutator<>())
+                .mutator(new NoOpFactorMutator<>())
                 .terminationPolicy(new OptimizationMaxIterationsPolicy(10))
                 .samplesPerIteration(10)
                 .build();
@@ -235,7 +235,7 @@ class OptimizationOrchestratorTest {
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())
-                .mutator(new NoOpMutator<>())
+                .mutator(new NoOpFactorMutator<>())
                 .terminationPolicy(new OptimizationMaxIterationsPolicy(10))
                 .samplesPerIteration(10)
                 .build();
@@ -268,7 +268,7 @@ class OptimizationOrchestratorTest {
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())
-                .mutator(new NoOpMutator<>())
+                .mutator(new NoOpFactorMutator<>())
                 .terminationPolicy(new OptimizationMaxIterationsPolicy(3))
                 .samplesPerIteration(10)
                 .build();
@@ -336,7 +336,7 @@ class OptimizationOrchestratorTest {
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())
-                .mutator(new NoOpMutator<>())
+                .mutator(new NoOpFactorMutator<>())
                 .terminationPolicy(new OptimizationCompositeTerminationPolicy(
                         new OptimizationMaxIterationsPolicy(3),
                         new OptimizationNoImprovementPolicy(2)

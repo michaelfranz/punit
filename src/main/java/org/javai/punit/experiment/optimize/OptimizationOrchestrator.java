@@ -117,7 +117,7 @@ public final class OptimizationOrchestrator<F> {
                         iteration,
                         factorSuit,
                         config.treatmentFactorName(),
-                        AggregateStatistics.empty(),
+                        OptimizationStatistics.empty(),
                         iterStart,
                         Instant.now()
                 );
@@ -131,7 +131,7 @@ public final class OptimizationOrchestrator<F> {
             }
 
             // 3. Aggregate outcomes
-            AggregateStatistics statistics = aggregator.aggregate(outcomes);
+            OptimizationStatistics statistics = aggregator.aggregate(outcomes);
 
             IterationAggregate aggregate = new IterationAggregate(
                     iteration,

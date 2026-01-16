@@ -17,7 +17,7 @@ class OptimizationHistoryTest {
 
     private OptimizationRecord createIteration(int iterationNumber, double score) {
         FactorSuit factorSuit = FactorSuit.of("systemPrompt", "value" + iterationNumber);
-        AggregateStatistics stats = AggregateStatistics.fromCounts(
+        OptimizationStatistics stats = OptimizationStatistics.fromCounts(
                 100, (int) (score * 100), 10000, 100.0
         );
         Instant start = Instant.now().minusSeconds(10);

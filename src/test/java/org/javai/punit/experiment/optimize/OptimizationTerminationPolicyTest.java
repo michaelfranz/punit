@@ -45,7 +45,7 @@ class OptimizationTerminationPolicyTest {
 
     private OptimizationRecord createIteration(int iterationNumber, double score) {
         FactorSuit factorSuit = FactorSuit.of("factor", "value" + iterationNumber);
-        AggregateStatistics stats = AggregateStatistics.fromCounts(100, 80, 10000, 100.0);
+        OptimizationStatistics stats = OptimizationStatistics.fromCounts(100, 80, 10000, 100.0);
         Instant start = Instant.now().minusSeconds(10);
         IterationAggregate aggregate = new IterationAggregate(
                 iterationNumber, factorSuit, "factor", stats, start, start.plusSeconds(5)

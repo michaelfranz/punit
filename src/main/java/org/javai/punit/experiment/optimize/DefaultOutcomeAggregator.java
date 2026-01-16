@@ -18,9 +18,9 @@ public final class DefaultOutcomeAggregator implements OutcomeAggregator {
     public static final String TOKEN_COUNT_KEY = "tokensUsed";
 
     @Override
-    public AggregateStatistics aggregate(List<UseCaseOutcome> outcomes) {
+    public OptimizationStatistics aggregate(List<UseCaseOutcome> outcomes) {
         if (outcomes == null || outcomes.isEmpty()) {
-            return AggregateStatistics.empty();
+            return OptimizationStatistics.empty();
         }
 
         int sampleCount = outcomes.size();
@@ -40,6 +40,6 @@ public final class DefaultOutcomeAggregator implements OutcomeAggregator {
 
         double meanLatencyMs = sampleCount > 0 ? (double) totalLatencyMs / sampleCount : 0.0;
 
-        return AggregateStatistics.fromCounts(sampleCount, successCount, totalTokens, meanLatencyMs);
+        return OptimizationStatistics.fromCounts(sampleCount, successCount, totalTokens, meanLatencyMs);
     }
 }

@@ -5,7 +5,7 @@ import org.javai.punit.experiment.model.EmpiricalSummary;
 import java.util.Map;
 
 /**
- * Statistics aggregated from N outcomes.
+ * Optimization statistics aggregated from N outcomes.
  *
  * <p>These are the metrics available to the {@link Scorer} for evaluation.
  * An aggregate represents the statistical summary of running a use case
@@ -21,7 +21,7 @@ import java.util.Map;
  * @param totalTokens total tokens consumed across all outcomes
  * @param meanLatencyMs mean latency in milliseconds
  */
-public record AggregateStatistics(
+public record OptimizationStatistics(
         int sampleCount,
         int successCount,
         int failureCount,
@@ -30,9 +30,9 @@ public record AggregateStatistics(
         double meanLatencyMs
 ) implements EmpiricalSummary {
     /**
-     * Creates AggregateStatistics with validation.
+     * Creates OptimizationStatistics with validation.
      */
-    public AggregateStatistics {
+    public OptimizationStatistics {
         if (sampleCount < 0) {
             throw new IllegalArgumentException("sampleCount must be non-negative");
         }
@@ -59,15 +59,15 @@ public record AggregateStatistics(
     }
 
     /**
-     * Creates AggregateStatistics computing successRate from counts.
+     * Creates OptimizationStatistics computing successRate from counts.
      *
      * @param sampleCount total number of samples
      * @param successCount number of successful samples
      * @param totalTokens total tokens consumed
      * @param meanLatencyMs mean latency in milliseconds
-     * @return new AggregateStatistics instance
+     * @return new OptimizationStatistics instance
      */
-    public static AggregateStatistics fromCounts(
+    public static OptimizationStatistics fromCounts(
             int sampleCount,
             int successCount,
             long totalTokens,
@@ -75,18 +75,18 @@ public record AggregateStatistics(
     ) {
         int failureCount = sampleCount - successCount;
         double successRate = sampleCount > 0 ? (double) successCount / sampleCount : 0.0;
-        return new AggregateStatistics(
+        return new OptimizationStatistics(
                 sampleCount, successCount, failureCount, successRate, totalTokens, meanLatencyMs
         );
     }
 
     /**
-     * Creates an empty AggregateStatistics (zero samples).
+     * Creates an empty OptimizationStatistics (zero samples).
      *
      * @return empty statistics
      */
-    public static AggregateStatistics empty() {
-        return new AggregateStatistics(0, 0, 0, 0.0, 0L, 0.0);
+    public static OptimizationStatistics empty() {
+        return new OptimizationStatistics(0, 0, 0, 0.0, 0L, 0.0);
     }
 
     // ========== EmpiricalSummary Implementation ==========

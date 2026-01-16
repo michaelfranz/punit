@@ -15,7 +15,7 @@ class OptimizationRecordTest {
 
     private IterationAggregate createAggregate(int iterationNumber) {
         FactorSuit factorSuit = FactorSuit.of("factor", "value");
-        AggregateStatistics stats = AggregateStatistics.fromCounts(100, 80, 10000, 100.0);
+        OptimizationStatistics stats = OptimizationStatistics.fromCounts(100, 80, 10000, 100.0);
         Instant start = Instant.now();
         return new IterationAggregate(
                 iterationNumber, factorSuit, "factor", stats, start, start.plusMillis(1000)
@@ -93,7 +93,7 @@ class OptimizationRecordTest {
     @Test
     void shouldCreateAggregate() {
         FactorSuit factorSuit = FactorSuit.of("systemPrompt", "You are helpful");
-        AggregateStatistics stats = AggregateStatistics.fromCounts(100, 90, 15000, 150.0);
+        OptimizationStatistics stats = OptimizationStatistics.fromCounts(100, 90, 15000, 150.0);
         Instant start = Instant.now();
         Instant end = start.plusMillis(5000);
 
@@ -113,7 +113,7 @@ class OptimizationRecordTest {
     @Test
     void shouldGetTreatmentFactorValue() {
         FactorSuit factorSuit = FactorSuit.of("systemPrompt", "You are helpful", "model", "gpt-4");
-        AggregateStatistics stats = AggregateStatistics.empty();
+        OptimizationStatistics stats = OptimizationStatistics.empty();
         Instant start = Instant.now();
 
         IterationAggregate aggregate = new IterationAggregate(
@@ -126,7 +126,7 @@ class OptimizationRecordTest {
     @Test
     void shouldRejectNegativeIterationNumber() {
         FactorSuit factorSuit = FactorSuit.of("factor", "value");
-        AggregateStatistics stats = AggregateStatistics.empty();
+        OptimizationStatistics stats = OptimizationStatistics.empty();
         Instant start = Instant.now();
 
         assertThrows(IllegalArgumentException.class, () ->
@@ -137,7 +137,7 @@ class OptimizationRecordTest {
     @Test
     void shouldRejectMissingTreatmentFactor() {
         FactorSuit factorSuit = FactorSuit.of("model", "gpt-4");  // No "systemPrompt"
-        AggregateStatistics stats = AggregateStatistics.empty();
+        OptimizationStatistics stats = OptimizationStatistics.empty();
         Instant start = Instant.now();
 
         assertThrows(IllegalArgumentException.class, () ->
@@ -148,7 +148,7 @@ class OptimizationRecordTest {
     @Test
     void shouldRejectEndTimeBeforeStartTime() {
         FactorSuit factorSuit = FactorSuit.of("factor", "value");
-        AggregateStatistics stats = AggregateStatistics.empty();
+        OptimizationStatistics stats = OptimizationStatistics.empty();
         Instant start = Instant.now();
 
         assertThrows(IllegalArgumentException.class, () ->
@@ -159,7 +159,7 @@ class OptimizationRecordTest {
     @Test
     void shouldRejectBlankTreatmentFactorName() {
         FactorSuit factorSuit = FactorSuit.of("factor", "value");
-        AggregateStatistics stats = AggregateStatistics.empty();
+        OptimizationStatistics stats = OptimizationStatistics.empty();
         Instant start = Instant.now();
 
         assertThrows(IllegalArgumentException.class, () ->
