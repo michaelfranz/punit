@@ -1,11 +1,18 @@
 package org.javai.punit.experiment.optimize;
 
+import org.javai.punit.experiment.model.EmpiricalSummary;
+
+import java.util.Map;
+
 /**
  * Statistics aggregated from N outcomes.
  *
  * <p>These are the metrics available to the {@link Scorer} for evaluation.
  * An aggregate represents the statistical summary of running a use case
  * N times with the same factor suit.
+ *
+ * <p>Implements {@link EmpiricalSummary} for compatibility with the broader
+ * experiment framework.
  *
  * @param sampleCount number of outcomes aggregated
  * @param successCount count of successful outcomes
@@ -21,7 +28,7 @@ public record AggregateStatistics(
         double successRate,
         long totalTokens,
         double meanLatencyMs
-) {
+) implements EmpiricalSummary {
     /**
      * Creates AggregateStatistics with validation.
      */
@@ -80,5 +87,39 @@ public record AggregateStatistics(
      */
     public static AggregateStatistics empty() {
         return new AggregateStatistics(0, 0, 0, 0.0, 0L, 0.0);
+    }
+
+    // ========== EmpiricalSummary Implementation ==========
+
+    @Override
+    public int successes() {
+        return successCount;
+    }
+
+    @Override
+    public int failures() {
+        return failureCount;
+    }
+
+    @Override
+    public int samplesExecuted() {
+        return sampleCount;
+    }
+
+    @Override
+    public long avgLatencyMs() {
+        return Math.round(meanLatencyMs);
+    }
+
+    @Override
+    public long avgTokensPerSample() {
+        return sampleCount > 0 ? totalTokens / sampleCount : 0L;
+    }
+
+    @Override
+    public Map<String, Integer> failureDistribution() {
+        // Failure categorization not tracked at this level.
+        // Returns empty map; detailed failure analysis available via IterationRecord.
+        return Map.of();
     }
 }

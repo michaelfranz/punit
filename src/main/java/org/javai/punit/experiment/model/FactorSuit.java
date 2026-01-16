@@ -1,4 +1,4 @@
-package org.javai.punit.experiment.optimize;
+package org.javai.punit.experiment.model;
 
 import java.util.HashMap;
 import java.util.Map;

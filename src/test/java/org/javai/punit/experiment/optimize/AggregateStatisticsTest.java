@@ -1,5 +1,6 @@
 package org.javai.punit.experiment.optimize;
 
+import org.javai.punit.experiment.model.EmpiricalSummary;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -101,5 +102,67 @@ class AggregateStatisticsTest {
         assertThrows(IllegalArgumentException.class, () ->
                 new AggregateStatistics(10, 5, 5, 0.5, 0L, -1.0)
         );
+    }
+
+    // === EmpiricalSummary Implementation Tests ===
+
+    @Test
+    void shouldImplementSuccesses() {
+        AggregateStatistics stats = AggregateStatistics.fromCounts(100, 85, 50000L, 120.5);
+
+        assertEquals(85, stats.successes());
+    }
+
+    @Test
+    void shouldImplementFailures() {
+        AggregateStatistics stats = AggregateStatistics.fromCounts(100, 85, 50000L, 120.5);
+
+        assertEquals(15, stats.failures());
+    }
+
+    @Test
+    void shouldImplementSamplesExecuted() {
+        AggregateStatistics stats = AggregateStatistics.fromCounts(100, 85, 50000L, 120.5);
+
+        assertEquals(100, stats.samplesExecuted());
+    }
+
+    @Test
+    void shouldImplementAvgLatencyMs() {
+        AggregateStatistics stats = AggregateStatistics.fromCounts(100, 85, 50000L, 120.5);
+
+        assertEquals(121L, stats.avgLatencyMs());  // Rounded from 120.5
+    }
+
+    @Test
+    void shouldImplementAvgTokensPerSample() {
+        AggregateStatistics stats = AggregateStatistics.fromCounts(100, 85, 50000L, 120.5);
+
+        assertEquals(500L, stats.avgTokensPerSample());  // 50000 / 100
+    }
+
+    @Test
+    void shouldImplementAvgTokensPerSampleWithZeroSamples() {
+        AggregateStatistics stats = AggregateStatistics.empty();
+
+        assertEquals(0L, stats.avgTokensPerSample());
+    }
+
+    @Test
+    void shouldImplementFailureDistribution() {
+        AggregateStatistics stats = AggregateStatistics.fromCounts(100, 85, 50000L, 120.5);
+
+        assertTrue(stats.failureDistribution().isEmpty());
+    }
+
+    @Test
+    void shouldBeUsableAsEmpiricalSummary() {
+        EmpiricalSummary summary = AggregateStatistics.fromCounts(100, 80, 20000L, 50.0);
+
+        assertEquals(80, summary.successes());
+        assertEquals(20, summary.failures());
+        assertEquals(100, summary.samplesExecuted());
+        assertEquals(50L, summary.avgLatencyMs());
+        assertEquals(200L, summary.avgTokensPerSample());
     }
 }

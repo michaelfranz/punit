@@ -1,5 +1,6 @@
 package org.javai.punit.experiment.optimize;
 
+import org.javai.punit.experiment.model.FactorSuit;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

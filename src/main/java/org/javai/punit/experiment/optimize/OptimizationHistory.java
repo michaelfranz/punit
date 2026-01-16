@@ -1,5 +1,7 @@
 package org.javai.punit.experiment.optimize;
 
+import org.javai.punit.experiment.model.FactorSuit;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;

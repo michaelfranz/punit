@@ -8,7 +8,7 @@
  *
  * <h2>Key Components</h2>
  * <ul>
- *   <li>{@link org.javai.punit.experiment.optimize.FactorSuit} - Complete set of factor values</li>
+ *   <li>{@link org.javai.punit.experiment.model.FactorSuit} - Complete set of factor values</li>
  *   <li>{@link org.javai.punit.experiment.optimize.Scorer} - Evaluates iterations</li>
  *   <li>{@link org.javai.punit.experiment.optimize.Mutator} - Generates new factor values</li>
  *   <li>{@link org.javai.punit.experiment.optimize.TerminationPolicy} - Decides when to stop</li>
