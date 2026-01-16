@@ -9,9 +9,13 @@ Unified the `measure` and `explore` Gradle tasks into a single `experiment` task
 ## Usage
 
 ```bash
-./gradlew experiment --tests "<experiment name>"
-# or shorthand:
-./gradlew exp --tests "<experiment name>"
+# Simplified syntax (recommended):
+./gradlew exp -Prun=ShoppingExperiment.measureRealisticSearchBaseline
+./gradlew experiment -Prun=ShoppingExperiment
+
+# Traditional --tests syntax also works:
+./gradlew exp --tests "ShoppingExperiment.measureRealisticSearchBaseline"
+./gradlew experiment --tests "ShoppingExperiment"
 ```
 
 The experiment mode (MEASURE or EXPLORE) is determined from the `@Experiment` annotation's `mode` property.

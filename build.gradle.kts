@@ -119,22 +119,26 @@ tasks.test {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// EXPERIMENT task - Run experiments (MEASURE or EXPLORE mode)
+// EXPERIMENT tasks - Run experiments (MEASURE or EXPLORE mode)
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // Runs experiments annotated with @Experiment. The mode (MEASURE or EXPLORE)
 // is determined from the annotation's mode property.
 //
-// Usage:
-//   ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
-//   ./gradlew exp --tests "ShoppingExperiment.exploreModelConfigurations"
+// Usage (simplified with -Prun):
+//   ./gradlew exp -Prun=ShoppingExperiment.measureRealisticSearchBaseline
+//   ./gradlew experiment -Prun=ShoppingExperiment
+//
+// Traditional --tests syntax also works:
+//   ./gradlew exp --tests "ShoppingExperiment.measureRealisticSearchBaseline"
 //
 // Output:
 //   MEASURE mode: Specs written to src/test/resources/punit/specs/{UseCaseId}.yaml
 //   EXPLORE mode: Specs written to src/test/resources/punit/explorations/{UseCaseId}/{config}.yaml
 //
-val experiment by tasks.registering(Test::class) {
-    description = "Runs experiments (mode determined from @Experiment annotation)"
+
+// Shared configuration for experiment tasks
+fun Test.configureAsExperimentTask() {
     group = "verification"
     
     // Use the experiment source set
@@ -168,6 +172,15 @@ val experiment by tasks.registering(Test::class) {
     // Ensure experiment classes are compiled first
     dependsOn("compileExperimentJava", "processExperimentResources")
     
+    // Support simplified syntax: ./gradlew exp -Prun=TestName
+    // This avoids the verbose --tests "TestName" syntax
+    val runFilter = project.findProperty("run") as String?
+    if (runFilter != null) {
+        filter {
+            includeTestsMatching("*$runFilter*")
+        }
+    }
+    
     doLast {
         println("\n✓ Experiment complete.")
         println("  MEASURE specs: src/test/resources/punit/specs/")
@@ -175,11 +188,15 @@ val experiment by tasks.registering(Test::class) {
     }
 }
 
-// Alias: 'exp' is shorthand for 'experiment'
-tasks.register("exp") {
-    description = "Alias for 'experiment' task"
-    group = "verification"
-    dependsOn(experiment)
+val experiment by tasks.registering(Test::class) {
+    description = "Runs experiments (mode determined from @Experiment annotation)"
+    configureAsExperimentTask()
+}
+
+// 'exp' is a full Test task (not just an alias) so --tests works
+val exp by tasks.registering(Test::class) {
+    description = "Shorthand for 'experiment' task"
+    configureAsExperimentTask()
 }
 
 tasks.javadoc {
