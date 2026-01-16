@@ -119,21 +119,22 @@ tasks.test {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MEASURE task - Generate specs for probabilistic tests
+// EXPERIMENT task - Run experiments (MEASURE or EXPLORE mode)
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// Runs experiments with mode = MEASURE to generate statistically reliable specs.
-// Specs are written directly to src/test/resources/punit/specs/ for version control.
+// Runs experiments annotated with @Experiment. The mode (MEASURE or EXPLORE)
+// is determined from the annotation's mode property.
 //
 // Usage:
-//   ./gradlew measure --tests "ShoppingExperiment.measureRealisticSearchBaseline"
+//   ./gradlew experiment --tests "ShoppingExperiment.measureRealisticSearchBaseline"
+//   ./gradlew exp --tests "ShoppingExperiment.exploreModelConfigurations"
 //
 // Output:
-//   Specs written to: src/test/resources/punit/specs/{UseCaseId}.yaml
-//   These are used by @ProbabilisticTest with useCase = MyUseCase.class
+//   MEASURE mode: Specs written to src/test/resources/punit/specs/{UseCaseId}.yaml
+//   EXPLORE mode: Specs written to src/test/resources/punit/explorations/{UseCaseId}/{config}.yaml
 //
-val measure by tasks.registering(Test::class) {
-    description = "Runs MEASURE experiments to generate specs for probabilistic tests"
+val experiment by tasks.registering(Test::class) {
+    description = "Runs experiments (mode determined from @Experiment annotation)"
     group = "verification"
     
     // Use the experiment source set
@@ -153,67 +154,12 @@ val measure by tasks.registering(Test::class) {
     
     // Configure reports output directory
     reports {
-        html.outputLocation.set(layout.buildDirectory.dir("reports/measure"))
-        junitXml.outputLocation.set(layout.buildDirectory.dir("measure-results"))
+        html.outputLocation.set(layout.buildDirectory.dir("reports/experiment"))
+        junitXml.outputLocation.set(layout.buildDirectory.dir("experiment-results"))
     }
     
-    // Specs go directly to src/test/resources/punit/specs/ (version controlled)
-    systemProperty("punit.mode", "measure")
+    // Output directories for each mode (used by the framework based on annotation mode)
     systemProperty("punit.specs.outputDir", "src/test/resources/punit/specs")
-    
-    // Experiments never fail the build (they're exploratory, not conformance tests)
-    ignoreFailures = true
-    
-    // Ensure experiment classes are compiled first
-    dependsOn("compileExperimentJava", "processExperimentResources")
-    
-    doLast {
-        println("\n✓ MEASURE complete. Specs written to: src/test/resources/punit/specs/")
-        println("  Next: Review and commit the generated specs.")
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// EXPLORE task - Compare configurations to find optimal settings
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// Runs experiments with mode = EXPLORE to compare different configurations.
-// Specs are written to src/test/resources/punit/explorations/ for analysis.
-//
-// Usage:
-//   ./gradlew explore --tests "ShoppingExperiment.exploreModelConfigurations"
-//
-// Output:
-//   Specs written to: src/test/resources/punit/explorations/{UseCaseId}/{config}.yaml
-//   These are for analysis/comparison, not for powering tests.
-//
-val explore by tasks.registering(Test::class) {
-    description = "Runs EXPLORE experiments to compare configurations"
-    group = "verification"
-    
-    // Use the experiment source set
-    testClassesDirs = sourceSets["experiment"].output.classesDirs
-    classpath = sourceSets["experiment"].runtimeClasspath
-    
-    useJUnitPlatform()
-    
-    testLogging {
-        events("passed", "skipped", "failed", "standardOut", "standardError")
-        showExceptions = true
-        showCauses = true
-        showStackTraces = true
-        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
-        showStandardStreams = true
-    }
-    
-    // Configure reports output directory
-    reports {
-        html.outputLocation.set(layout.buildDirectory.dir("reports/explore"))
-        junitXml.outputLocation.set(layout.buildDirectory.dir("explore-results"))
-    }
-    
-    // Exploration specs go to explorations/ (for analysis, not tests)
-    systemProperty("punit.mode", "explore")
     systemProperty("punit.explorations.outputDir", "src/test/resources/punit/explorations")
     
     // Experiments never fail the build (they're exploratory, not conformance tests)
@@ -223,9 +169,17 @@ val explore by tasks.registering(Test::class) {
     dependsOn("compileExperimentJava", "processExperimentResources")
     
     doLast {
-        println("\n✓ EXPLORE complete. Results written to: src/test/resources/punit/explorations/")
-        println("  Analyze results to choose optimal configuration, then run MEASURE.")
+        println("\n✓ Experiment complete.")
+        println("  MEASURE specs: src/test/resources/punit/specs/")
+        println("  EXPLORE results: src/test/resources/punit/explorations/")
     }
+}
+
+// Alias: 'exp' is shorthand for 'experiment'
+tasks.register("exp") {
+    description = "Alias for 'experiment' task"
+    group = "verification"
+    dependsOn(experiment)
 }
 
 tasks.javadoc {
