@@ -1,439 +1,523 @@
 # ExperimentExtension Refactoring Plan
 
-## Current State
-
-| Metric                 | Value                                                            |
-|------------------------|------------------------------------------------------------------|
-| Lines of Code          | 1,510                                                            |
-| Implemented Interfaces | `TestTemplateInvocationContextProvider`, `InvocationInterceptor` |
-| Nested Records/Classes | 8                                                                |
-| Public Methods         | 3                                                                |
-| Private Methods        | ~35                                                              |
-
-## Problem
-
-`ExperimentExtension` has grown unwieldy, spanning too many responsibilities:
-- Factor resolution and naming
-- Pacing control
-- Result recording and success determination
-- Spec/baseline generation
-- Path resolution for output files
-- Progress reporting
-- Invocation context creation
-- Parameter resolution
-- Covariate extraction
-
-This violates the Single Responsibility Principle and makes the class difficult to test, understand, and maintain.
-
-## Goal
-
-Reduce `ExperimentExtension` to ~600-700 lines by extracting cohesive responsibilities into dedicated, package-private helper classes. Each helper will receive its own unit test suite.
-
-## Identified Responsibilities
-
-| # | Responsibility             | Lines (est.) | Candidate Class                |
-|---|----------------------------|--------------|--------------------------------|
-| 1 | Factor Resolution          | ~130         | `FactorResolver`               |
-| 2 | Spec Generation            | ~200         | `SpecGenerator`                |
-| 3 | Result Recording           | ~50          | `ResultRecorder`               |
-| 4 | Pacing Orchestration       | ~40          | `ExperimentPacingOrchestrator` |
-| 5 | Invocation Context Classes | ~150         | Move to own files              |
-| 6 | Parameter Resolvers        | ~120         | Move to own files              |
-| 7 | Path Resolution            | ~60          | `ExperimentOutputPathResolver` |
-| 8 | Report Publishing          | ~30          | `ExperimentReporter`           |
+## Document Status
+**Status**: Draft
+**Version**: 2.0
+**Last Updated**: 2026-01-16
 
 ---
 
-## Phase 1: Extract FactorResolver
+## Problem Statement
 
-**Target Lines**: ~130 lines extracted
+`ExperimentExtension` is 1,575 lines serving three distinct experiment modes: MEASURE, EXPLORE, and OPTIMIZE. The current structure:
 
-### Responsibilities to Extract
+- Intermingles mode-specific logic via switch/if statements
+- Uses a "god record" (`ExperimentConfig`) with many null fields per mode
+- Has asymmetric package structure: OPTIMIZE has a subpackage, MEASURE and EXPLORE don't
+- Makes it unclear where new mode-specific behavior should go
+- Is difficult to test in isolation
 
-- `extractFactorInfos(Method, FactorSource, List<FactorArguments>)`
-- `extractFactorInfosFromArguments(Method, FactorArguments)`
-- `extractFactorValues(FactorArguments, List<FactorInfo>)`
-- `getFactorInfos(Method)` (static helper)
-- `buildConfigName(List<FactorInfo>, Object[])`
-- `formatFactorValue(Object)`
-- `resolveClass(String, Class<?>)`
-- `getFactorArguments(Method, String)`
-- `FactorInfo` record (move to own file)
+## Design Goals
 
-### New Classes
+1. **Structural clarity**: Each mode has its own package with symmetric organization
+2. **Mode-agnostic coordinator**: `ExperimentExtension` dispatches to strategies, never branches on mode
+3. **Testability**: Mode-specific logic can be unit tested without the full extension
+4. **Extensibility**: Adding behavior to a mode has an obvious home
 
-```
-src/main/java/org/javai/punit/experiment/engine/
-├── FactorResolver.java       (~100 lines)
-├── FactorInfo.java           (~10 lines, record)
-└── ...
-```
-
-### Test File
+## Target Architecture
 
 ```
-src/test/java/org/javai/punit/experiment/engine/
-└── FactorResolverTest.java   (~150 lines, 15-20 tests)
+src/main/java/org/javai/punit/experiment/
+├── engine/                              # Coordinator + shared infrastructure
+│   ├── ExperimentExtension.java         # Thin dispatcher (~200-300 lines)
+│   ├── ExperimentModeStrategy.java      # Strategy interface
+│   ├── ExperimentConfig.java            # Sealed interface for config hierarchy
+│   ├── ExperimentInvocationContext.java # Base interface/record
+│   └── shared/                          # Helpers used by all modes
+│       ├── FactorResolver.java
+│       ├── ResultRecorder.java
+│       ├── OutputPathResolver.java
+│       └── ProgressReporter.java
+│
+├── measure/                             # MEASURE mode implementation
+│   ├── MeasureConfig.java               # Record implementing ExperimentConfig
+│   ├── MeasureStrategy.java             # Implements ExperimentModeStrategy
+│   ├── MeasureInvocationContext.java
+│   └── MeasureSpecGenerator.java
+│
+├── explore/                             # EXPLORE mode implementation
+│   ├── ExploreConfig.java
+│   ├── ExploreStrategy.java
+│   ├── ExploreInvocationContext.java
+│   └── ExploreSpecGenerator.java
+│
+└── optimize/                            # OPTIMIZE mode implementation (exists, needs alignment)
+    ├── OptimizeConfig.java
+    ├── OptimizeStrategy.java
+    ├── OptimizeInvocationContext.java
+    └── ... (existing: Scorer, FactorMutator, OptimizationHistory, etc.)
 ```
-
-### Test Cases
-
-1. Extract factor infos from FactorArguments with embedded names
-2. Extract factor infos from @FactorSource.factors()
-3. Extract factor infos from @Factor annotations
-4. Build config name from factor values (single factor)
-5. Build config name from factor values (multiple factors)
-6. Format factor value (null, string, number)
-7. Format factor value with special characters
-8. Resolve class in same package
-9. Resolve class in sibling package (usecase, model, etc.)
-10. Resolve fully qualified class name
-11. Get factor arguments from method returning Stream
-12. Get factor arguments from method returning Collection
-13. Error on invalid factor source
-
-### Estimated Effort
-
-- Implementation: ~1 hour
-- Tests: ~1 hour
 
 ---
 
-## Phase 2: Extract SpecGenerator
+## Core Interfaces
 
-**Target Lines**: ~200 lines extracted
+### ExperimentConfig (Sealed Interface)
 
-### Responsibilities to Extract
+```java
+package org.javai.punit.experiment.engine;
 
-- `generateSpec(ExtensionContext, Store)`
-- `generateExploreSpec(ExtensionContext, Store, String, ExperimentResultAggregator)`
-- `generateSpecOnce(ExtensionContext, Store)`
-- `checkAndGenerateSpec(ExtensionContext, Store)`
-- Covariate extraction logic (currently inline in `generateSpec`)
+public sealed interface ExperimentConfig
+    permits MeasureConfig, ExploreConfig, OptimizeConfig {
 
-### New Classes
+    /** The experiment mode. */
+    ExperimentMode mode();
 
+    /** The use case class. */
+    Class<?> useCaseClass();
+
+    /** Resolved use case ID. */
+    String useCaseId();
+
+    /** Time budget in milliseconds (0 = unlimited). */
+    long timeBudgetMs();
+
+    /** Token budget (0 = unlimited). */
+    long tokenBudget();
+
+    /** Experiment identifier for output naming. */
+    String experimentId();
+}
 ```
-src/main/java/org/javai/punit/experiment/engine/
-├── SpecGenerator.java        (~180 lines)
-└── ...
+
+Each mode package provides its own record:
+
+```java
+// experiment.measure.MeasureConfig
+public record MeasureConfig(
+    Class<?> useCaseClass,
+    String useCaseId,
+    int samples,
+    long timeBudgetMs,
+    long tokenBudget,
+    String experimentId,
+    int expiresInDays
+) implements ExperimentConfig {
+    @Override public ExperimentMode mode() { return ExperimentMode.MEASURE; }
+}
+
+// experiment.explore.ExploreConfig
+public record ExploreConfig(
+    Class<?> useCaseClass,
+    String useCaseId,
+    int samplesPerConfig,
+    long timeBudgetMs,
+    long tokenBudget,
+    String experimentId,
+    int expiresInDays
+) implements ExperimentConfig {
+    @Override public ExperimentMode mode() { return ExperimentMode.EXPLORE; }
+}
+
+// experiment.optimize.OptimizeConfig
+public record OptimizeConfig(
+    Class<?> useCaseClass,
+    String useCaseId,
+    String treatmentFactor,
+    Class<?> scorerClass,
+    Class<?> mutatorClass,
+    OptimizationObjective objective,
+    int samplesPerIteration,
+    int maxIterations,
+    int noImprovementWindow,
+    long timeBudgetMs,
+    long tokenBudget,
+    String experimentId
+) implements ExperimentConfig {
+    @Override public ExperimentMode mode() { return ExperimentMode.OPTIMIZE; }
+}
 ```
 
-### Test File
+### ExperimentModeStrategy (Interface)
 
+```java
+package org.javai.punit.experiment.engine;
+
+/**
+ * Strategy for handling a specific experiment mode.
+ *
+ * Each mode (MEASURE, EXPLORE, OPTIMIZE) provides an implementation that knows how to:
+ * - Parse its annotation into a config
+ * - Generate invocation contexts (the sample stream)
+ * - Intercept and execute each sample
+ * - Generate output (specs, optimization history, etc.)
+ */
+public interface ExperimentModeStrategy {
+
+    /**
+     * Parse the experiment annotation into a mode-specific config.
+     *
+     * @param testMethod the annotated test method
+     * @return the parsed configuration
+     * @throws ExtensionConfigurationException if annotation is invalid
+     */
+    ExperimentConfig parseConfig(Method testMethod);
+
+    /**
+     * Provide the stream of invocation contexts for this experiment.
+     *
+     * @param config the parsed configuration
+     * @param context the JUnit extension context
+     * @param store the extension store for shared state
+     * @return stream of invocation contexts (one per sample)
+     */
+    Stream<TestTemplateInvocationContext> provideInvocationContexts(
+        ExperimentConfig config,
+        ExtensionContext context,
+        ExtensionContext.Store store
+    );
+
+    /**
+     * Intercept and execute a single sample.
+     *
+     * @param invocation the JUnit invocation to proceed or skip
+     * @param invocationContext reflective context for the method
+     * @param extensionContext the JUnit extension context
+     * @param store the extension store for shared state
+     */
+    void intercept(
+        InvocationInterceptor.Invocation<Void> invocation,
+        ReflectiveInvocationContext<Method> invocationContext,
+        ExtensionContext extensionContext,
+        ExtensionContext.Store store
+    ) throws Throwable;
+
+    /**
+     * Check if this strategy handles the given test method.
+     *
+     * @param testMethod the test method to check
+     * @return true if this strategy's annotation is present
+     */
+    boolean supports(Method testMethod);
+}
 ```
-src/test/java/org/javai/punit/experiment/engine/
-└── SpecGeneratorTest.java    (~200 lines, 15-20 tests)
+
+### ExperimentExtension (Thin Coordinator)
+
+```java
+package org.javai.punit.experiment.engine;
+
+/**
+ * JUnit 5 extension that coordinates experiment execution.
+ *
+ * This class is intentionally thin - it detects which mode annotation is present,
+ * delegates to the corresponding strategy, and manages shared infrastructure
+ * (pacing, store setup). Mode-specific logic lives in the strategy implementations.
+ */
+public class ExperimentExtension implements
+    TestTemplateInvocationContextProvider, InvocationInterceptor {
+
+    private static final List<ExperimentModeStrategy> STRATEGIES = List.of(
+        new MeasureStrategy(),
+        new ExploreStrategy(),
+        new OptimizeStrategy()
+    );
+
+    @Override
+    public boolean supportsTestTemplate(ExtensionContext context) {
+        return context.getTestMethod()
+            .map(m -> STRATEGIES.stream().anyMatch(s -> s.supports(m)))
+            .orElse(false);
+    }
+
+    @Override
+    public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
+            ExtensionContext context) {
+
+        Method testMethod = context.getRequiredTestMethod();
+        ExperimentModeStrategy strategy = findStrategy(testMethod);
+
+        ExtensionContext.Store store = context.getStore(NAMESPACE);
+        ExperimentConfig config = strategy.parseConfig(testMethod);
+
+        // Store shared state
+        store.put("strategy", strategy);
+        store.put("config", config);
+        store.put("startTimeMs", System.currentTimeMillis());
+
+        // Setup pacing (shared infrastructure)
+        setupPacing(testMethod, config, store);
+
+        return strategy.provideInvocationContexts(config, context, store);
+    }
+
+    @Override
+    public void interceptTestTemplateMethod(
+            Invocation<Void> invocation,
+            ReflectiveInvocationContext<Method> invocationContext,
+            ExtensionContext extensionContext) throws Throwable {
+
+        ExtensionContext.Store store = getParentStore(extensionContext);
+        ExperimentModeStrategy strategy = store.get("strategy", ExperimentModeStrategy.class);
+
+        // Apply pacing (shared infrastructure)
+        applyPacingDelay(store);
+
+        strategy.intercept(invocation, invocationContext, extensionContext, store);
+    }
+
+    private ExperimentModeStrategy findStrategy(Method testMethod) {
+        return STRATEGIES.stream()
+            .filter(s -> s.supports(testMethod))
+            .findFirst()
+            .orElseThrow(() -> new ExtensionConfigurationException(
+                "No strategy found for method: " + testMethod.getName()));
+    }
+
+    // Pacing setup and application (shared infrastructure)
+    private void setupPacing(Method testMethod, ExperimentConfig config,
+                             ExtensionContext.Store store) { ... }
+    private void applyPacingDelay(ExtensionContext.Store store) { ... }
+}
 ```
-
-### Test Cases
-
-1. Generate spec for completed MEASURE experiment
-2. Generate spec for terminated MEASURE experiment (time budget)
-3. Generate spec for terminated MEASURE experiment (token budget)
-4. Generate spec with covariates
-5. Generate spec without covariates
-6. Generate spec exactly once (thread-safe guard)
-7. Generate EXPLORE spec for single config
-8. Generate EXPLORE specs for multiple configs
-9. Include result projections in EXPLORE spec
-10. Handle experiment ID in path
-11. Use footprint in filename when present
-12. Emit info note when expiresInDays == 0
-
-### Estimated Effort
-
-- Implementation: ~1.5 hours
-- Tests: ~1.5 hours
 
 ---
 
-## Phase 3: Extract ExperimentOutputPathResolver
+## Implementation Phases
 
-**Target Lines**: ~60 lines extracted
+### Phase 1: Create Package Structure and Interfaces
 
-### Responsibilities to Extract
+**Goal**: Establish the target structure without moving existing code.
 
-- `resolveMeasureOutputPath(String, String, CovariateProfile)`
-- `resolveExploreOutputPath(Experiment, String, String)`
-- Constants: `DEFAULT_SPECS_DIR`, `DEFAULT_EXPLORATIONS_DIR`
+**Tasks**:
+1. Create `experiment.engine.shared` package
+2. Create `experiment.measure` package
+3. Create `experiment.explore` package
+4. Create `ExperimentConfig` sealed interface
+5. Create `ExperimentModeStrategy` interface
 
-### New Classes
-
+**Files Created**:
 ```
-src/main/java/org/javai/punit/experiment/engine/
-├── ExperimentOutputPathResolver.java  (~50 lines)
-└── ...
-```
-
-### Test File
-
-```
-src/test/java/org/javai/punit/experiment/engine/
-└── ExperimentOutputPathResolverTest.java  (~100 lines, 12-15 tests)
+experiment/engine/ExperimentConfig.java
+experiment/engine/ExperimentModeStrategy.java
+experiment/measure/package-info.java
+experiment/explore/package-info.java
+experiment/engine/shared/package-info.java
 ```
 
-### Test Cases
+**Tests**: Interface compilation only (no behavior yet)
 
-1. MEASURE path with no footprint (legacy naming)
-2. MEASURE path with footprint
-3. MEASURE path with system property override
-4. EXPLORE path creates use case subdirectory
-5. EXPLORE path with system property override
-6. EXPLORE path sanitizes config name for filesystem
-7. Creates parent directories if missing
-8. Handles use case ID with dots
-
-### Estimated Effort
-
-- Implementation: ~0.5 hours
-- Tests: ~0.5 hours
+**Estimated Effort**: ~1 hour
 
 ---
 
-## Phase 4: Extract ResultRecorder
+### Phase 2: Extract MeasureStrategy
 
-**Target Lines**: ~50 lines extracted
+**Goal**: Move MEASURE-specific logic to its own package.
 
-### Responsibilities to Extract
+**Tasks**:
+1. Create `MeasureConfig` record
+2. Create `MeasureStrategy` implementing the interface
+3. Move `MeasureInvocationContext` to `experiment.measure`
+4. Move `MeasureWithFactorsInvocationContext` to `experiment.measure`
+5. Extract MEASURE spec generation to `MeasureSpecGenerator`
+6. Update `ExperimentExtension` to delegate MEASURE to strategy
 
-- `recordResult(ResultCaptor, ExperimentResultAggregator)`
-- `determineSuccess(UseCaseResult)`
-- `determineFailureCategory(UseCaseResult, UseCaseCriteria)`
-
-### New Classes
-
+**Files Created**:
 ```
-src/main/java/org/javai/punit/experiment/engine/
-├── ResultRecorder.java       (~40 lines)
-└── ...
-```
-
-### Test File
-
-```
-src/test/java/org/javai/punit/experiment/engine/
-└── ResultRecorderTest.java   (~120 lines, 15-18 tests)
+experiment/measure/MeasureConfig.java
+experiment/measure/MeasureStrategy.java
+experiment/measure/MeasureInvocationContext.java
+experiment/measure/MeasureWithFactorsInvocationContext.java
+experiment/measure/MeasureSpecGenerator.java
 ```
 
-### Test Cases
+**Tests**:
+- `MeasureStrategyTest` - unit tests for config parsing, context generation
+- `MeasureSpecGeneratorTest` - unit tests for spec generation
+- Existing integration tests must pass
 
-1. Record success when criteria.allPassed() is true
-2. Record failure when criteria.allPassed() is false
-3. Record success from "success" boolean field
-4. Record success from "isValid" boolean field
-5. Record failure from "error" field presence
-6. Default to success when no indicators present
-7. Extract failure category from first failed criterion
-8. Extract failure category from "failureCategory" field
-9. Extract failure category from "errorType" field
-10. Handle exception recording
-11. Handle null captor gracefully
-12. Handle empty result gracefully
-
-### Estimated Effort
-
-- Implementation: ~0.5 hours
-- Tests: ~1 hour
+**Estimated Effort**: ~3 hours
 
 ---
 
-## Phase 5: Extract ExperimentPacingOrchestrator
+### Phase 3: Extract ExploreStrategy
 
-**Target Lines**: ~40 lines extracted
+**Goal**: Move EXPLORE-specific logic to its own package.
 
-### Responsibilities to Extract
+**Tasks**:
+1. Create `ExploreConfig` record
+2. Create `ExploreStrategy` implementing the interface
+3. Move `ExploreInvocationContext` to `experiment.explore`
+4. Extract EXPLORE spec generation to `ExploreSpecGenerator`
+5. Update `ExperimentExtension` to delegate EXPLORE to strategy
 
-- `resolvePacing(Method, int, Experiment)`
-- `applyPacingDelay(Store)`
-- `computeTotalSamples(Experiment, Method)`
-- Pacing reporting (currently inline)
-
-### New Classes
-
+**Files Created**:
 ```
-src/main/java/org/javai/punit/experiment/engine/
-├── ExperimentPacingOrchestrator.java  (~60 lines)
-└── ...
-```
-
-### Test File
-
-```
-src/test/java/org/javai/punit/experiment/engine/
-└── ExperimentPacingOrchestratorTest.java  (~100 lines, 12-15 tests)
+experiment/explore/ExploreConfig.java
+experiment/explore/ExploreStrategy.java
+experiment/explore/ExploreInvocationContext.java
+experiment/explore/ExploreSpecGenerator.java
 ```
 
-### Test Cases
+**Tests**:
+- `ExploreStrategyTest` - unit tests for config parsing, context generation
+- `ExploreSpecGeneratorTest` - unit tests for spec generation
+- Existing integration tests must pass
 
-1. Resolve pacing from @Pacing annotation
-2. Resolve pacing with no annotation (defaults)
-3. Compute total samples for MEASURE mode
-4. Compute total samples for EXPLORE mode
-5. Apply pacing delay (skip first sample)
-6. Apply pacing delay (subsequent samples)
-7. Handle null pacing configuration
-8. Handle missing global sample counter
-9. Report pacing configuration when enabled
-10. Report feasibility warning when pacing exceeds time budget
-
-### Estimated Effort
-
-- Implementation: ~0.5 hours
-- Tests: ~1 hour
+**Estimated Effort**: ~3 hours
 
 ---
 
-## Phase 6: Extract ExperimentReporter
+### Phase 4: Align OptimizeStrategy
 
-**Target Lines**: ~30 lines extracted
+**Goal**: Align existing `experiment.optimize` package with the strategy pattern.
 
-### Responsibilities to Extract
+**Tasks**:
+1. Create `OptimizeConfig` record (or adapt existing)
+2. Create `OptimizeStrategy` implementing the interface
+3. Create `OptimizeInvocationContext`
+4. Integrate existing optimize classes (Scorer, FactorMutator, etc.)
+5. Update `ExperimentExtension` to delegate OPTIMIZE to strategy
 
-- `reportProgress(ExtensionContext, ExperimentResultAggregator, int, int)`
-- `publishFinalReport(ExtensionContext, ExperimentResultAggregator)`
-
-### New Classes
-
+**Files Created/Modified**:
 ```
-src/main/java/org/javai/punit/experiment/engine/
-├── ExperimentReporter.java   (~40 lines)
-└── ...
-```
-
-### Test File
-
-```
-src/test/java/org/javai/punit/experiment/engine/
-└── ExperimentReporterTest.java  (~80 lines, 10-12 tests)
+experiment/optimize/OptimizeConfig.java
+experiment/optimize/OptimizeStrategy.java
+experiment/optimize/OptimizeInvocationContext.java
 ```
 
-### Test Cases
+**Tests**:
+- `OptimizeStrategyTest` - unit tests for config parsing
+- Integration with existing optimize tests
 
-1. Report progress with current sample and total
-2. Report progress with success rate
-3. Publish final report with all metrics
-4. Include termination reason in final report
-5. Include elapsed time in final report
-6. Include token usage in final report
-
-### Estimated Effort
-
-- Implementation: ~0.5 hours
-- Tests: ~0.5 hours
+**Estimated Effort**: ~2 hours
 
 ---
 
-## Phase 7: Move Invocation Context Records to Own Files
+### Phase 5: Extract Shared Helpers
 
-**Target Lines**: ~150 lines moved
+**Goal**: Extract shared infrastructure to `experiment.engine.shared`.
 
-### Classes to Extract
+**Tasks**:
+1. Extract `FactorResolver` - factor info extraction and naming
+2. Extract `ResultRecorder` - recording results to aggregator
+3. Extract `OutputPathResolver` - spec/exploration/optimization paths
+4. Extract `ProgressReporter` - JUnit report entry publishing
+5. Update strategies to use shared helpers
 
-Move from `ExperimentExtension` to their own files:
-
+**Files Created**:
 ```
-src/main/java/org/javai/punit/experiment/engine/
-├── MeasureInvocationContext.java            (~30 lines)
-├── MeasureWithFactorsInvocationContext.java (~40 lines)
-├── ExploreInvocationContext.java            (~40 lines)
-└── ...
+experiment/engine/shared/FactorResolver.java
+experiment/engine/shared/ResultRecorder.java
+experiment/engine/shared/OutputPathResolver.java
+experiment/engine/shared/ProgressReporter.java
 ```
 
-### Notes
+**Tests**:
+- Unit tests for each helper
+- Existing integration tests must pass
 
-- These are currently `private record` declarations
-- Move to package-private files
-- No new tests needed (tested via integration)
-
-### Estimated Effort
-
-- Implementation: ~0.5 hours
-- No additional tests (covered by integration)
+**Estimated Effort**: ~3 hours
 
 ---
 
-## Phase 8: Move Parameter Resolvers to Own Files
+### Phase 6: Extract Parameter Resolvers
 
-**Target Lines**: ~120 lines moved
+**Goal**: Move parameter resolvers to appropriate locations.
 
-### Classes to Extract
+**Tasks**:
+1. Move `CaptorParameterResolver` to `experiment.engine.shared`
+2. Move `FactorParameterResolver` to `experiment.engine.shared`
+3. Move `FactorValuesResolver` to `experiment.engine.shared`
+4. Move `FactorValuesInitializer` to `experiment.engine.shared`
+5. Make package-private (not nested private)
 
-Move from `ExperimentExtension` to their own files:
-
+**Files Created**:
 ```
-src/main/java/org/javai/punit/experiment/engine/
-├── CaptorParameterResolver.java     (~50 lines)
-├── FactorParameterResolver.java     (~40 lines)
-├── FactorValuesResolver.java        (~30 lines)
-├── FactorValuesInitializer.java     (~50 lines)
-└── ...
+experiment/engine/shared/CaptorParameterResolver.java
+experiment/engine/shared/FactorParameterResolver.java
+experiment/engine/shared/FactorValuesResolver.java
+experiment/engine/shared/FactorValuesInitializer.java
 ```
 
-### Notes
+**Tests**: Covered by existing integration tests
 
-- These are currently `private static class` declarations
-- Move to package-private files
-- No new tests needed (tested via integration)
+**Estimated Effort**: ~1 hour
 
-### Estimated Effort
+---
 
-- Implementation: ~0.5 hours
-- No additional tests (covered by integration)
+### Phase 7: Clean Up ExperimentExtension
+
+**Goal**: Remove dead code and verify thin coordinator.
+
+**Tasks**:
+1. Remove mode-specific methods from `ExperimentExtension`
+2. Remove nested record/class definitions
+3. Remove the "god record" `ExperimentConfig` (replaced by sealed interface)
+4. Verify extension is ~200-300 lines
+5. Update Javadoc
+
+**Verification**:
+- `ExperimentExtension` contains no switch/if on mode
+- All mode-specific logic is in strategy packages
+- Full test suite passes
+
+**Estimated Effort**: ~1 hour
 
 ---
 
 ## Summary
 
-| Phase | Description | Lines Extracted | New Test Count |
-|-------|-------------|-----------------|----------------|
-| 1 | FactorResolver | ~130 | 15-20 |
-| 2 | SpecGenerator | ~200 | 15-20 |
-| 3 | ExperimentOutputPathResolver | ~60 | 12-15 |
-| 4 | ResultRecorder | ~50 | 15-18 |
-| 5 | ExperimentPacingOrchestrator | ~40 | 12-15 |
-| 6 | ExperimentReporter | ~30 | 10-12 |
-| 7 | Invocation Context Records | ~150 | 0 |
-| 8 | Parameter Resolvers | ~120 | 0 |
-| **Total** | | **~780** | **~80** |
+| Phase | Description | New Files | Est. Effort |
+|-------|-------------|-----------|-------------|
+| 1 | Package structure and interfaces | 6 | 1 hour |
+| 2 | Extract MeasureStrategy | 5 | 3 hours |
+| 3 | Extract ExploreStrategy | 4 | 3 hours |
+| 4 | Align OptimizeStrategy | 3 | 2 hours |
+| 5 | Extract shared helpers | 4 | 3 hours |
+| 6 | Extract parameter resolvers | 4 | 1 hour |
+| 7 | Clean up ExperimentExtension | 0 | 1 hour |
+| **Total** | | **~26** | **~14 hours** |
 
-### Expected Final State
+## Expected Final State
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Lines in ExperimentExtension | 1,510 | ~650-750 |
-| Nested Records/Classes | 8 | 0 |
-| Helper Classes | 0 | 10+ |
-| Unit Test Coverage | Low | High |
-
----
-
-## Execution Strategy
-
-1. **One phase per feature branch**: `refactor/extract-factor-resolver`, etc.
-2. **Test before extracting**: Write helper class tests first
-3. **Delegate, don't duplicate**: Replace inline code with delegation calls
-4. **Verify all existing tests pass**: Run full test suite after each phase
-5. **Commit, push, create PR**: After each phase passes tests
-
----
-
-## Dependencies
-
-- Phase 2 (SpecGenerator) depends on Phase 3 (OutputPathResolver)
-- Phase 2 (SpecGenerator) may use Phase 1 (FactorResolver) for covariate naming
-- All other phases are independent
-
-**Recommended order**: 1 → 3 → 2 → 4 → 5 → 6 → 7 → 8
-
----
+| Lines in ExperimentExtension | 1,575 | ~200-300 |
+| Mode-specific branching in coordinator | 5+ locations | 0 |
+| Nested classes in ExperimentExtension | 8 | 0 |
+| Mode packages | 1 (optimize) | 3 (measure, explore, optimize) |
+| Testable strategy classes | 0 | 3 |
 
 ## Risks and Mitigations
 
 | Risk | Mitigation |
 |------|------------|
-| Breaking existing experiment behavior | Run full test suite after each extraction |
-| Store access patterns change | Document store keys in each helper |
-| Thread safety issues | Use same atomic patterns as original |
-| Parameter resolver ordering | Maintain `getAdditionalExtensions()` order |
+| Breaking existing experiment behavior | Run full test suite after each phase |
+| Store key conflicts between strategies | Document store keys; use strategy-prefixed keys if needed |
+| Parameter resolver ordering | Strategies control their own `getAdditionalExtensions()` order |
+| Shared helper dependencies | Extract helpers after strategies are working |
 
+## Execution Strategy
+
+1. **One phase per commit/PR** - small, reviewable changes
+2. **Tests pass after each phase** - no broken windows
+3. **Strategies working before helpers extracted** - prove the pattern first
+4. **ExperimentExtension shrinks incrementally** - visible progress
+
+---
+
+## Appendix: Current Mode Branching Points
+
+For reference, these are the locations in the current `ExperimentExtension` that branch on mode:
+
+| Line | Code | Issue |
+|------|------|-------|
+| 135-139 | `switch (config.mode())` | Dispatches to mode-specific context providers |
+| 740-744 | `if (mode == EXPLORE)` | Dispatches to mode-specific interceptors |
+| 145-163 | `ExperimentConfig` record | Union type with null fields per mode |
+| 247-255 | `switch (config.mode())` | Computes total samples differently |
+| 1325-1395 | Invocation context records | Mode-specific but not in mode packages |
+
+All of these will be eliminated by the strategy pattern.

@@ -1,6 +1,5 @@
 package org.javai.punit.experiment.model;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -18,15 +17,15 @@ import java.util.stream.Collectors;
  * </ul>
  */
 public final class ExperimentConfig {
-    
+
     private final int index;
     private final String name;
-    private final Map<String, Object> factors;
-    
-    private ExperimentConfig(int index, String name, Map<String, Object> factors) {
+    private final FactorSuit factorSuit;
+
+    private ExperimentConfig(int index, String name, FactorSuit factorSuit) {
         this.index = index;
         this.name = name;
-        this.factors = Collections.unmodifiableMap(new LinkedHashMap<>(factors));
+        this.factorSuit = factorSuit;
     }
     
     public static Builder builder() {
@@ -40,7 +39,17 @@ public final class ExperimentConfig {
      * @return the config
      */
     public static ExperimentConfig of(Map<String, Object> factors) {
-        return new ExperimentConfig(0, null, factors);
+        return new ExperimentConfig(0, null, FactorSuit.of(factors));
+    }
+
+    /**
+     * Creates a config from a FactorSuit.
+     *
+     * @param factorSuit the factor suit
+     * @return the config
+     */
+    public static ExperimentConfig of(FactorSuit factorSuit) {
+        return new ExperimentConfig(0, null, factorSuit);
     }
     
     /**
@@ -67,9 +76,18 @@ public final class ExperimentConfig {
      * @return unmodifiable map of factors
      */
     public Map<String, Object> getFactors() {
-        return factors;
+        return factorSuit.asMap();
     }
-    
+
+    /**
+     * Returns the underlying FactorSuit.
+     *
+     * @return the factor suit
+     */
+    public FactorSuit getFactorSuit() {
+        return factorSuit;
+    }
+
     /**
      * Returns the level for a specific factor.
      *
@@ -77,9 +95,9 @@ public final class ExperimentConfig {
      * @return the level, or null if not present
      */
     public Object getLevel(String factorName) {
-        return factors.get(factorName);
+        return factorSuit.get(factorName);
     }
-    
+
     /**
      * Returns the level for a specific factor with type casting.
      *
@@ -91,7 +109,7 @@ public final class ExperimentConfig {
      */
     @SuppressWarnings("unchecked")
     public <T> Optional<T> getLevel(String factorName, Class<T> type) {
-        Object level = factors.get(factorName);
+        Object level = factorSuit.get(factorName);
         if (level == null) {
             return Optional.empty();
         }
@@ -111,12 +129,12 @@ public final class ExperimentConfig {
         if (name != null && !name.isEmpty()) {
             return name.replaceAll("[^a-zA-Z0-9-_]", "_");
         }
-        return factors.entrySet().stream()
+        return factorSuit.asMap().entrySet().stream()
             .map(e -> e.getKey() + "=" + e.getValue())
             .collect(Collectors.joining(","))
             .replaceAll("[^a-zA-Z0-9-_=,]", "_");
     }
-    
+
     /**
      * Returns a display name for this config.
      *
@@ -126,65 +144,72 @@ public final class ExperimentConfig {
         if (name != null && !name.isEmpty()) {
             return name;
         }
-        return factors.entrySet().stream()
+        return factorSuit.asMap().entrySet().stream()
             .map(e -> e.getKey() + "=" + e.getValue())
             .collect(Collectors.joining(", ", "{", "}"));
     }
-    
+
     @Override
     public String toString() {
         return "ExperimentConfig{" +
             "index=" + index +
             ", name='" + name + '\'' +
-            ", factors=" + factors +
+            ", factorSuit=" + factorSuit +
             '}';
     }
-    
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ExperimentConfig that = (ExperimentConfig) o;
-        return Objects.equals(factors, that.factors);
+        return Objects.equals(factorSuit, that.factorSuit);
     }
-    
+
     @Override
     public int hashCode() {
-        return Objects.hash(factors);
+        return Objects.hash(factorSuit);
     }
     
     public static final class Builder {
-        
+
         private int index = 0;
         private String name;
         private final Map<String, Object> factors = new LinkedHashMap<>();
-        
+
         private Builder() {}
-        
+
         public Builder index(int index) {
             this.index = index;
             return this;
         }
-        
+
         public Builder name(String name) {
             this.name = name;
             return this;
         }
-        
+
         public Builder factor(String name, Object level) {
             factors.put(name, level);
             return this;
         }
-        
+
         public Builder factors(Map<String, Object> factors) {
             if (factors != null) {
                 this.factors.putAll(factors);
             }
             return this;
         }
-        
+
+        public Builder factorSuit(FactorSuit factorSuit) {
+            if (factorSuit != null) {
+                this.factors.putAll(factorSuit.asMap());
+            }
+            return this;
+        }
+
         public ExperimentConfig build() {
-            return new ExperimentConfig(index, name, factors);
+            return new ExperimentConfig(index, name, FactorSuit.of(factors));
         }
     }
 }
