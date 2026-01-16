@@ -1,11 +1,45 @@
 # Gradle build config simplification
 
-The gradle build config current defines two tasks where one should suffice.
+**STATUS: COMPLETED** ✅
 
-There are two types of 'experiment' in PUnit> MEASURE and EXPLORE.
+## Summary
+
+Unified the `measure` and `explore` Gradle tasks into a single `experiment` task.
+
+## Usage
+
+```bash
+# Simplified syntax (recommended):
+./gradlew exp -Prun=ShoppingExperiment.measureRealisticSearchBaseline
+./gradlew experiment -Prun=ShoppingExperiment
+
+# Traditional --tests syntax also works:
+./gradlew exp --tests "ShoppingExperiment.measureRealisticSearchBaseline"
+./gradlew experiment --tests "ShoppingExperiment"
+```
+
+The experiment mode (MEASURE or EXPLORE) is determined from the `@Experiment` annotation's `mode` property.
+
+## Output Directories
+
+- **MEASURE mode**: `src/test/resources/punit/specs/{UseCaseId}.yaml`
+- **EXPLORE mode**: `src/test/resources/punit/explorations/{UseCaseId}/{config}.yaml`
+
+---
+
+## Original Problem
+
+The gradle build config defined two tasks where one should suffice.
+
+There are two types of 'experiment' in PUnit: MEASURE and EXPLORE.
 
 A developer must express which one to use. This is done using the mode property of the Experiment annotation.
 
-For historical reasons I introduced two different gradle tasks to invoke these two different kinds of experiment, 
-but it instead if saying
+For historical reasons two different gradle tasks were used:
 
+```bash
+./gradlew clean measure --tests "<measure experiment name>"
+./gradlew clean explore --tests "<explore experiment name>"
+```
+
+Since the mode can be discovered from the annotation on the experiment method, a single task suffices.
