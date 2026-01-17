@@ -5,10 +5,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.javai.punit.engine.expiration.ExpirationEvaluator;
-import org.javai.punit.engine.expiration.ExpirationReportPublisher;
-import org.javai.punit.engine.expiration.ExpirationWarningRenderer;
-import org.javai.punit.engine.expiration.WarningLevel;
+import org.javai.punit.spec.expiration.ExpirationEvaluator;
+import org.javai.punit.spec.expiration.ExpirationReportPublisher;
+import org.javai.punit.spec.expiration.ExpirationWarningRenderer;
+import org.javai.punit.spec.expiration.WarningLevel;
 import org.javai.punit.model.ExpirationStatus;
 import org.javai.punit.model.TerminationReason;
 import org.javai.punit.reporting.PUnitReporter;

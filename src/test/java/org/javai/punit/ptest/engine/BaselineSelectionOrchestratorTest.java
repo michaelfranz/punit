@@ -7,11 +7,11 @@ import java.util.List;
 import java.util.Optional;
 
 import org.javai.punit.api.UseCaseProvider;
-import org.javai.punit.engine.covariate.BaselineRepository;
-import org.javai.punit.engine.covariate.BaselineSelector;
-import org.javai.punit.engine.covariate.CovariateProfileResolver;
-import org.javai.punit.engine.covariate.FootprintComputer;
-import org.javai.punit.engine.covariate.UseCaseCovariateExtractor;
+import org.javai.punit.spec.baseline.BaselineRepository;
+import org.javai.punit.spec.baseline.BaselineSelector;
+import org.javai.punit.spec.baseline.FootprintComputer;
+import org.javai.punit.spec.baseline.covariate.CovariateProfileResolver;
+import org.javai.punit.spec.baseline.covariate.UseCaseCovariateExtractor;
 import org.javai.punit.model.CovariateDeclaration;
 import org.javai.punit.ptest.engine.BaselineSelectionOrchestrator.PendingSelection;
 import org.javai.punit.ptest.engine.BaselineSelectionOrchestrator.PreparationResult;

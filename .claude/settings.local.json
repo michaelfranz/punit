@@ -12,7 +12,9 @@
       "Bash(./mvnw test:*)",
       "Bash(find:*)",
       "Bash(mvn test:*)",
-      "Bash(./gradlew compileExperimentJava:*)"
+      "Bash(./gradlew compileExperimentJava:*)",
+      "Bash(git mv:*)",
+      "Bash(wc:*)"
     ]
   }
 }

@@ -18,37 +18,37 @@ import org.junit.jupiter.api.extension.InvocationInterceptor.Invocation;
  * <p>The executor returns a {@link SampleResult} that allows the caller
  * to determine next steps (continue, abort, finalize).
  *
- * <p>Package-private: internal implementation detail of the test extension.
+ * <p>Public to allow access from strategy implementations.
  */
-class SampleExecutor {
+public class SampleExecutor {
 
     /**
      * Result of executing a single sample.
      *
-     * @param success true if the sample passed
+     * @param passed true if the sample passed
      * @param failure the exception if sample failed, null otherwise
      * @param shouldAbort true if test should abort immediately (ABORT_TEST policy triggered)
      * @param abortException the exception to rethrow if aborting
      */
-    record SampleResult(
+    public record SampleResult(
             boolean passed,
             Throwable failure,
             boolean shouldAbort,
             Throwable abortException
     ) {
-        static SampleResult ofSuccess() {
+        public static SampleResult ofSuccess() {
             return new SampleResult(true, null, false, null);
         }
 
-        static SampleResult ofFailure(Throwable failure) {
+        public static SampleResult ofFailure(Throwable failure) {
             return new SampleResult(false, failure, false, null);
         }
 
-        static SampleResult ofAbort(Throwable failure) {
+        public static SampleResult ofAbort(Throwable failure) {
             return new SampleResult(false, failure, true, failure);
         }
 
-        boolean hasSampleFailure() {
+        public boolean hasSampleFailure() {
             return failure != null;
         }
     }
@@ -68,7 +68,7 @@ class SampleExecutor {
      * @return the result of the sample execution
      * @throws Throwable if the sample should abort and rethrow immediately
      */
-    SampleResult execute(
+    public SampleResult execute(
             Invocation<Void> invocation,
             SampleResultAggregator aggregator,
             ExceptionHandling exceptionPolicy) throws Throwable {
@@ -101,7 +101,7 @@ class SampleExecutor {
      *
      * @param aggregator the result aggregator
      */
-    void prepareForAbort(SampleResultAggregator aggregator) {
+    public void prepareForAbort(SampleResultAggregator aggregator) {
         aggregator.setTerminated(TerminationReason.COMPLETED, "Test aborted due to exception");
     }
 }

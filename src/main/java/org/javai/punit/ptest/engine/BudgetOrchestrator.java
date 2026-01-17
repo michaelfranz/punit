@@ -19,26 +19,26 @@ import org.javai.punit.model.TerminationReason;
  * <p>Budget checks follow precedence order: suite → class → method.
  * The first exhausted budget triggers termination.
  *
- * <p>Package-private: internal implementation detail of the test extension.
+ * <p>Public to allow access from strategy implementations.
  */
-class BudgetOrchestrator {
+public class BudgetOrchestrator {
 
     /**
      * Result of a budget check operation.
      *
      * @param terminationReason the reason for termination, if budget is exhausted
      */
-    record BudgetCheckResult(Optional<TerminationReason> terminationReason) {
-        
-        static BudgetCheckResult ok() {
+    public record BudgetCheckResult(Optional<TerminationReason> terminationReason) {
+
+        public static BudgetCheckResult ok() {
             return new BudgetCheckResult(Optional.empty());
         }
-        
-        static BudgetCheckResult exhausted(TerminationReason reason) {
+
+        public static BudgetCheckResult exhausted(TerminationReason reason) {
             return new BudgetCheckResult(Optional.of(reason));
         }
-        
-        boolean shouldTerminate() {
+
+        public boolean shouldTerminate() {
             return terminationReason.isPresent();
         }
     }
@@ -61,7 +61,7 @@ class BudgetOrchestrator {
      * @param methodBudget the method-level budget monitor
      * @return the result of the budget check
      */
-    BudgetCheckResult checkBeforeSample(
+    public BudgetCheckResult checkBeforeSample(
             SharedBudgetMonitor suiteBudget,
             SharedBudgetMonitor classBudget,
             CostBudgetMonitor methodBudget) {
@@ -105,7 +105,7 @@ class BudgetOrchestrator {
      * @param methodBudget the method-level budget monitor
      * @return the result of the budget check
      */
-    BudgetCheckResult checkAfterSample(
+    public BudgetCheckResult checkAfterSample(
             SharedBudgetMonitor suiteBudget,
             SharedBudgetMonitor classBudget,
             CostBudgetMonitor methodBudget) {
@@ -141,7 +141,7 @@ class BudgetOrchestrator {
      * @param suiteBudget the suite-level budget monitor (may be null)
      * @return the number of tokens consumed in this sample
      */
-    long recordAndPropagateTokens(
+    public long recordAndPropagateTokens(
             DefaultTokenChargeRecorder tokenRecorder,
             CostBudgetMonitor methodBudget,
             CostBudgetMonitor.TokenMode tokenMode,
@@ -188,7 +188,7 @@ class BudgetOrchestrator {
      * @param methodBehavior the method-level exhaustion behavior
      * @return the appropriate exhaustion behavior
      */
-    BudgetExhaustedBehavior determineBehavior(
+    public BudgetExhaustedBehavior determineBehavior(
             TerminationReason reason,
             SharedBudgetMonitor suiteBudget,
             SharedBudgetMonitor classBudget,
@@ -214,7 +214,7 @@ class BudgetOrchestrator {
      * @param suiteBudget the suite-level budget monitor (may be null)
      * @return the formatted exhaustion message
      */
-    String buildExhaustionMessage(
+    public String buildExhaustionMessage(
             TerminationReason reason,
             CostBudgetMonitor methodBudget,
             SharedBudgetMonitor classBudget,
@@ -268,7 +268,7 @@ class BudgetOrchestrator {
      * @param elapsedMs elapsed time in milliseconds
      * @return the formatted failure message
      */
-    String buildExhaustionFailureMessage(
+    public String buildExhaustionFailureMessage(
             TerminationReason terminationReason,
             String terminationDetails,
             int samplesExecuted,

@@ -22,18 +22,23 @@ import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.ThresholdOrigin;
 import org.javai.punit.api.TokenChargeRecorder;
 import org.javai.punit.api.UseCaseProvider;
-import org.javai.punit.engine.covariate.BaselineRepository;
-import org.javai.punit.engine.covariate.BaselineSelectionTypes.BaselineCandidate;
-import org.javai.punit.engine.covariate.BaselineSelectionTypes.SelectionResult;
-import org.javai.punit.engine.covariate.BaselineSelector;
-import org.javai.punit.engine.covariate.CovariateProfileResolver;
-import org.javai.punit.engine.covariate.DefaultCovariateResolutionContext;
-import org.javai.punit.engine.covariate.FootprintComputer;
-import org.javai.punit.engine.covariate.NoCompatibleBaselineException;
-import org.javai.punit.engine.covariate.UseCaseCovariateExtractor;
+import org.javai.punit.spec.baseline.BaselineRepository;
+import org.javai.punit.spec.baseline.BaselineSelectionTypes.BaselineCandidate;
+import org.javai.punit.spec.baseline.BaselineSelectionTypes.SelectionResult;
+import org.javai.punit.spec.baseline.BaselineSelector;
+import org.javai.punit.spec.baseline.FootprintComputer;
+import org.javai.punit.spec.baseline.NoCompatibleBaselineException;
+import org.javai.punit.spec.baseline.covariate.CovariateProfileResolver;
+import org.javai.punit.spec.baseline.covariate.DefaultCovariateResolutionContext;
+import org.javai.punit.spec.baseline.covariate.UseCaseCovariateExtractor;
 import org.javai.punit.experiment.engine.FactorSourceAdapter;
 import org.javai.punit.model.CovariateDeclaration;
 import org.javai.punit.model.CovariateProfile;
+import org.javai.punit.ptest.bernoulli.BernoulliTrialsConfig;
+import org.javai.punit.ptest.bernoulli.BernoulliTrialsStrategy;
+import org.javai.punit.ptest.strategy.InterceptResult;
+import org.javai.punit.ptest.strategy.ProbabilisticTestStrategy;
+import org.javai.punit.ptest.strategy.SampleExecutionContext;
 import org.javai.punit.model.ExpirationStatus;
 import org.javai.punit.model.TerminationReason;
 import org.javai.punit.ptest.engine.FactorConsistencyValidator.ValidationResult;
@@ -100,6 +105,10 @@ public class ProbabilisticTestExtension implements
 	private static final String SPEC_KEY = "spec";
 	private static final String SELECTION_RESULT_KEY = "selectionResult";
 	private static final String PENDING_SELECTION_KEY = "pendingSelection";
+	private static final String STRATEGY_CONFIG_KEY = "strategyConfig";
+
+	// Strategy for test execution (currently only Bernoulli trials supported)
+	private final ProbabilisticTestStrategy strategy;
 
 	private final ConfigurationResolver configResolver;
 	private final BaselineRepository baselineRepository;
@@ -117,7 +126,8 @@ public class ProbabilisticTestExtension implements
 	public ProbabilisticTestExtension() {
 		this(new ConfigurationResolver(), new PacingResolver(), new PacingReporter(),
 			 new BaselineRepository(), new BaselineSelector(), new CovariateProfileResolver(),
-			 new FootprintComputer(), new UseCaseCovariateExtractor());
+			 new FootprintComputer(), new UseCaseCovariateExtractor(),
+			 new BernoulliTrialsStrategy());
 	}
 
 	/**
@@ -126,31 +136,35 @@ public class ProbabilisticTestExtension implements
 	ProbabilisticTestExtension(ConfigurationResolver configResolver) {
 		this(configResolver, new PacingResolver(), new PacingReporter(),
 			 new BaselineRepository(), new BaselineSelector(), new CovariateProfileResolver(),
-			 new FootprintComputer(), new UseCaseCovariateExtractor());
+			 new FootprintComputer(), new UseCaseCovariateExtractor(),
+			 new BernoulliTrialsStrategy());
 	}
 
 	/**
 	 * Constructor for testing with custom resolvers and reporter.
 	 */
-	ProbabilisticTestExtension(ConfigurationResolver configResolver, 
+	ProbabilisticTestExtension(ConfigurationResolver configResolver,
 							   PacingResolver pacingResolver,
 							   PacingReporter pacingReporter) {
 		this(configResolver, pacingResolver, pacingReporter,
 			 new BaselineRepository(), new BaselineSelector(), new CovariateProfileResolver(),
-			 new FootprintComputer(), new UseCaseCovariateExtractor());
+			 new FootprintComputer(), new UseCaseCovariateExtractor(),
+			 new BernoulliTrialsStrategy());
 	}
 
 	/**
 	 * Full constructor for testing with all dependencies injectable.
 	 */
-	ProbabilisticTestExtension(ConfigurationResolver configResolver, 
+	ProbabilisticTestExtension(ConfigurationResolver configResolver,
 							   PacingResolver pacingResolver,
 							   PacingReporter pacingReporter,
 							   BaselineRepository baselineRepository,
 							   BaselineSelector baselineSelector,
 							   CovariateProfileResolver covariateProfileResolver,
 							   FootprintComputer footprintComputer,
-							   UseCaseCovariateExtractor covariateExtractor) {
+							   UseCaseCovariateExtractor covariateExtractor,
+							   ProbabilisticTestStrategy strategy) {
+		this.strategy = strategy;
 		this.configResolver = configResolver;
 		this.pacingResolver = pacingResolver;
 		this.pacingReporter = pacingReporter;
