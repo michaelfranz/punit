@@ -6,7 +6,7 @@
 
 ## Introduction: The Determinism Assumption in Software Testing
 
-For decades, the dominant paradigm in software testing has rested on an implicit assumption: **systems under test behave deterministically**. Given the same input, a correctly functioning system produces the same output. This assumption has shaped our tools, our practices, and our intuitions about what "correct" means.
+For decades, the dominant paradigm in software testing has rested on an implicit assumption: **systems under test behave (more or less) deterministically**. Given the same input, a correctly functioning system produces the same output. This assumption has shaped our tools, our practices, and our intuitions about what "correct" means.
 
 Under this paradigm, tests produce **binary outcomes**—pass or fail—and a single failure is definitive evidence of a defect. Test frameworks report success as a count of green checkmarks, and any red mark warrants investigation. The entire edifice of continuous integration, test-driven development, and quality gates is built on this foundation.
 
@@ -14,7 +14,9 @@ Of course, non-determinism has always existed. Network timeouts, race conditions
 
 ### The LLM Inflection Point
 
-Large Language Models fundamentally challenge this paradigm. Their non-determinism is not a bug to fix but an **intrinsic characteristic of the technology**. Even with identical input parameters, a model will likely produce different outputs. This is the system working as designed. The same input genuinely produces different outputs, and the distribution of those outputs *is* the system's behavior.
+As long as undesirable glitches or crashes occur sufficiently rarely, and their consequences remain relatively harmless, the sloppy handling of indeterminism may go unnoticed, be ignored, or be downplayed. Such phenomena are effectively normalized.
+
+However, this posture cannot possibly work in the context of Large Language Models, in which non-determinism is not a bug to fix but an **intrinsic characteristic of the technology**. Even with identical input parameters, a model will likely produce different outputs. This is the system working as designed. The same input genuinely produces different outputs, and the distribution of those outputs *is* the system's behavior.
 
 This represents a qualitative shift in the testing challenge:
 
@@ -38,7 +40,7 @@ This shift demands a corresponding evolution in testing methodology. We cannot s
 
 These are fundamentally **statistical questions**, and they deserve statistical answers. PUnit exists to bring the rigor of hypothesis testing, confidence intervals, and power analysis to the practical problem of testing non-deterministic systems.
 
-This document provides the formal foundations for that approach.
+This document provides the formal foundations for that approach. And while the hot topic of LLMs brings the reality of non-determinism into the foreground, the principles developed in this document and in the PUnit testing framework are applicable to any system that uses non-deterministic behavior.
 
 ---
 
@@ -59,11 +61,11 @@ For operational context and workflow guidance, see the companion document: [Oper
 
 PUnit accommodates two distinct testing scenarios. Both are equally valid; they differ only in where the threshold comes from.
 
-### Scenario A: Payment Processing API (SLA-Driven)
+### Scenario A: An SLA-Driven Setup Involving a Payment Processing API 
 
 **Application**: A third-party payment processing API with a contractual uptime guarantee.
 
-**SLA Requirement**: The contract states: "The API shall successfully process transactions at least 99.5% of the time."
+**Service Level Agreement (SLA) Requirement**: The contract states: "The API shall successfully process transactions at least 99.5% of the time."
 
 **Success Criterion**: A trial is successful if the API returns a successful response (HTTP 2xx with valid transaction confirmation).
 
@@ -72,7 +74,7 @@ PUnit accommodates two distinct testing scenarios. Both are equally valid; they 
 - No baseline experiment required
 - Statistical question: "Does the system meet its contractual obligation?"
 
-### Scenario B: LLM-Based Customer Service (Spec-Driven)
+### Scenario B: Spec-Driven Setup involving an LLM-Based Customer Service
 
 **Application**: A customer service system that uses a Large Language Model (LLM) to generate structured JSON responses from natural language queries.
 
@@ -115,7 +117,7 @@ The threshold is a **normative claim**—a business or contractual requirement:
 The threshold is an **empirical estimate** derived from measurement:
 
 - The threshold is derived from experimental data $(\hat{p}_{\text{exp}}, n_{\text{exp}})$
-- A baseline experiment (MEASURE mode) is required first
+- A baseline experiment (called a "measure experiment" in PUnit) is required first
 - The test detects regression from the measured baseline
 - Failure means: "Evidence that the system has degraded"
 
@@ -167,15 +169,13 @@ $$E[\hat{p}] = p, \quad \text{Var}(\hat{p}) = \frac{p(1-p)}{n}$$
 
 The Bernoulli model assumes:
 
-1. **Independence**: Each trial is independent. In practice, this may be violated if:
+1. **Independence**: Each trial is independent. In practice, this may be violated if, for example:
    - The LLM provider implements request-level caching
    - Rate limiting causes correlated delays
    - Model state persists across requests (generally not the case for stateless APIs)
 
-2. **Stationarity**: The success probability *p* is constant across trials. This may be violated if:
-   - The LLM provider updates the model during the experiment
-   - System load affects response quality
-   - Input distribution changes during execution
+2. **Stationarity**: The success probability *p* is constant across trials. This may be violated if, for example:
+   - A baseline is created at a time when the system was under load, but a test performed later, while the system IS NOT under load. Such a test will likely miss a drop in performance of the system.  
    - Contextual factors differ between baseline creation and test execution (time of day, day of week, deployment region, etc.)
 
    **PUnit addresses stationarity through two complementary mechanisms**:
