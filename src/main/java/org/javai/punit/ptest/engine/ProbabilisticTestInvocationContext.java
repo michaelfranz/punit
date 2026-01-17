@@ -2,8 +2,8 @@ package org.javai.punit.ptest.engine;
 
 import java.util.Collections;
 import java.util.List;
-
 import org.javai.punit.api.TokenChargeRecorder;
+import org.javai.punit.controls.budget.DefaultTokenChargeRecorder;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
@@ -19,13 +19,13 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
  *   <li>Optional TokenChargeRecorder injection for dynamic token tracking</li>
  * </ul>
  *
- * <p>Package-private: internal implementation detail of the test extension.
+ * <p>Public to allow access from strategy implementations.
  *
  * @param sampleIndex The 1-based index of this sample
  * @param totalSamples The total number of samples to be executed
  * @param tokenRecorder The token recorder for this sample (null if not using dynamic tokens)
  */
-record ProbabilisticTestInvocationContext(
+public record ProbabilisticTestInvocationContext(
         int sampleIndex,
         int totalSamples,
         DefaultTokenChargeRecorder tokenRecorder) implements TestTemplateInvocationContext {

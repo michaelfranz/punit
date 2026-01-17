@@ -6,7 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.javai.punit.engine.CriteriaOutcomeAggregator;
+import org.javai.punit.spec.criteria.CriteriaOutcomeAggregator;
 import org.javai.punit.experiment.model.ResultProjection;
 import org.javai.punit.model.UseCaseCriteria;
 import org.javai.punit.model.UseCaseResult;
