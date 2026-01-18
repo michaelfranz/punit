@@ -1,6 +1,7 @@
 package org.javai.punit.examples2.experiments;
 
 import org.javai.punit.api.Factor;
+import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.OptimizeExperiment;
 import org.javai.punit.api.ResultCaptor;
 import org.javai.punit.api.TreatmentValue;
@@ -106,7 +107,7 @@ public class ShoppingBasketOptimizePrompt {
             noImprovementWindow = 4,
             experimentId = "prompt-optimization-varied-v1"
     )
-    @org.javai.punit.api.FactorSource(value = "standardInstructions", factors = {"instruction"})
+    @FactorSource(value = "standardInstructions", factors = {"instruction"})
     void optimizeSystemPromptVaried(
             ShoppingBasketUseCase useCase,
             @TreatmentValue("systemPrompt") String systemPrompt,

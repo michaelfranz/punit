@@ -3,6 +3,7 @@ package org.javai.punit.spec.baseline.covariate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.javai.punit.api.StandardCovariate;
+import org.javai.punit.model.CovariateValue;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -77,7 +78,7 @@ class CovariateResolverRegistryTest {
         @DisplayName("should return registered resolver for custom keys")
         void shouldReturnRegisteredResolverForCustomKeys() {
             var customResolver = (CovariateResolver) ctx -> 
-                new org.javai.punit.model.CovariateValue.StringValue("custom-value");
+                new CovariateValue.StringValue("custom-value");
             
             var registry = CovariateResolverRegistry.builder()
                 .register("my_custom_key", customResolver)
@@ -117,7 +118,7 @@ class CovariateResolverRegistryTest {
         @DisplayName("custom registration should override standard")
         void customRegistrationShouldOverrideStandard() {
             var customResolver = (CovariateResolver) ctx -> 
-                new org.javai.punit.model.CovariateValue.StringValue("overridden");
+                new CovariateValue.StringValue("overridden");
             
             var registry = CovariateResolverRegistry.builder()
                 .register(StandardCovariate.REGION, new RegionResolver())

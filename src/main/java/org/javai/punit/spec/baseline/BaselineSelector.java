@@ -14,6 +14,7 @@ import org.javai.punit.spec.baseline.covariate.CovariateMatcher;
 import org.javai.punit.spec.baseline.covariate.CovariateMatcherRegistry;
 import org.javai.punit.model.CovariateDeclaration;
 import org.javai.punit.model.CovariateProfile;
+import org.javai.punit.model.CovariateValue;
 
 /**
  * Selects the best-matching baseline for a probabilistic test.
@@ -197,10 +198,10 @@ public final class BaselineSelector {
             if (baselineValue == null || testValue == null) {
                 result = CovariateMatcher.MatchResult.DOES_NOT_CONFORM;
                 if (testValue == null) {
-                    testValue = new org.javai.punit.model.CovariateValue.StringValue("<missing>");
+                    testValue = new CovariateValue.StringValue("<missing>");
                 }
                 if (baselineValue == null) {
-                    baselineValue = new org.javai.punit.model.CovariateValue.StringValue("<missing>");
+                    baselineValue = new CovariateValue.StringValue("<missing>");
                 }
             } else {
                 var matcher = matcherRegistry.getMatcher(key);

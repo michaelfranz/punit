@@ -18,6 +18,7 @@ import org.javai.punit.api.UseCase;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.experiment.engine.ExperimentConfig;
 import org.javai.punit.experiment.engine.ExperimentModeStrategy;
+import org.javai.punit.experiment.measure.MeasureInvocationContext;
 import org.javai.punit.experiment.engine.ExperimentResultAggregator;
 import org.javai.punit.experiment.engine.ResultProjectionBuilder;
 import org.javai.punit.experiment.engine.shared.FactorInfo;
@@ -140,7 +141,7 @@ public class ExploreStrategy implements ExperimentModeStrategy {
 
         return Stream.iterate(1, i -> i + 1)
                 .limit(samplesPerConfig)
-                .map(i -> new org.javai.punit.experiment.measure.MeasureInvocationContext(
+                .map(i -> new MeasureInvocationContext(
                         i, samplesPerConfig, useCaseId, new ResultCaptor()));
     }
 
