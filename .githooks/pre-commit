@@ -14,10 +14,13 @@
 
 EXAMPLES_DIR="src/test/java/org/javai/punit/examples"
 
-# Find staged Java files in the examples directory (excluding package-info.java)
+# Find staged Java files in the examples directory that are test/experiment classes
+# Exclude: package-info.java, *Mutator.java, *Scorer.java (helper classes)
 STAGED_EXAMPLE_FILES=$(git diff --cached --name-only --diff-filter=ACM | \
     grep "^${EXAMPLES_DIR}/.*\.java$" | \
-    grep -v "package-info.java")
+    grep -v "package-info.java" | \
+    grep -v "Mutator\.java$" | \
+    grep -v "Scorer\.java$")
 
 if [ -z "$STAGED_EXAMPLE_FILES" ]; then
     # No example files staged, nothing to check
