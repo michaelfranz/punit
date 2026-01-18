@@ -1,25 +1,34 @@
 package org.javai.punit.examples.experiments;
 
-import java.util.List;
 import org.javai.punit.experiment.optimize.FactorMutator;
 import org.javai.punit.experiment.optimize.MutationException;
-import org.javai.punit.experiment.optimize.OptimizationRecord;
 import org.javai.punit.experiment.optimize.OptimizeHistory;
 
 /**
- * Mutator for numeric temperature parameter optimization.
+ * Mutator for temperature parameter that decreases linearly from 1.0 to 0.0.
  *
- * <p>This mutator implements a simple gradient-like search strategy for
- * finding optimal temperature values. It adjusts the temperature based
- * on the direction that has shown improvement in recent iterations.
+ * <p>This mutator demonstrates a simple, predictable optimization strategy
+ * for the temperature parameter. It starts at the maximum temperature (1.0)
+ * and decreases by a fixed step each iteration.
  *
  * <h2>Strategy</h2>
  * <ul>
- *   <li>Initial step size: 0.1</li>
- *   <li>Direction: Determined by comparing recent scores</li>
- *   <li>Bounds: 0.0 to 1.0 (valid temperature range)</li>
- *   <li>Adaptive: Step size reduces when oscillating</li>
+ *   <li>Initial value: 1.0 (maximum creativity/randomness)</li>
+ *   <li>Step: -0.1 per iteration</li>
+ *   <li>Final value: 0.0 (maximum determinism)</li>
  * </ul>
+ *
+ * <h2>Expected Outcome</h2>
+ * <p>For structured JSON output tasks like the shopping basket use case,
+ * lower temperatures should produce higher success rates because:
+ * <ul>
+ *   <li>High temperature (1.0): More "creative" responses that deviate from format</li>
+ *   <li>Low temperature (0.0): Deterministic responses that follow instructions</li>
+ * </ul>
+ *
+ * <p>The optimization output should show a clear trend of improving scores
+ * as temperature decreases, demonstrating that for structured output tasks,
+ * lower temperatures are more reliable.
  *
  * @see org.javai.punit.experiment.optimize.FactorMutator
  */
@@ -27,78 +36,25 @@ public class TemperatureMutator implements FactorMutator<Double> {
 
     private static final double MIN_TEMP = 0.0;
     private static final double MAX_TEMP = 1.0;
-    private static final double INITIAL_STEP = 0.1;
-    private static final double MIN_STEP = 0.01;
-
-    private double stepSize = INITIAL_STEP;
-    private int direction = -1; // Start by decreasing (lower temp = more reliable)
+    private static final double STEP = 0.1;
 
     @Override
     public Double mutate(Double currentValue, OptimizeHistory history) throws MutationException {
         if (currentValue == null) {
-            return 0.5; // Default starting point
+            // Start at maximum temperature (naive starting point)
+            return MAX_TEMP;
         }
 
-        // Analyze history to determine direction
-        adjustDirectionFromHistory(history);
-
-        // Calculate new value
-        double newValue = currentValue + (direction * stepSize);
+        // Simple linear decrease
+        double newValue = currentValue - STEP;
 
         // Clamp to valid range
-        newValue = Math.max(MIN_TEMP, Math.min(MAX_TEMP, newValue));
-
-        // If we hit a boundary, reverse direction and reduce step
-        if (newValue == MIN_TEMP || newValue == MAX_TEMP) {
-            direction = -direction;
-            stepSize = Math.max(MIN_STEP, stepSize * 0.5);
-        }
-
-        return newValue;
-    }
-
-    /**
-     * Analyzes optimization history to determine the best direction.
-     */
-    private void adjustDirectionFromHistory(OptimizeHistory history) {
-        List<OptimizationRecord> iterations = history.iterations();
-
-        if (iterations.size() < 2) {
-            return; // Not enough data
-        }
-
-        // Get the last two successful iterations
-        List<OptimizationRecord> successful = history.successfulIterations();
-        if (successful.size() < 2) {
-            return;
-        }
-
-        OptimizationRecord prev = successful.get(successful.size() - 2);
-        OptimizationRecord last = successful.get(successful.size() - 1);
-
-        // Get temperature values
-        Double prevTemp = prev.aggregate().controlFactorValue();
-        Double lastTemp = last.aggregate().controlFactorValue();
-
-        // Determine if we improved
-        boolean improved = last.score() > prev.score();
-
-        // Determine the direction we moved
-        int movedDirection = Double.compare(lastTemp, prevTemp);
-
-        if (improved) {
-            // Keep going in the same direction
-            direction = movedDirection != 0 ? movedDirection : direction;
-        } else {
-            // Reverse direction and reduce step size
-            direction = -direction;
-            stepSize = Math.max(MIN_STEP, stepSize * 0.7);
-        }
+        return Math.max(MIN_TEMP, newValue);
     }
 
     @Override
     public String description() {
-        return "Gradient-like temperature optimization with adaptive step size";
+        return "Linear temperature decrease from 1.0 to 0.0 in steps of 0.1";
     }
 
     @Override

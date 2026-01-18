@@ -4,30 +4,21 @@ import org.javai.punit.experiment.optimize.OptimizationIterationAggregate;
 import org.javai.punit.experiment.optimize.Scorer;
 
 /**
- * Scorer that evaluates iterations based on success rate.
+ * Scorer for shopping basket experiments that evaluates iterations based on success rate.
  *
  * <p>Use with {@code OptimizationObjective.MAXIMIZE} - higher success rates are better.
  *
- * <p><b>Demo mode:</b> When no real samples are collected (sampleCount == 0),
- * returns simulated scores showing the expected improvement progression:
- * <pre>
- * Iteration 0: 0.30 (weak prompt)
- * Iteration 1: 0.50 (+ JSON format)
- * Iteration 2: 0.65 (+ schema structure)
- * Iteration 3: 0.80 (+ required fields)
- * Iteration 4: 0.90 (+ valid actions)
- * Iteration 5+: 0.95 (+ quantity constraints)
- * </pre>
+ * <h2>Minimum Acceptance Threshold</h2>
+ * <p>This scorer defines a <b>50% minimum acceptance threshold</b>. Iterations scoring
+ * below this threshold are marked as {@code BELOW_THRESHOLD} in the optimization output,
+ * indicating they don't meet minimum quality standards for the shopping basket use case.
  *
  * @see org.javai.punit.experiment.optimize.Scorer
+ * @see ShoppingBasketPromptMutator
+ * @see ShoppingBasketOptimizePrompt
+ * @see ShoppingBasketOptimizeTemperature
  */
-public class SuccessRateScorer implements Scorer<OptimizationIterationAggregate> {
-
-    /**
-     * Simulated success rates for demo mode, matching the expected
-     * progression documented in {@link ShoppingBasketPromptMutator}.
-     */
-    private static final double[] DEMO_SCORES = {0.30, 0.50, 0.65, 0.80, 0.90, 0.95};
+public class ShoppingBasketSuccessRateScorer implements Scorer<OptimizationIterationAggregate> {
 
     @Override
     public double score(OptimizationIterationAggregate aggregate) {

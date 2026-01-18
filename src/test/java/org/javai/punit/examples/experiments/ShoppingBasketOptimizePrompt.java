@@ -47,7 +47,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li>{@code initialControlFactorSource} for specifying a weak starting point</li>
  *   <li>{@code @ControlFactor} for receiving the current prompt value</li>
  *   <li>Custom {@link ShoppingBasketPromptMutator} for targeted improvements</li>
- *   <li>{@link SuccessRateScorer} for iteration scoring</li>
+ *   <li>{@link ShoppingBasketSuccessRateScorer} for iteration scoring</li>
  * </ul>
  *
  * <h2>Output</h2>
@@ -60,7 +60,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * @see ShoppingBasketUseCase
  * @see ShoppingBasketPromptMutator
- * @see SuccessRateScorer
+ * @see ShoppingBasketSuccessRateScorer
  */
 @Disabled("Example experiment - run manually with ./gradlew exp -Prun=ShoppingBasketOptimizePrompt")
 public class ShoppingBasketOptimizePrompt {
@@ -118,7 +118,7 @@ public class ShoppingBasketOptimizePrompt {
             useCase = ShoppingBasketUseCase.class,
             controlFactor = "systemPrompt",
             initialControlFactorSource = "weakStartingPrompt",
-            scorer = SuccessRateScorer.class,
+            scorer = ShoppingBasketSuccessRateScorer.class,
             mutator = ShoppingBasketPromptMutator.class,
             objective = OptimizationObjective.MAXIMIZE,
             samplesPerIteration = 5,

@@ -272,11 +272,42 @@ public class OptimizeSpecGenerator {
             } else {
                 sb.append(str);
             }
+        } else if (value instanceof Double d) {
+            // Format doubles cleanly, avoiding floating-point ugliness like 0.7000000000000001
+            sb.append(formatDouble(d));
+        } else if (value instanceof Float f) {
+            sb.append(formatDouble(f.doubleValue()));
         } else if (value instanceof Boolean || value instanceof Number) {
             sb.append(value);
         } else {
             sb.append("\"").append(escapeYamlString(value.toString())).append("\"");
         }
+    }
+
+    /**
+     * Formats a double value cleanly, avoiding floating-point representation issues.
+     *
+     * <p>Values very close to integers are rounded. Values very close to zero
+     * are displayed as 0.0. Other values are displayed with up to 4 decimal places.
+     */
+    private static String formatDouble(double value) {
+        // Handle values very close to zero
+        if (Math.abs(value) < 1e-10) {
+            return "0.0";
+        }
+        // Handle values very close to integers
+        double rounded = Math.round(value * 10000.0) / 10000.0;
+        if (rounded == Math.floor(rounded) && rounded < 1e10) {
+            return String.format("%.1f", rounded);
+        }
+        // General case: up to 4 decimal places, strip trailing zeros
+        String formatted = String.format("%.4f", rounded);
+        // Strip trailing zeros but keep at least one decimal place
+        formatted = formatted.replaceAll("0+$", "");
+        if (formatted.endsWith(".")) {
+            formatted += "0";
+        }
+        return formatted;
     }
 
     private String quoteIfNeeded(String str) {

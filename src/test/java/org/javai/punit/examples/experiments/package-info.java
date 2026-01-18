@@ -37,8 +37,8 @@
  *
  * <h2>Supporting Classes</h2>
  * <ul>
- *   <li>{@link org.javai.punit.examples.experiments.SuccessRateScorer} - Scores
- *       optimization iterations by pass rate</li>
+ *   <li>{@link org.javai.punit.examples.experiments.ShoppingBasketSuccessRateScorer} - Scores
+ *       optimization iterations by pass rate (defines 50% minimum threshold)</li>
  *   <li>{@link org.javai.punit.examples.experiments.TemperatureMutator} - Generates
  *       temperature variations for optimization</li>
  *   <li>{@link org.javai.punit.examples.experiments.ShoppingBasketPromptMutator} -

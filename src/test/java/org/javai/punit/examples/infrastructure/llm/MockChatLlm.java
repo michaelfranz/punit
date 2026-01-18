@@ -193,35 +193,48 @@ public final class MockChatLlm implements ChatLlm {
     }
 
     /**
-     * Generates a response based on what the prompt specifies.
+     * Generates a response based on what the prompt specifies and the temperature.
      *
-     * <p>If the prompt is vague, the response will have issues that fail validation.
-     * If the prompt is comprehensive, the response will be correct.
+     * <p>Temperature affects the likelihood of deviation from the prompt's instructions:
+     * <ul>
+     *   <li>{@code 0.0}: Follows prompt faithfully (deterministic)</li>
+     *   <li>{@code 0.5}: Occasional deviations (~25% chance per aspect)</li>
+     *   <li>{@code 1.0}: Frequent deviations (~50% chance per aspect)</li>
+     * </ul>
+     *
+     * <p>This models real LLM behavior where higher temperature increases creativity
+     * but also increases the chance of not following structured output requirements.
      */
     private String generateResponse(String userMessage, PromptRequirements req, double temperature) {
-        // Temperature adds randomness - higher temp means more likely to deviate even with good prompt
-        double deviationChance = temperature * 0.3;
+        // Temperature determines deviation probability for each aspect
+        // At temp=0: 0% deviation, at temp=1: 50% deviation
+        double deviationChance = temperature * 0.5;
 
         StringBuilder response = new StringBuilder();
 
-        // If prompt doesn't require JSON-only, might add prose
-        if (!req.requiresJsonOnly && random.nextDouble() < 0.7) {
+        // If prompt doesn't require JSON-only, might add prose (temperature-dependent)
+        boolean addProse = !req.requiresJsonOnly && random.nextDouble() < (0.3 + deviationChance);
+        if (addProse) {
             response.append("I'd be happy to help! Here's the JSON:\n\n");
         }
 
-        // Determine the root field name
-        String rootField = req.specifiesSchema ? "operations" : randomRootField();
+        // Determine the root field name - deviate based on temperature
+        boolean deviateSchema = !req.specifiesSchema || random.nextDouble() < deviationChance;
+        String rootField = deviateSchema ? randomRootField() : "operations";
 
-        // Determine field names
-        String actionField = req.specifiesFields ? "action" : randomFieldName("action");
-        String itemField = req.specifiesFields ? "item" : randomFieldName("item");
-        String quantityField = req.specifiesFields ? "quantity" : randomFieldName("quantity");
+        // Determine field names - deviate based on temperature
+        boolean deviateFields = !req.specifiesFields || random.nextDouble() < deviationChance;
+        String actionField = deviateFields ? randomFieldName("action") : "action";
+        String itemField = deviateFields ? randomFieldName("item") : "item";
+        String quantityField = deviateFields ? randomFieldName("quantity") : "quantity";
 
-        // Determine action value
-        String actionValue = req.specifiesActions ? "add" : randomAction();
+        // Determine action value - deviate based on temperature
+        boolean deviateActions = !req.specifiesActions || random.nextDouble() < deviationChance;
+        String actionValue = deviateActions ? randomAction() : "add";
 
-        // Determine quantity value
-        Object quantityValue = req.specifiesConstraints ? extractQuantity(userMessage, "add") : randomQuantity();
+        // Determine quantity value - deviate based on temperature
+        boolean deviateQuantity = !req.specifiesConstraints || random.nextDouble() < deviationChance;
+        Object quantityValue = deviateQuantity ? randomQuantity() : extractQuantity(userMessage, "add");
 
         // Build the JSON
         String item = extractItem(userMessage, "add");
@@ -233,8 +246,8 @@ public final class MockChatLlm implements ChatLlm {
         response.append(String.format("\"%s\": %s", quantityField, quantityValue));
         response.append("}]}");
 
-        // Small chance of malformed JSON at high temperature
-        if (random.nextDouble() < deviationChance) {
+        // Additional chance of malformed JSON at high temperature
+        if (random.nextDouble() < deviationChance * 0.3) {
             return corruptJson(response.toString());
         }
 
