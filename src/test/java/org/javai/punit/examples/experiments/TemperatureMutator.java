@@ -1,11 +1,10 @@
 package org.javai.punit.examples.experiments;
 
+import java.util.List;
 import org.javai.punit.experiment.optimize.FactorMutator;
 import org.javai.punit.experiment.optimize.MutationException;
 import org.javai.punit.experiment.optimize.OptimizationRecord;
 import org.javai.punit.experiment.optimize.OptimizeHistory;
-
-import java.util.List;
 
 /**
  * Mutator for numeric temperature parameter optimization.
@@ -78,8 +77,8 @@ public class TemperatureMutator implements FactorMutator<Double> {
         OptimizationRecord last = successful.get(successful.size() - 1);
 
         // Get temperature values
-        Double prevTemp = prev.aggregate().treatmentFactorValue();
-        Double lastTemp = last.aggregate().treatmentFactorValue();
+        Double prevTemp = prev.aggregate().controlFactorValue();
+        Double lastTemp = last.aggregate().controlFactorValue();
 
         // Determine if we improved
         boolean improved = last.score() > prev.score();

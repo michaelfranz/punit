@@ -1,11 +1,13 @@
 package org.javai.punit.experiment.optimize;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.time.Instant;
 import org.javai.punit.experiment.model.FactorSuit;
 import org.junit.jupiter.api.Test;
-
-import java.time.Instant;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for {@link Scorer} implementations.
@@ -15,7 +17,7 @@ class ScorerTest {
     private static final Instant NOW = Instant.now();
 
     private OptimizationIterationAggregate createAggregate(double successRate, long totalTokens) {
-        FactorSuit factorSuit = FactorSuit.of("treatmentFactor", "value");
+        FactorSuit factorSuit = FactorSuit.of("controlFactor", "value");
         int successCount = (int) Math.round(successRate * 100);
         int failureCount = 100 - successCount;
         OptimizeStatistics stats = new OptimizeStatistics(
@@ -23,7 +25,7 @@ class ScorerTest {
                 successRate, totalTokens, 100.0
         );
         return new OptimizationIterationAggregate(
-                0, factorSuit, "treatmentFactor", stats, NOW, NOW.plusMillis(1000)
+                0, factorSuit, "controlFactor", stats, NOW, NOW.plusMillis(1000)
         );
     }
 

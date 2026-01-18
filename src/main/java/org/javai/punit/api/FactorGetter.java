@@ -38,7 +38,7 @@ import java.lang.annotation.Target;
  * }</pre>
  *
  * <h2>Usage in Optimization</h2>
- * <p>In {@link OptimizeExperiment}, the getter for the treatment factor provides
+ * <p>In {@link OptimizeExperiment}, the getter for the control factor provides
  * the initial value that the optimizer will iteratively refine:
  * <pre>{@code
  * @OptimizeExperiment(

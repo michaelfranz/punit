@@ -1,15 +1,16 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.experiment.model.FactorSuit;
-import org.junit.jupiter.api.Test;
-
-import static org.javai.punit.model.TerminationReason.*;
-
+import static org.javai.punit.model.TerminationReason.MAX_ITERATIONS;
+import static org.javai.punit.model.TerminationReason.NO_IMPROVEMENT;
+import static org.javai.punit.model.TerminationReason.OPTIMIZATION_TIME_BUDGET_EXHAUSTED;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.javai.punit.experiment.model.FactorSuit;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for {@link OptimizeTerminationPolicy} implementations.
@@ -21,7 +22,7 @@ class OptimizeTerminationPolicyTest {
     private OptimizeHistory createHistory(int iterationCount, int bestIteration) {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now().minusSeconds(iterationCount * 10));
 
@@ -36,7 +37,7 @@ class OptimizeTerminationPolicyTest {
     private OptimizeHistory createHistoryWithDuration(Duration duration) {
         return OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now().minus(duration))
                 .endTime(Instant.now())

@@ -109,7 +109,7 @@ public class OptimizeSpecGenerator {
 
         // Header
         sb.append("# Optimization History for ").append(history.useCaseId()).append("\n");
-        sb.append("# Primary output: the best value for the treatment factor\n");
+        sb.append("# Primary output: the best value for the control factor\n");
         sb.append("# Generated automatically by punit @OptimizeExperiment\n\n");
 
         sb.append("schemaVersion: ").append(SCHEMA_VERSION).append("\n");
@@ -121,10 +121,10 @@ public class OptimizeSpecGenerator {
         }
 
         // Treatment factor
-        sb.append("\ntreatmentFactor:\n");
-        sb.append("  name: ").append(history.treatmentFactorName()).append("\n");
-        if (history.treatmentFactorType() != null) {
-            sb.append("  type: ").append(history.treatmentFactorType()).append("\n");
+        sb.append("\ncontrolFactor:\n");
+        sb.append("  name: ").append(history.controlFactorName()).append("\n");
+        if (history.controlFactorType() != null) {
+            sb.append("  type: ").append(history.controlFactorType()).append("\n");
         }
 
         // Fixed factors
@@ -163,8 +163,8 @@ public class OptimizeSpecGenerator {
             sb.append("  score: ").append(String.format("%.6f", best.score())).append("\n");
 
             // Emphasize the best treatment value
-            Object bestValue = best.aggregate().treatmentFactorValue();
-            sb.append("  bestTreatmentValue: ");
+            Object bestValue = best.aggregate().controlFactorValue();
+            sb.append("  bestControlFactor: ");
             if (bestValue instanceof String s && s.contains("\n")) {
                 sb.append("|\n");
                 for (String line : s.split("\n")) {
@@ -218,14 +218,17 @@ public class OptimizeSpecGenerator {
         sb.append("    status: ").append(record.status().name()).append("\n");
         sb.append("    score: ").append(String.format("%.6f", record.score())).append("\n");
 
-        // Treatment value for this iteration
-        Object treatmentValue = agg.treatmentFactorValue();
-        sb.append("    treatmentValue: ");
-        if (treatmentValue instanceof String s && s.length() > 80) {
-            // Truncate long strings in the iteration list
-            sb.append("\"").append(escapeYamlString(s.substring(0, 80))).append("...\"\n");
+        // Control factor value for this iteration
+        Object controlFactorValue = agg.controlFactorValue();
+        sb.append("    controlFactor: ");
+        if (controlFactorValue instanceof String s && s.contains("\n")) {
+            // Use YAML block scalar for multiline strings
+            sb.append("|\n");
+            for (String line : s.split("\n")) {
+                sb.append("      ").append(line).append("\n");
+            }
         } else {
-            appendYamlValue(sb, treatmentValue);
+            appendYamlValue(sb, controlFactorValue);
             sb.append("\n");
         }
 
@@ -303,7 +306,7 @@ public class OptimizeSpecGenerator {
         context.publishReportEntry("punit.experiment.complete", "true");
         context.publishReportEntry("punit.mode", "OPTIMIZE");
         context.publishReportEntry("punit.useCaseId", history.useCaseId());
-        context.publishReportEntry("punit.treatmentFactor", history.treatmentFactorName());
+        context.publishReportEntry("punit.controlFactor", history.controlFactorName());
         context.publishReportEntry("punit.iterationsCompleted",
                 String.valueOf(history.iterationCount()));
 

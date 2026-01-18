@@ -10,7 +10,6 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.javai.punit.api.ExperimentMode;
 import org.javai.punit.api.FactorAnnotations;
-import org.javai.punit.api.FactorGetter;
 import org.javai.punit.api.OptimizeExperiment;
 import org.javai.punit.api.ResultCaptor;
 import org.javai.punit.api.UseCaseProvider;
@@ -27,9 +26,9 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 /**
  * Strategy for handling @OptimizeExperiment.
  *
- * <p>OPTIMIZE mode iteratively refines a single treatment factor to find its
+ * <p>OPTIMIZE mode iteratively refines a single control factor to find its
  * optimal value. It runs multiple samples per iteration, scores each iteration,
- * and mutates the treatment factor until termination conditions are met.
+ * and mutates the control factor until termination conditions are met.
  *
  * <p>The optimization loop:
  * <ol>
@@ -38,7 +37,7 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
  *   <li>Score the aggregate</li>
  *   <li>Record in history</li>
  *   <li>Check termination conditions</li>
- *   <li>Mutate the treatment factor for next iteration</li>
+ *   <li>Mutate the control factor for next iteration</li>
  *   <li>Repeat until terminated</li>
  * </ol>
  */
@@ -63,10 +62,20 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
         Class<?> useCaseClass = annotation.useCase();
         String useCaseId = UseCaseProvider.resolveId(useCaseClass);
 
+        // Validate mutual exclusivity of initial value options
+        if (!annotation.initialControlFactorValue().isEmpty() &&
+                !annotation.initialControlFactorSource().isEmpty()) {
+            throw new ExtensionConfigurationException(
+                    "Cannot specify both initialControlFactorValue and initialControlFactorSource. " +
+                            "Use one or the other.");
+        }
+
         return new OptimizeConfig(
                 useCaseClass,
                 useCaseId,
-                annotation.treatmentFactor(),
+                annotation.controlFactor(),
+                annotation.initialControlFactorValue(),
+                annotation.initialControlFactorSource(),
                 annotation.scorer(),
                 annotation.mutator(),
                 annotation.objective(),
@@ -87,17 +96,16 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
 
         OptimizeConfig optimizeConfig = (OptimizeConfig) config;
 
-        // Get the use case instance to retrieve the initial treatment value
-        Object useCaseInstance = getUseCaseInstance(context, optimizeConfig.useCaseClass());
-        Object initialTreatmentValue = getInitialTreatmentValue(
-                useCaseInstance,
-                optimizeConfig.useCaseClass(),
-                optimizeConfig.treatmentFactor()
-        );
+        // Resolve the initial control factor value using priority order:
+        // 1. initialControlFactorValue (inline)
+        // 2. initialControlFactorSource (method reference)
+        // 3. @FactorGetter on use case (fallback)
+        Object initialControlFactorValue = resolveInitialControlFactorValue(
+                context, optimizeConfig);
 
-        // Determine treatment factor type
-        String treatmentFactorType = initialTreatmentValue != null
-                ? initialTreatmentValue.getClass().getSimpleName()
+        // Determine control factor type
+        String controlFactorType = initialControlFactorValue != null
+                ? initialControlFactorValue.getClass().getSimpleName()
                 : "Object";
 
         // Instantiate scorer and mutator
@@ -111,8 +119,8 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
         OptimizeState state = new OptimizeState(
                 optimizeConfig.useCaseId(),
                 optimizeConfig.experimentId(),
-                optimizeConfig.treatmentFactor(),
-                treatmentFactorType,
+                optimizeConfig.controlFactor(),
+                controlFactorType,
                 optimizeConfig.samplesPerIteration(),
                 optimizeConfig.maxIterations(),
                 optimizeConfig.objective(),
@@ -120,7 +128,7 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
                 mutator,
                 terminationPolicy,
                 FactorSuit.empty(), // Fixed factors not implemented yet
-                initialTreatmentValue
+                initialControlFactorValue
         );
 
         store.put("mode", ExperimentMode.OPTIMIZE);
@@ -187,6 +195,56 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
         return optimizeConfig.maxTotalSamples();
     }
 
+    // === Initial Value Resolution ===
+
+    /**
+     * Resolves the initial control factor value using priority order:
+     * <ol>
+     *   <li>initialControlFactorValue - inline value from annotation</li>
+     *   <li>initialControlFactorSource - method reference on experiment class</li>
+     *   <li>@FactorGetter on use case - fallback</li>
+     * </ol>
+     */
+    private Object resolveInitialControlFactorValue(ExtensionContext context, OptimizeConfig config) {
+        // 1. Try inline value
+        if (config.hasInitialValue()) {
+            return config.initialControlFactorValue();
+        }
+
+        // 2. Try method source
+        if (config.hasInitialValueSource()) {
+            return resolveFromMethodSource(context, config.initialControlFactorSource());
+        }
+
+        // 3. Fall back to @FactorGetter on use case
+        Object useCaseInstance = getUseCaseInstance(context, config.useCaseClass());
+        return getControlFactorFromUseCase(useCaseInstance, config.useCaseClass(), config.controlFactor());
+    }
+
+    /**
+     * Resolves initial value from a static method on the experiment class.
+     */
+    private Object resolveFromMethodSource(ExtensionContext context, String methodName) {
+        Class<?> testClass = context.getRequiredTestClass();
+
+        try {
+            Method method = testClass.getDeclaredMethod(methodName);
+            if (!java.lang.reflect.Modifier.isStatic(method.getModifiers())) {
+                throw new ExtensionConfigurationException(
+                        "initialControlFactorSource method must be static: " + methodName);
+            }
+            method.setAccessible(true);
+            return method.invoke(null);
+        } catch (NoSuchMethodException e) {
+            throw new ExtensionConfigurationException(
+                    "initialControlFactorSource method not found: " + methodName +
+                            " on class " + testClass.getName(), e);
+        } catch (Exception e) {
+            throw new ExtensionConfigurationException(
+                    "Failed to invoke initialControlFactorSource method: " + methodName, e);
+        }
+    }
+
     // === Helper Methods ===
 
     private Object getUseCaseInstance(ExtensionContext context, Class<?> useCaseClass) {
@@ -214,15 +272,15 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
         }
     }
 
-    private Object getInitialTreatmentValue(Object useCaseInstance, Class<?> useCaseClass, String treatmentFactor) {
-        // Find method annotated with @FactorGetter matching the treatment factor
-        Optional<Method> getterOpt = FactorAnnotations.findFactorGetter(useCaseClass, treatmentFactor);
+    private Object getControlFactorFromUseCase(Object useCaseInstance, Class<?> useCaseClass, String controlFactor) {
+        // Find method annotated with @FactorGetter matching the control factor
+        Optional<Method> getterOpt = FactorAnnotations.findFactorGetter(useCaseClass, controlFactor);
 
         if (getterOpt.isEmpty()) {
             throw new ExtensionConfigurationException(
-                    "No @FactorGetter for \"" + treatmentFactor + "\" found on use case class: " +
-                            useCaseClass.getName() + ". Add a method like: " +
-                            "@FactorGetter public T get" + capitalize(treatmentFactor) + "() { ... }");
+                    "No @FactorGetter for \"" + controlFactor + "\" found on use case class: " +
+                            useCaseClass.getName() + ". Either add a @FactorGetter method, or specify " +
+                            "initialControlFactorValue or initialControlFactorSource in @OptimizeExperiment.");
         }
 
         Method method = getterOpt.get();
@@ -235,7 +293,7 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
             return method.invoke(useCaseInstance);
         } catch (Exception e) {
             throw new ExtensionConfigurationException(
-                    "Failed to get initial treatment value from @FactorGetter method: " +
+                    "Failed to get initial control factor value from @FactorGetter method: " +
                             method.getName(), e);
         }
     }
@@ -368,8 +426,8 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
                     state.samplesPerIteration(),
                     state.maxIterations(),
                     state.useCaseId(),
-                    state.currentTreatmentValue(),
-                    state.treatmentFactorName(),
+                    state.currentControlFactorValue(),
+                    state.controlFactorName(),
                     new ResultCaptor()
             );
 

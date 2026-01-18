@@ -6,9 +6,9 @@ import org.javai.punit.experiment.engine.ExperimentConfig;
 /**
  * Configuration for @OptimizeExperiment.
  *
- * <p>OPTIMIZE mode iteratively refines a single treatment factor to find its
+ * <p>OPTIMIZE mode iteratively refines a single control factor to find its
  * optimal value. It runs multiple samples per iteration, scores each iteration,
- * and mutates the treatment factor until termination conditions are met.
+ * and mutates the control factor until termination conditions are met.
  *
  * <p>This config holds the annotation-parsed values (class references).
  * The {@link OptimizationConfig} class holds the runtime objects (instantiated
@@ -16,7 +16,9 @@ import org.javai.punit.experiment.engine.ExperimentConfig;
  *
  * @param useCaseClass the use case class to test
  * @param useCaseId resolved use case identifier
- * @param treatmentFactor name of the factor to optimize
+ * @param controlFactor name of the factor to optimize
+ * @param initialControlFactorValue inline initial value (empty = not specified)
+ * @param initialControlFactorSource method name for initial value (empty = not specified)
  * @param scorerClass scorer class for evaluating iterations
  * @param mutatorClass mutator class for generating new factor values
  * @param objective optimization objective (MAXIMIZE or MINIMIZE)
@@ -30,7 +32,9 @@ import org.javai.punit.experiment.engine.ExperimentConfig;
 public record OptimizeConfig(
         Class<?> useCaseClass,
         String useCaseId,
-        String treatmentFactor,
+        String controlFactor,
+        String initialControlFactorValue,
+        String initialControlFactorSource,
         Class<? extends Scorer<OptimizationIterationAggregate>> scorerClass,
         Class<? extends FactorMutator<?>> mutatorClass,
         OptimizationObjective objective,
@@ -54,5 +58,23 @@ public record OptimizeConfig(
      */
     public int maxTotalSamples() {
         return samplesPerIteration * maxIterations;
+    }
+
+    /**
+     * Checks if an initial value is specified inline.
+     *
+     * @return true if initialControlFactorValue is non-empty
+     */
+    public boolean hasInitialValue() {
+        return initialControlFactorValue != null && !initialControlFactorValue.isEmpty();
+    }
+
+    /**
+     * Checks if an initial value source method is specified.
+     *
+     * @return true if initialControlFactorSource is non-empty
+     */
+    public boolean hasInitialValueSource() {
+        return initialControlFactorSource != null && !initialControlFactorSource.isEmpty();
     }
 }

@@ -1,8 +1,7 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.experiment.model.FactorSuit;
-
 import java.util.Objects;
+import org.javai.punit.experiment.model.FactorSuit;
 
 /**
  * Configuration for the optimization orchestrator.
@@ -10,14 +9,14 @@ import java.util.Objects;
  * <p>Contains all the settings and pluggable components needed to run
  * an optimization loop.
  *
- * @param <F> the type of the treatment factor
+ * @param <F> the type of the control factor
  */
 public final class OptimizationConfig<F> {
 
     private final String useCaseId;
     private final String experimentId;
-    private final String treatmentFactorName;
-    private final String treatmentFactorType;
+    private final String controlFactorName;
+    private final String controlFactorType;
     private final F initialFactorValue;
     private final FactorSuit fixedFactors;
     private final OptimizationObjective objective;
@@ -29,8 +28,8 @@ public final class OptimizationConfig<F> {
     private OptimizationConfig(Builder<F> builder) {
         this.useCaseId = builder.useCaseId;
         this.experimentId = builder.experimentId;
-        this.treatmentFactorName = builder.treatmentFactorName;
-        this.treatmentFactorType = builder.treatmentFactorType;
+        this.controlFactorName = builder.controlFactorName;
+        this.controlFactorType = builder.controlFactorType;
         this.initialFactorValue = builder.initialFactorValue;
         this.fixedFactors = builder.fixedFactors;
         this.objective = builder.objective;
@@ -48,12 +47,12 @@ public final class OptimizationConfig<F> {
         return experimentId;
     }
 
-    public String treatmentFactorName() {
-        return treatmentFactorName;
+    public String controlFactorName() {
+        return controlFactorName;
     }
 
-    public String treatmentFactorType() {
-        return treatmentFactorType;
+    public String controlFactorType() {
+        return controlFactorType;
     }
 
     public F initialFactorValue() {
@@ -87,7 +86,7 @@ public final class OptimizationConfig<F> {
     /**
      * Creates a new builder.
      *
-     * @param <F> the type of the treatment factor
+     * @param <F> the type of the control factor
      * @return a new builder
      */
     public static <F> Builder<F> builder() {
@@ -97,14 +96,14 @@ public final class OptimizationConfig<F> {
     /**
      * Builder for OptimizationConfig.
      *
-     * @param <F> the type of the treatment factor
+     * @param <F> the type of the control factor
      */
     public static final class Builder<F> {
 
         private String useCaseId;
         private String experimentId = "";
-        private String treatmentFactorName;
-        private String treatmentFactorType = "Object";
+        private String controlFactorName;
+        private String controlFactorType = "Object";
         private F initialFactorValue;
         private FactorSuit fixedFactors = FactorSuit.empty();
         private OptimizationObjective objective = OptimizationObjective.MAXIMIZE;
@@ -125,18 +124,18 @@ public final class OptimizationConfig<F> {
             return this;
         }
 
-        public Builder<F> treatmentFactorName(String treatmentFactorName) {
-            this.treatmentFactorName = treatmentFactorName;
+        public Builder<F> controlFactorName(String controlFactorName) {
+            this.controlFactorName = controlFactorName;
             return this;
         }
 
-        public Builder<F> treatmentFactorType(String treatmentFactorType) {
-            this.treatmentFactorType = treatmentFactorType;
+        public Builder<F> controlFactorType(String controlFactorType) {
+            this.controlFactorType = controlFactorType;
             return this;
         }
 
-        public Builder<F> treatmentFactorType(Class<F> type) {
-            this.treatmentFactorType = type.getSimpleName();
+        public Builder<F> controlFactorType(Class<F> type) {
+            this.controlFactorType = type.getSimpleName();
             return this;
         }
 
@@ -183,7 +182,7 @@ public final class OptimizationConfig<F> {
          */
         public OptimizationConfig<F> build() {
             Objects.requireNonNull(useCaseId, "useCaseId is required");
-            Objects.requireNonNull(treatmentFactorName, "treatmentFactorName is required");
+            Objects.requireNonNull(controlFactorName, "controlFactorName is required");
             Objects.requireNonNull(initialFactorValue, "initialFactorValue is required");
             Objects.requireNonNull(scorer, "scorer is required");
             Objects.requireNonNull(mutator, "mutator is required");

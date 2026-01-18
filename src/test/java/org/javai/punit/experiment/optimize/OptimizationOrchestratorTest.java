@@ -1,19 +1,20 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.experiment.model.FactorSuit;
-import org.javai.punit.model.UseCaseCriteria;
-
-import static org.javai.punit.model.TerminationReason.*;
-import org.javai.punit.model.UseCaseOutcome;
-import org.javai.punit.model.UseCaseResult;
-import org.junit.jupiter.api.Test;
-
+import static org.javai.punit.model.TerminationReason.MAX_ITERATIONS;
+import static org.javai.punit.model.TerminationReason.MUTATION_FAILURE;
+import static org.javai.punit.model.TerminationReason.NO_IMPROVEMENT;
+import static org.javai.punit.model.TerminationReason.SCORING_FAILURE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.javai.punit.experiment.model.FactorSuit;
+import org.javai.punit.model.UseCaseCriteria;
+import org.javai.punit.model.UseCaseOutcome;
+import org.javai.punit.model.UseCaseResult;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for {@link OptimizationOrchestrator}.
@@ -82,8 +83,8 @@ class OptimizationOrchestratorTest {
         OptimizationConfig<String> config = OptimizationConfig.<String>builder()
                 .useCaseId("test-use-case")
                 .experimentId("test-experiment")
-                .treatmentFactorName("systemPrompt")
-                .treatmentFactorType(String.class)
+                .controlFactorName("systemPrompt")
+                .controlFactorType(String.class)
                 .initialFactorValue("Initial prompt")
                 .fixedFactors(FactorSuit.of("model", "gpt-4"))
                 .objective(OptimizationObjective.MAXIMIZE)
@@ -114,7 +115,7 @@ class OptimizationOrchestratorTest {
 
         OptimizationConfig<String> config = OptimizationConfig.<String>builder()
                 .useCaseId("test")
-                .treatmentFactorName("prompt")
+                .controlFactorName("prompt")
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())
@@ -144,7 +145,7 @@ class OptimizationOrchestratorTest {
 
         OptimizationConfig<String> config = OptimizationConfig.<String>builder()
                 .useCaseId("test")
-                .treatmentFactorName("prompt")
+                .controlFactorName("prompt")
                 .initialFactorValue("v0")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())
@@ -172,7 +173,7 @@ class OptimizationOrchestratorTest {
     void shouldHandleScoringFailure() {
         OptimizationConfig<String> config = OptimizationConfig.<String>builder()
                 .useCaseId("test")
-                .treatmentFactorName("prompt")
+                .controlFactorName("prompt")
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(aggregate -> {
@@ -200,7 +201,7 @@ class OptimizationOrchestratorTest {
 
         OptimizationConfig<String> config = OptimizationConfig.<String>builder()
                 .useCaseId("test")
-                .treatmentFactorName("prompt")
+                .controlFactorName("prompt")
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())
@@ -231,7 +232,7 @@ class OptimizationOrchestratorTest {
 
         OptimizationConfig<String> config = OptimizationConfig.<String>builder()
                 .useCaseId("test")
-                .treatmentFactorName("prompt")
+                .controlFactorName("prompt")
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())
@@ -264,7 +265,7 @@ class OptimizationOrchestratorTest {
 
         OptimizationConfig<String> config = OptimizationConfig.<String>builder()
                 .useCaseId("test")
-                .treatmentFactorName("prompt")
+                .controlFactorName("prompt")
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())
@@ -294,7 +295,7 @@ class OptimizationOrchestratorTest {
 
         OptimizationConfig<String> config = OptimizationConfig.<String>builder()
                 .useCaseId("test")
-                .treatmentFactorName("prompt")
+                .controlFactorName("prompt")
                 .initialFactorValue("Initial")
                 .fixedFactors(FactorSuit.of("model", "gpt-4", "temperature", 0.7))
                 .objective(OptimizationObjective.MAXIMIZE)
@@ -332,7 +333,7 @@ class OptimizationOrchestratorTest {
     void shouldStoreComponentDescriptions() {
         OptimizationConfig<String> config = OptimizationConfig.<String>builder()
                 .useCaseId("test")
-                .treatmentFactorName("prompt")
+                .controlFactorName("prompt")
                 .initialFactorValue("Initial")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorer(new SuccessRateScorer())

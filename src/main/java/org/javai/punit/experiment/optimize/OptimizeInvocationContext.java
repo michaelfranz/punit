@@ -2,7 +2,6 @@ package org.javai.punit.experiment.optimize;
 
 import java.util.List;
 import org.javai.punit.api.ResultCaptor;
-import org.javai.punit.experiment.engine.shared.CaptorParameterResolver;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 
@@ -23,7 +22,7 @@ public record OptimizeInvocationContext(
         int maxIterations,
         String useCaseId,
         Object treatmentValue,
-        String treatmentFactorName,
+        String controlFactorName,
         ResultCaptor captor
 ) implements TestTemplateInvocationContext {
 
@@ -37,7 +36,7 @@ public record OptimizeInvocationContext(
     public List<Extension> getAdditionalExtensions() {
         return List.of(
                 new OptimizeCaptorParameterResolver(this),
-                new ControlFactorParameterResolver(treatmentValue, treatmentFactorName)
+                new ControlFactorParameterResolver(treatmentValue, controlFactorName)
         );
     }
 }

@@ -1,14 +1,13 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.experiment.model.FactorSuit;
-import org.junit.jupiter.api.Test;
-
-import static org.javai.punit.model.TerminationReason.*;
-
+import static org.javai.punit.model.TerminationReason.MAX_ITERATIONS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Instant;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.javai.punit.experiment.model.FactorSuit;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for {@link OptimizeHistory}.
@@ -31,13 +30,13 @@ class OptimizeHistoryTest {
     void shouldBuildMinimalHistory() {
         OptimizeHistory history = OptimizeHistory.builder()
                 .useCaseId("shopping")
-                .treatmentFactorName("systemPrompt")
+                .controlFactorName("systemPrompt")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now())
                 .build();
 
         assertEquals("shopping", history.useCaseId());
-        assertEquals("systemPrompt", history.treatmentFactorName());
+        assertEquals("systemPrompt", history.controlFactorName());
         assertEquals(OptimizationObjective.MAXIMIZE, history.objective());
         assertEquals(0, history.iterationCount());
     }
@@ -46,7 +45,7 @@ class OptimizeHistoryTest {
     void shouldTrackIterations() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now());
 
@@ -64,7 +63,7 @@ class OptimizeHistoryTest {
     void shouldFindBestIterationForMaximize() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now());
 
@@ -84,7 +83,7 @@ class OptimizeHistoryTest {
     void shouldFindBestIterationForMinimize() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MINIMIZE)
                 .startTime(Instant.now());
 
@@ -104,7 +103,7 @@ class OptimizeHistoryTest {
     void shouldReturnEmptyBestWhenNoIterations() {
         OptimizeHistory history = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now())
                 .buildPartial();
@@ -118,7 +117,7 @@ class OptimizeHistoryTest {
     void shouldCalculateScoreImprovement() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now());
 
@@ -136,7 +135,7 @@ class OptimizeHistoryTest {
     void shouldGetLastNIterations() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now());
 
@@ -156,7 +155,7 @@ class OptimizeHistoryTest {
     void shouldGetBestFactorValue() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("systemPrompt")
+                .controlFactorName("systemPrompt")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now());
 
@@ -174,7 +173,7 @@ class OptimizeHistoryTest {
     void shouldCalculateTotalTokens() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now());
 
@@ -191,7 +190,7 @@ class OptimizeHistoryTest {
     @Test
     void shouldRequireUseCaseId() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now());
 
@@ -212,7 +211,7 @@ class OptimizeHistoryTest {
     void shouldRequireStartTime() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE);
 
         assertThrows(IllegalStateException.class, builder::build);
@@ -222,7 +221,7 @@ class OptimizeHistoryTest {
     void shouldSupportPartialBuildDuringOptimization() {
         OptimizeHistory.Builder builder = OptimizeHistory.builder()
                 .useCaseId("test")
-                .treatmentFactorName("factor")
+                .controlFactorName("factor")
                 .objective(OptimizationObjective.MAXIMIZE)
                 .startTime(Instant.now());
 
@@ -246,8 +245,8 @@ class OptimizeHistoryTest {
         OptimizeHistory history = OptimizeHistory.builder()
                 .useCaseId("shopping")
                 .experimentId("optimize-v1")
-                .treatmentFactorName("systemPrompt")
-                .treatmentFactorType("String")
+                .controlFactorName("systemPrompt")
+                .controlFactorType("String")
                 .fixedFactors(FactorSuit.of("model", "gpt-4", "temperature", 0.7))
                 .objective(OptimizationObjective.MAXIMIZE)
                 .scorerDescription("Success rate scorer")
@@ -260,8 +259,8 @@ class OptimizeHistoryTest {
 
         assertEquals("shopping", history.useCaseId());
         assertEquals("optimize-v1", history.experimentId());
-        assertEquals("systemPrompt", history.treatmentFactorName());
-        assertEquals("String", history.treatmentFactorType());
+        assertEquals("systemPrompt", history.controlFactorName());
+        assertEquals("String", history.controlFactorType());
         assertEquals("gpt-4", history.fixedFactors().get("model"));
         assertEquals(0.7, history.fixedFactors().<Double>get("temperature"));
         assertEquals("Success rate scorer", history.scorerDescription());

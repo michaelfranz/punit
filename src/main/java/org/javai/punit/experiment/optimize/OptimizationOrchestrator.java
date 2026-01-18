@@ -1,12 +1,11 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.experiment.model.FactorSuit;
-import org.javai.punit.model.UseCaseOutcome;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import org.javai.punit.experiment.model.FactorSuit;
+import org.javai.punit.model.UseCaseOutcome;
 
 /**
  * Executes the OPTIMIZE experiment loop.
@@ -18,14 +17,14 @@ import java.util.function.Consumer;
  *   <li>Score the aggregate</li>
  *   <li>Record in history</li>
  *   <li>Check termination</li>
- *   <li>Mutate the treatment factor</li>
+ *   <li>Mutate the control factor</li>
  *   <li>Repeat</li>
  * </ol>
  *
  * <p>The orchestrator coordinates these steps but delegates the actual
  * work to the {@link Scorer}, {@link FactorMutator}, and {@link OptimizeTerminationPolicy}.
  *
- * @param <F> the type of the treatment factor
+ * @param <F> the type of the control factor
  */
 public final class OptimizationOrchestrator<F> {
 
@@ -88,8 +87,8 @@ public final class OptimizationOrchestrator<F> {
         OptimizeHistory.Builder historyBuilder = OptimizeHistory.builder()
                 .useCaseId(config.useCaseId())
                 .experimentId(config.experimentId())
-                .treatmentFactorName(config.treatmentFactorName())
-                .treatmentFactorType(config.treatmentFactorType())
+                .controlFactorName(config.controlFactorName())
+                .controlFactorType(config.controlFactorType())
                 .fixedFactors(config.fixedFactors())
                 .objective(config.objective())
                 .scorerDescription(config.scorer().description())
@@ -105,7 +104,7 @@ public final class OptimizationOrchestrator<F> {
 
             // 1. Build complete factor suit for this iteration
             FactorSuit factorSuit = config.fixedFactors()
-                    .with(config.treatmentFactorName(), currentFactorValue);
+                    .with(config.controlFactorName(), currentFactorValue);
 
             // 2. Execute use case N times (like MEASURE)
             List<UseCaseOutcome> outcomes;
@@ -116,7 +115,7 @@ public final class OptimizationOrchestrator<F> {
                 OptimizationIterationAggregate aggregate = new OptimizationIterationAggregate(
                         iteration,
                         factorSuit,
-                        config.treatmentFactorName(),
+                        config.controlFactorName(),
                         OptimizeStatistics.empty(),
                         iterStart,
                         Instant.now()
@@ -136,7 +135,7 @@ public final class OptimizationOrchestrator<F> {
             OptimizationIterationAggregate aggregate = new OptimizationIterationAggregate(
                     iteration,
                     factorSuit,
-                    config.treatmentFactorName(),
+                    config.controlFactorName(),
                     statistics,
                     iterStart,
                     Instant.now()
@@ -173,7 +172,7 @@ public final class OptimizationOrchestrator<F> {
                         .build();
             }
 
-            // 7. Mutate treatment factor for next iteration
+            // 7. Mutate control factor for next iteration
             try {
                 currentFactorValue = config.mutator().mutate(currentFactorValue, currentHistory);
                 config.mutator().validate(currentFactorValue);

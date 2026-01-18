@@ -1,12 +1,13 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.experiment.model.FactorSuit;
-import org.junit.jupiter.api.Test;
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Instant;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.javai.punit.experiment.model.FactorSuit;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for {@link OptimizationRecord} and {@link OptimizationIterationAggregate}.
@@ -103,7 +104,7 @@ class OptimizationRecordTest {
 
         assertEquals(3, aggregate.iterationNumber());
         assertEquals(factorSuit, aggregate.factorSuit());
-        assertEquals("systemPrompt", aggregate.treatmentFactorName());
+        assertEquals("systemPrompt", aggregate.controlFactorName());
         assertEquals(stats, aggregate.statistics());
         assertEquals(start, aggregate.startTime());
         assertEquals(end, aggregate.endTime());
@@ -120,7 +121,7 @@ class OptimizationRecordTest {
                 0, factorSuit, "systemPrompt", stats, start, start.plusMillis(100)
         );
 
-        assertEquals("You are helpful", aggregate.treatmentFactorValue());
+        assertEquals("You are helpful", aggregate.controlFactorValue());
     }
 
     @Test
