@@ -3,7 +3,9 @@ package org.javai.punit.experiment.engine;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 import org.javai.punit.api.FactorArguments;
@@ -33,10 +35,13 @@ import org.javai.punit.api.HashableFactorSource;
  *       or {@code Collection<FactorArguments>}</li>
  * </ul>
  *
- * <h2>Reference Formats</h2>
+ * <h2>Reference Formats and Resolution</h2>
  * <ul>
- *   <li>{@code "methodName"} - method in the same class</li>
- *   <li>{@code "ClassName#methodName"} - method in another class</li>
+ *   <li><b>Simple name</b> ({@code "methodName"}): Search current class,
+ *       then use case class</li>
+ *   <li><b>Class#method</b> ({@code "ClassName#methodName"}): Search current
+ *       package, then use case's package</li>
+ *   <li><b>Fully qualified</b> ({@code "pkg.ClassName#methodName"}): Direct lookup</li>
  * </ul>
  *
  * @see DefaultHashableFactorSource
@@ -51,42 +56,61 @@ public final class FactorSourceAdapter {
     /**
      * Creates a HashableFactorSource from a @FactorSource annotation on a method.
      *
+     * <p>This overload does not search the use case class for simple names.
+     * Prefer {@link #fromAnnotation(FactorSource, Class, Class)} when a use case
+     * class is available.
+     *
+     * @param annotation    the FactorSource annotation
+     * @param declaringClass the class containing the annotation
+     * @return a HashableFactorSource wrapping the annotated method
+     * @throws FactorSourceResolutionException if the method cannot be resolved or invoked
+     */
+    public static HashableFactorSource fromAnnotation(FactorSource annotation, Class<?> declaringClass) {
+        return fromAnnotation(annotation, declaringClass, null);
+    }
+
+    /**
+     * Creates a HashableFactorSource from a @FactorSource annotation on a method.
+     *
+     * <p>Resolution order depends on the reference format:
+     * <ul>
+     *   <li><b>Simple name</b>: Search current class, then use case class</li>
+     *   <li><b>Class#method</b>: Search current package, then use case's package</li>
+     *   <li><b>Fully qualified</b>: Direct lookup</li>
+     * </ul>
+     *
      * <p>The implementation type is determined by the method's return type:
      * <ul>
      *   <li>{@code List} or {@code Collection} → {@link DefaultHashableFactorSource}</li>
      *   <li>{@code Stream} → {@link StreamingHashableFactorSource}</li>
      * </ul>
      *
-     * @param annotation    the FactorSource annotation
-     * @param declaringClass the class containing the factor source method
+     * @param annotation     the FactorSource annotation
+     * @param declaringClass the class containing the annotation
+     * @param useCaseClass   the use case class to search (may be null)
      * @return a HashableFactorSource wrapping the annotated method
      * @throws FactorSourceResolutionException if the method cannot be resolved or invoked
      */
-    public static HashableFactorSource fromAnnotation(FactorSource annotation, Class<?> declaringClass) {
+    public static HashableFactorSource fromAnnotation(
+            FactorSource annotation, Class<?> declaringClass, Class<?> useCaseClass) {
         Objects.requireNonNull(annotation, "annotation must not be null");
         Objects.requireNonNull(declaringClass, "declaringClass must not be null");
 
-        String methodName = resolveMethodName(annotation.value(), declaringClass);
-        Method method = findMethod(methodName, declaringClass);
-        validateMethod(method);
+        String reference = annotation.value();
+        if (reference == null || reference.isEmpty()) {
+            throw new FactorSourceResolutionException(
+                    "FactorSource value is required in class " + declaringClass.getName());
+        }
 
-        return createSourceForMethod(method, methodName, declaringClass);
+        return resolveReference(reference, declaringClass, useCaseClass);
     }
 
     /**
      * Resolves a method reference that may include a class name.
      *
-     * <p>Supports two formats:
-     * <ul>
-     *   <li>{@code "methodName"} - method in the declaring class</li>
-     *   <li>{@code "ClassName#methodName"} - method in the specified class</li>
-     * </ul>
-     *
-     * <p>The implementation type is determined by the method's return type:
-     * <ul>
-     *   <li>{@code List} or {@code Collection} → {@link DefaultHashableFactorSource}</li>
-     *   <li>{@code Stream} → {@link StreamingHashableFactorSource}</li>
-     * </ul>
+     * <p>This overload does not search the use case class for simple names.
+     * Prefer {@link #fromReference(String, Class, Class)} when a use case
+     * class is available.
      *
      * @param reference      the method reference from the annotation
      * @param declaringClass the class containing the annotation
@@ -94,35 +118,186 @@ public final class FactorSourceAdapter {
      * @throws FactorSourceResolutionException if resolution fails
      */
     public static HashableFactorSource fromReference(String reference, Class<?> declaringClass) {
+        return fromReference(reference, declaringClass, null);
+    }
+
+    /**
+     * Resolves a method reference that may include a class name.
+     *
+     * <p>Resolution order depends on the reference format:
+     * <ul>
+     *   <li><b>Simple name</b> ({@code "methodName"}): Search current class,
+     *       then use case class</li>
+     *   <li><b>Class#method</b> ({@code "ClassName#methodName"}): Search current
+     *       package, then use case's package</li>
+     *   <li><b>Fully qualified</b> ({@code "pkg.ClassName#methodName"}): Direct lookup</li>
+     * </ul>
+     *
+     * @param reference      the method reference from the annotation
+     * @param declaringClass the class containing the annotation
+     * @param useCaseClass   the use case class to search (may be null)
+     * @return a HashableFactorSource for the referenced method
+     * @throws FactorSourceResolutionException if resolution fails
+     */
+    public static HashableFactorSource fromReference(
+            String reference, Class<?> declaringClass, Class<?> useCaseClass) {
         Objects.requireNonNull(reference, "reference must not be null");
         Objects.requireNonNull(declaringClass, "declaringClass must not be null");
 
-        if (reference.contains("#")) {
-            // Cross-class reference: "ClassName#methodName"
-            String[] parts = reference.split("#", 2);
-            String className = parts[0];
-            String methodName = parts[1];
+        return resolveReference(reference, declaringClass, useCaseClass);
+    }
 
-            Class<?> targetClass = resolveClass(className, declaringClass);
-            Method method = findMethod(methodName, targetClass);
-            validateMethod(method);
+    /**
+     * Core resolution logic implementing the three-form algorithm.
+     */
+    private static HashableFactorSource resolveReference(
+            String reference, Class<?> declaringClass, Class<?> useCaseClass) {
 
-            return createSourceForMethod(method, reference, targetClass);
+        if (!reference.contains("#")) {
+            // Simple name - search current class, then use case class
+            return resolveSimpleName(reference, declaringClass, useCaseClass);
+        }
+
+        String[] parts = reference.split("#", 2);
+        String classRef = parts[0];
+        String methodName = parts[1];
+
+        if (classRef.contains(".")) {
+            // Fully qualified - direct lookup
+            return resolveFullyQualified(classRef, methodName);
         } else {
-            // Same-class reference: "methodName"
-            Method method = findMethod(reference, declaringClass);
-            validateMethod(method);
-
-            return createSourceForMethod(method, reference, declaringClass);
+            // Class#method - search current package, then use case's package
+            return resolveClassMethod(classRef, methodName, declaringClass, useCaseClass);
         }
     }
 
-    private static String resolveMethodName(String value, Class<?> declaringClass) {
-        if (value == null || value.isEmpty()) {
-            throw new FactorSourceResolutionException(
-                    "FactorSource value is required in class " + declaringClass.getName());
+    /**
+     * Resolves a simple method name by searching current class, then use case class.
+     */
+    private static HashableFactorSource resolveSimpleName(
+            String methodName, Class<?> currentClass, Class<?> useCaseClass) {
+
+        // 1. Try current class
+        Method method = tryFindMethod(methodName, currentClass);
+        if (method != null) {
+            validateMethod(method);
+            return createSourceForMethod(method, methodName, currentClass);
         }
-        return value;
+
+        // 2. Try use case class
+        if (useCaseClass != null && useCaseClass != Void.class && useCaseClass != currentClass) {
+            method = tryFindMethod(methodName, useCaseClass);
+            if (method != null) {
+                validateMethod(method);
+                return createSourceForMethod(method, methodName, useCaseClass);
+            }
+        }
+
+        // Not found - build helpful error message
+        StringBuilder searched = new StringBuilder();
+        searched.append("\n  - ").append(currentClass.getName());
+        if (useCaseClass != null && useCaseClass != Void.class && useCaseClass != currentClass) {
+            searched.append("\n  - ").append(useCaseClass.getName());
+        }
+
+        throw new FactorSourceResolutionException(
+                "Cannot find factor source method '" + methodName + "'.\n" +
+                        "Searched in:" + searched +
+                        "\nHint: Use 'ClassName#methodName' or fully qualified 'pkg.ClassName#methodName' for explicit resolution.");
+    }
+
+    /**
+     * Resolves Class#method by searching current package, then use case's package.
+     */
+    private static HashableFactorSource resolveClassMethod(
+            String className, String methodName, Class<?> currentClass, Class<?> useCaseClass) {
+
+        List<String> searchedLocations = new ArrayList<>();
+
+        // 1. Try current class's package
+        String currentPackage = currentClass.getPackageName();
+        Class<?> targetClass = tryLoadClass(currentPackage + "." + className);
+        if (targetClass != null) {
+            Method method = tryFindMethod(methodName, targetClass);
+            if (method != null) {
+                validateMethod(method);
+                return createSourceForMethod(method, className + "#" + methodName, targetClass);
+            }
+        }
+        searchedLocations.add(currentPackage + "." + className);
+
+        // 2. Try use case class's package (if different)
+        if (useCaseClass != null && useCaseClass != Void.class) {
+            String useCasePackage = useCaseClass.getPackageName();
+            if (!useCasePackage.equals(currentPackage)) {
+                targetClass = tryLoadClass(useCasePackage + "." + className);
+                if (targetClass != null) {
+                    Method method = tryFindMethod(methodName, targetClass);
+                    if (method != null) {
+                        validateMethod(method);
+                        return createSourceForMethod(method, className + "#" + methodName, targetClass);
+                    }
+                }
+                searchedLocations.add(useCasePackage + "." + className);
+            }
+        }
+
+        // Not found - build helpful error message
+        StringBuilder searched = new StringBuilder();
+        for (String loc : searchedLocations) {
+            searched.append("\n  - ").append(loc);
+        }
+
+        throw new FactorSourceResolutionException(
+                "Cannot find factor source '" + className + "#" + methodName + "'.\n" +
+                        "Searched in:" + searched +
+                        "\nHint: Use fully qualified 'pkg.ClassName#methodName' for explicit resolution.");
+    }
+
+    /**
+     * Resolves a fully qualified class#method reference.
+     */
+    private static HashableFactorSource resolveFullyQualified(
+            String fullyQualifiedClassName, String methodName) {
+
+        Class<?> targetClass;
+        try {
+            targetClass = Class.forName(fullyQualifiedClassName);
+        } catch (ClassNotFoundException e) {
+            throw new FactorSourceResolutionException(
+                    "Cannot find class '" + fullyQualifiedClassName + "' for factor source.");
+        }
+
+        Method method = tryFindMethod(methodName, targetClass);
+        if (method == null) {
+            throw new FactorSourceResolutionException(
+                    "Cannot find method '" + methodName + "' in class " + fullyQualifiedClassName);
+        }
+
+        validateMethod(method);
+        return createSourceForMethod(method, fullyQualifiedClassName + "#" + methodName, targetClass);
+    }
+
+    /**
+     * Attempts to find a method in a class, returning null if not found.
+     */
+    private static Method tryFindMethod(String methodName, Class<?> clazz) {
+        try {
+            return clazz.getDeclaredMethod(methodName);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Attempts to load a class, returning null if not found.
+     */
+    private static Class<?> tryLoadClass(String className) {
+        try {
+            return Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
     }
 
     /**
@@ -168,64 +343,6 @@ public final class FactorSourceAdapter {
             throw new FactorSourceResolutionException(
                     "Failed to invoke factor source method '" + method.getName() + "': " + e.getMessage(), e);
         }
-    }
-
-    private static Method findMethod(String methodName, Class<?> declaringClass) {
-        // Handle cross-class reference if present
-        if (methodName.contains("#")) {
-            String[] parts = methodName.split("#", 2);
-            declaringClass = resolveClass(parts[0], declaringClass);
-            methodName = parts[1];
-        }
-
-        try {
-            return declaringClass.getDeclaredMethod(methodName);
-        } catch (NoSuchMethodException e) {
-            throw new FactorSourceResolutionException(
-                    "Factor source method '" + methodName + "' not found in class " +
-                            declaringClass.getName() + ". Ensure the method exists and takes no parameters.");
-        }
-    }
-
-    private static Class<?> resolveClass(String className, Class<?> contextClass) {
-        String packageName = contextClass.getPackageName();
-        
-        // 1. Try same package
-        try {
-            return Class.forName(packageName + "." + className);
-        } catch (ClassNotFoundException ignored) {
-        }
-        
-        // 2. Try fully qualified name (className might already be FQN)
-        try {
-            return Class.forName(className);
-        } catch (ClassNotFoundException ignored) {
-        }
-        
-        // 3. Try sibling packages (e.g., from .experiment to .usecase)
-        // This handles common project structures where related classes are in sibling packages
-        int lastDot = packageName.lastIndexOf('.');
-        if (lastDot > 0) {
-            String parentPackage = packageName.substring(0, lastDot);
-            
-            // Try common sibling package names
-            for (String sibling : new String[]{"usecase", "model", "domain", "service", "api", "core"}) {
-                try {
-                    return Class.forName(parentPackage + "." + sibling + "." + className);
-                } catch (ClassNotFoundException ignored) {
-                }
-            }
-            
-            // Try parent package directly
-            try {
-                return Class.forName(parentPackage + "." + className);
-            } catch (ClassNotFoundException ignored) {
-            }
-        }
-        
-        throw new FactorSourceResolutionException(
-                "Cannot resolve class '" + className + "' from context " + contextClass.getName() +
-                ". Try using the fully qualified class name.");
     }
 
     private static void validateMethod(Method method) {

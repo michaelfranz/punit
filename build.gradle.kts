@@ -31,33 +31,6 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-// Define the experiment source set
-sourceSets {
-    val experiment by creating {
-        java.srcDir("src/experiment/java")
-        resources.srcDir("src/experiment/resources")
-        
-        // experiment depends on main's output
-        compileClasspath += sourceSets.main.get().output
-        runtimeClasspath += sourceSets.main.get().output
-    }
-    
-    test {
-        // test depends on both main and experiment
-        compileClasspath += experiment.output
-        runtimeClasspath += experiment.output
-    }
-}
-
-// Configure dependencies for experiment source set
-val experimentImplementation: Configuration by configurations.getting {
-    extendsFrom(configurations.implementation.get())
-}
-
-val experimentRuntimeOnly: Configuration by configurations.getting {
-    extendsFrom(configurations.runtimeOnly.get())
-}
-
 repositories {
     mavenCentral()
 }
@@ -75,36 +48,18 @@ dependencies {
     // Log4j 2 - structured logging for runtime output
     implementation("org.apache.logging.log4j:log4j-api:2.23.1")
     runtimeOnly("org.apache.logging.log4j:log4j-core:2.23.1")
+    // Bridge SLF4J to Log4j2 (some dependencies use SLF4J)
+    runtimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.23.1")
     
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.junit.platform:junit-platform-testkit")
     testImplementation("org.assertj:assertj-core:3.27.6")
     testImplementation("org.apache.logging.log4j:log4j-core:2.23.1")
+    testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.23.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    
-    // Experiment dependencies - experiments use JUnit's TestTemplate mechanism
-    experimentImplementation("org.junit.jupiter:junit-jupiter")
-    experimentImplementation("org.assertj:assertj-core:3.27.6")
-    experimentRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
-// Ensure build order: main -> experiment -> test
-tasks.named("compileExperimentJava") {
-    dependsOn(tasks.compileJava)
-}
-
-tasks.named("compileTestJava") {
-    dependsOn("compileExperimentJava")
-}
-
-tasks.named("processExperimentResources") {
-    dependsOn(tasks.processResources)
-}
-
-tasks.named("processTestResources") {
-    dependsOn("processExperimentResources")
 }
 
 tasks.test {
@@ -144,13 +99,13 @@ val explorationsDir = "src/test/resources/punit/explorations"
 // Shared configuration for experiment tasks
 fun Test.configureAsExperimentTask() {
     group = "verification"
-    
-    // Use the experiment source set
-    testClassesDirs = sourceSets["experiment"].output.classesDirs
-    classpath = sourceSets["experiment"].runtimeClasspath
-    
+
+    // Use the test source set (experiments live alongside tests)
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+
     useJUnitPlatform()
-    
+
     testLogging {
         events("passed", "skipped", "failed", "standardOut", "standardError")
         showExceptions = true
@@ -159,22 +114,29 @@ fun Test.configureAsExperimentTask() {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showStandardStreams = true
     }
-    
+
     // Configure reports output directory
     reports {
         html.outputLocation.set(layout.buildDirectory.dir("reports/experiment"))
         junitXml.outputLocation.set(layout.buildDirectory.dir("experiment-results"))
     }
-    
+
     // Output directories for each mode (used by the framework based on annotation mode)
     systemProperty("punit.specs.outputDir", specsDir)
     systemProperty("punit.explorations.outputDir", explorationsDir)
-    
+
+    // Deactivate @Disabled so experiments can run even when disabled
+    // (they're @Disabled to prevent accidental execution in regular test runs)
+    systemProperty("junit.jupiter.conditions.deactivate", "org.junit.*DisabledCondition")
+
     // Experiments never fail the build (they're exploratory, not conformance tests)
     ignoreFailures = true
-    
-    // Ensure experiment classes are compiled first
-    dependsOn("compileExperimentJava", "processExperimentResources")
+
+    // Exclude test subject classes (they are executed via TestKit in integration tests)
+    exclude("**/testsubjects/**")
+
+    // Ensure test classes are compiled first
+    dependsOn("compileTestJava", "processTestResources")
     
     // Support simplified syntax: ./gradlew exp -Prun=TestName
     // This avoids the verbose --tests "TestName" syntax
@@ -323,10 +285,7 @@ tasks.jacocoTestReport {
     classDirectories.setFrom(
         files(classDirectories.files.map {
             fileTree(it) {
-                exclude(
-                    "**/examples/**",
-                    "**/experiment/**"
-                )
+                exclude("**/examples/**")
             }
         })
     )

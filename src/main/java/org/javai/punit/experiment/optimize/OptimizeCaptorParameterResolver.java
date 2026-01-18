@@ -15,8 +15,8 @@ import org.junit.jupiter.api.extension.ParameterResolver;
  *   <li>{@code iterationNumber} - the current iteration (0-indexed)</li>
  *   <li>{@code sampleInIteration} - the sample number within the iteration (1-indexed)</li>
  *   <li>{@code samplesPerIteration} - total samples per iteration</li>
- *   <li>{@code treatmentValue} - the current treatment factor value</li>
- *   <li>{@code treatmentFactorName} - the name of the treatment factor</li>
+ *   <li>{@code treatmentValue} - the current control factor value</li>
+ *   <li>{@code controlFactorName} - the name of the control factor</li>
  * </ul>
  */
 public class OptimizeCaptorParameterResolver implements ParameterResolver {
@@ -48,7 +48,7 @@ public class OptimizeCaptorParameterResolver implements ParameterResolver {
         store.put("sampleInIteration", context.sampleInIteration());
         store.put("samplesPerIteration", context.samplesPerIteration());
         store.put("treatmentValue", context.treatmentValue());
-        store.put("treatmentFactorName", context.treatmentFactorName());
+        store.put("controlFactorName", context.controlFactorName());
         return context.captor();
     }
 }

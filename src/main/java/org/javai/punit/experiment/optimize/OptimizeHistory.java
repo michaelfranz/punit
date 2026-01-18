@@ -1,7 +1,5 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.experiment.model.FactorSuit;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -9,6 +7,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import org.javai.punit.experiment.model.FactorSuit;
 
 /**
  * Complete history of an optimization run.
@@ -21,7 +20,7 @@ import java.util.Optional;
  *
  * <p>OPTIMIZE produces:
  * <ul>
- *   <li>The best value found for the treatment factor (primary output)</li>
+ *   <li>The best value found for the control factor (primary output)</li>
  *   <li>Full iteration history (for auditability and analysis)</li>
  *   <li>Termination reason (why optimization stopped)</li>
  * </ul>
@@ -35,8 +34,8 @@ public final class OptimizeHistory {
     private final String experimentId;
 
     // === Factor Configuration ===
-    private final String treatmentFactorName;
-    private final String treatmentFactorType;
+    private final String controlFactorName;
+    private final String controlFactorType;
     private final FactorSuit fixedFactors;
     private final OptimizationObjective objective;
 
@@ -58,8 +57,8 @@ public final class OptimizeHistory {
     private OptimizeHistory(Builder builder) {
         this.useCaseId = builder.useCaseId;
         this.experimentId = builder.experimentId;
-        this.treatmentFactorName = builder.treatmentFactorName;
-        this.treatmentFactorType = builder.treatmentFactorType;
+        this.controlFactorName = builder.controlFactorName;
+        this.controlFactorType = builder.controlFactorType;
         this.fixedFactors = builder.fixedFactors;
         this.objective = builder.objective;
         this.scorerDescription = builder.scorerDescription;
@@ -81,12 +80,12 @@ public final class OptimizeHistory {
         return experimentId;
     }
 
-    public String treatmentFactorName() {
-        return treatmentFactorName;
+    public String controlFactorName() {
+        return controlFactorName;
     }
 
-    public String treatmentFactorType() {
-        return treatmentFactorType;
+    public String controlFactorType() {
+        return controlFactorType;
     }
 
     public FactorSuit fixedFactors() {
@@ -190,15 +189,15 @@ public final class OptimizeHistory {
     }
 
     /**
-     * Get the best value found for the treatment factor.
+     * Get the best value found for the control factor.
      *
-     * @param <F> the type of the treatment factor
+     * @param <F> the type of the control factor
      * @return the best value, or empty if no successful iterations
      */
     @SuppressWarnings("unchecked")
     public <F> Optional<F> bestFactorValue() {
         return bestIteration()
-                .map(iter -> (F) iter.aggregate().treatmentFactorValue());
+                .map(iter -> (F) iter.aggregate().controlFactorValue());
     }
 
     /**
@@ -279,8 +278,8 @@ public final class OptimizeHistory {
 
         private String useCaseId;
         private String experimentId;
-        private String treatmentFactorName;
-        private String treatmentFactorType;
+        private String controlFactorName;
+        private String controlFactorType;
         private FactorSuit fixedFactors;
         private OptimizationObjective objective = OptimizationObjective.MAXIMIZE;
         private String scorerDescription = "";
@@ -303,13 +302,13 @@ public final class OptimizeHistory {
             return this;
         }
 
-        public Builder treatmentFactorName(String treatmentFactorName) {
-            this.treatmentFactorName = treatmentFactorName;
+        public Builder controlFactorName(String controlFactorName) {
+            this.controlFactorName = controlFactorName;
             return this;
         }
 
-        public Builder treatmentFactorType(String treatmentFactorType) {
-            this.treatmentFactorType = treatmentFactorType;
+        public Builder controlFactorType(String controlFactorType) {
+            this.controlFactorType = controlFactorType;
             return this;
         }
 
@@ -409,8 +408,8 @@ public final class OptimizeHistory {
             if (useCaseId == null || useCaseId.isBlank()) {
                 throw new IllegalStateException("useCaseId is required");
             }
-            if (treatmentFactorName == null || treatmentFactorName.isBlank()) {
-                throw new IllegalStateException("treatmentFactorName is required");
+            if (controlFactorName == null || controlFactorName.isBlank()) {
+                throw new IllegalStateException("controlFactorName is required");
             }
             if (objective == null) {
                 throw new IllegalStateException("objective is required");

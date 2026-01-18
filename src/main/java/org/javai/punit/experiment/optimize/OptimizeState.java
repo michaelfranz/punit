@@ -1,13 +1,12 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.experiment.model.FactorSuit;
-import org.javai.punit.model.UseCaseOutcome;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.javai.punit.experiment.model.FactorSuit;
+import org.javai.punit.model.UseCaseOutcome;
 
 /**
  * Mutable state for an OPTIMIZE experiment execution.
@@ -16,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * stream generation (Spliterator) and the intercept method. It tracks:
  * <ul>
  *   <li>Current iteration and sample numbers</li>
- *   <li>Current treatment factor value</li>
+ *   <li>Current control factor value</li>
  *   <li>Outcomes collected for the current iteration</li>
  *   <li>History of completed iterations</li>
  *   <li>Termination status</li>
@@ -30,8 +29,8 @@ public final class OptimizeState {
     // Configuration
     private final String useCaseId;
     private final String experimentId;
-    private final String treatmentFactorName;
-    private final String treatmentFactorType;
+    private final String controlFactorName;
+    private final String controlFactorType;
     private final int samplesPerIteration;
     private final int maxIterations;
     private final OptimizationObjective objective;
@@ -44,7 +43,7 @@ public final class OptimizeState {
     private final AtomicInteger currentIteration = new AtomicInteger(0);
     private final AtomicInteger currentSampleInIteration = new AtomicInteger(0);
     private final AtomicBoolean terminated = new AtomicBoolean(false);
-    private volatile Object currentTreatmentValue;
+    private volatile Object currentControlFactorValue;
     private volatile Instant iterationStartTime;
 
     // Current iteration outcomes (reset at start of each iteration)
@@ -60,8 +59,8 @@ public final class OptimizeState {
     public OptimizeState(
             String useCaseId,
             String experimentId,
-            String treatmentFactorName,
-            String treatmentFactorType,
+            String controlFactorName,
+            String controlFactorType,
             int samplesPerIteration,
             int maxIterations,
             OptimizationObjective objective,
@@ -69,12 +68,12 @@ public final class OptimizeState {
             FactorMutator<?> mutator,
             OptimizeTerminationPolicy terminationPolicy,
             FactorSuit fixedFactors,
-            Object initialTreatmentValue
+            Object initialControlFactorValue
     ) {
         this.useCaseId = useCaseId;
         this.experimentId = experimentId;
-        this.treatmentFactorName = treatmentFactorName;
-        this.treatmentFactorType = treatmentFactorType;
+        this.controlFactorName = controlFactorName;
+        this.controlFactorType = controlFactorType;
         this.samplesPerIteration = samplesPerIteration;
         this.maxIterations = maxIterations;
         this.objective = objective;
@@ -82,15 +81,15 @@ public final class OptimizeState {
         this.mutator = (FactorMutator<Object>) mutator;
         this.terminationPolicy = terminationPolicy;
         this.fixedFactors = fixedFactors;
-        this.currentTreatmentValue = initialTreatmentValue;
+        this.currentControlFactorValue = initialControlFactorValue;
         this.iterationStartTime = Instant.now();
         this.aggregator = OptimizationOutcomeAggregator.defaultAggregator();
 
         this.historyBuilder = OptimizeHistory.builder()
                 .useCaseId(useCaseId)
                 .experimentId(experimentId)
-                .treatmentFactorName(treatmentFactorName)
-                .treatmentFactorType(treatmentFactorType)
+                .controlFactorName(controlFactorName)
+                .controlFactorType(controlFactorType)
                 .fixedFactors(fixedFactors)
                 .objective(objective)
                 .scorerDescription(scorer.description())
@@ -109,12 +108,12 @@ public final class OptimizeState {
         return experimentId;
     }
 
-    public String treatmentFactorName() {
-        return treatmentFactorName;
+    public String controlFactorName() {
+        return controlFactorName;
     }
 
-    public String treatmentFactorType() {
-        return treatmentFactorType;
+    public String controlFactorType() {
+        return controlFactorType;
     }
 
     public int samplesPerIteration() {
@@ -149,8 +148,8 @@ public final class OptimizeState {
         terminated.set(value);
     }
 
-    public Object currentTreatmentValue() {
-        return currentTreatmentValue;
+    public Object currentControlFactorValue() {
+        return currentControlFactorValue;
     }
 
     public Instant iterationStartTime() {
@@ -198,7 +197,7 @@ public final class OptimizeState {
         Instant iterEnd = Instant.now();
 
         // Build factor suit for this iteration
-        FactorSuit factorSuit = fixedFactors.with(treatmentFactorName, currentTreatmentValue);
+        FactorSuit factorSuit = fixedFactors.with(controlFactorName, currentControlFactorValue);
 
         // Aggregate outcomes
         OptimizeStatistics statistics = aggregator.aggregate(currentIterationOutcomes);
@@ -206,7 +205,7 @@ public final class OptimizeState {
         OptimizationIterationAggregate aggregate = new OptimizationIterationAggregate(
                 iteration,
                 factorSuit,
-                treatmentFactorName,
+                controlFactorName,
                 statistics,
                 iterationStartTime,
                 iterEnd
@@ -225,8 +224,9 @@ public final class OptimizeState {
             return false;
         }
 
-        // Record in history
-        OptimizationRecord record = OptimizationRecord.success(aggregate, score);
+        // Record in history (applying minimum acceptance threshold)
+        double threshold = scorer.minimumAcceptanceThreshold();
+        OptimizationRecord record = OptimizationRecord.successOrBelowThreshold(aggregate, score, threshold);
         historyBuilder.addIteration(record);
 
         // Check termination
@@ -240,10 +240,10 @@ public final class OptimizeState {
             return false;
         }
 
-        // Mutate treatment factor for next iteration
+        // Mutate control factor for next iteration
         try {
-            currentTreatmentValue = mutator.mutate(currentTreatmentValue, currentHistory);
-            mutator.validate(currentTreatmentValue);
+            currentControlFactorValue = mutator.mutate(currentControlFactorValue, currentHistory);
+            mutator.validate(currentControlFactorValue);
         } catch (MutationException e) {
             historyBuilder.endTime(Instant.now());
             historyBuilder.terminationReason(OptimizeTerminationReason.mutationFailure(e.getMessage()));

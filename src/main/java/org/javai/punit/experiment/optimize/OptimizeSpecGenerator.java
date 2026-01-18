@@ -42,6 +42,14 @@ public class OptimizeSpecGenerator {
     private static final String SCHEMA_VERSION = "punit-optimize-1";
 
     /**
+     * Formats a score (0.0-1.0) as a percentage with 1 decimal place.
+     * Example: 0.88 → "88.0%"
+     */
+    private static String formatAsPercent(double score) {
+        return String.format("%.1f%%", score * 100);
+    }
+
+    /**
      * Generates the optimization history YAML file.
      *
      * @param context the extension context for publishing reports
@@ -109,7 +117,7 @@ public class OptimizeSpecGenerator {
 
         // Header
         sb.append("# Optimization History for ").append(history.useCaseId()).append("\n");
-        sb.append("# Primary output: the best value for the treatment factor\n");
+        sb.append("# Primary output: the best value for the control factor\n");
         sb.append("# Generated automatically by punit @OptimizeExperiment\n\n");
 
         sb.append("schemaVersion: ").append(SCHEMA_VERSION).append("\n");
@@ -121,10 +129,10 @@ public class OptimizeSpecGenerator {
         }
 
         // Treatment factor
-        sb.append("\ntreatmentFactor:\n");
-        sb.append("  name: ").append(history.treatmentFactorName()).append("\n");
-        if (history.treatmentFactorType() != null) {
-            sb.append("  type: ").append(history.treatmentFactorType()).append("\n");
+        sb.append("\ncontrolFactor:\n");
+        sb.append("  name: ").append(history.controlFactorName()).append("\n");
+        if (history.controlFactorType() != null) {
+            sb.append("  type: ").append(history.controlFactorType()).append("\n");
         }
 
         // Fixed factors
@@ -160,11 +168,11 @@ public class OptimizeSpecGenerator {
             OptimizationRecord best = bestOpt.get();
             sb.append("\nbestIteration:\n");
             sb.append("  iterationNumber: ").append(best.aggregate().iterationNumber()).append("\n");
-            sb.append("  score: ").append(String.format("%.6f", best.score())).append("\n");
+            sb.append("  score: ").append(formatAsPercent(best.score())).append("\n");
 
             // Emphasize the best treatment value
-            Object bestValue = best.aggregate().treatmentFactorValue();
-            sb.append("  bestTreatmentValue: ");
+            Object bestValue = best.aggregate().controlFactorValue();
+            sb.append("  bestControlFactor: ");
             if (bestValue instanceof String s && s.contains("\n")) {
                 sb.append("|\n");
                 for (String line : s.split("\n")) {
@@ -178,7 +186,7 @@ public class OptimizeSpecGenerator {
             OptimizeStatistics stats = best.aggregate().statistics();
             sb.append("  statistics:\n");
             sb.append("    sampleCount: ").append(stats.sampleCount()).append("\n");
-            sb.append("    successRate: ").append(String.format("%.4f", stats.successRate())).append("\n");
+            sb.append("    successRate: ").append(formatAsPercent(stats.successRate())).append("\n");
             sb.append("    totalTokens: ").append(stats.totalTokens()).append("\n");
         }
 
@@ -188,12 +196,11 @@ public class OptimizeSpecGenerator {
         sb.append("  totalTokens: ").append(history.totalTokens()).append("\n");
 
         history.initialScore().ifPresent(score ->
-                sb.append("  initialScore: ").append(String.format("%.6f", score)).append("\n"));
+                sb.append("  initialScore: ").append(formatAsPercent(score)).append("\n"));
         history.bestScore().ifPresent(score ->
-                sb.append("  bestScore: ").append(String.format("%.6f", score)).append("\n"));
+                sb.append("  bestScore: ").append(formatAsPercent(score)).append("\n"));
 
-        sb.append("  scoreImprovement: ").append(String.format("%.6f", history.scoreImprovement())).append("\n");
-        sb.append("  scoreImprovementPercent: ").append(String.format("%.2f", history.scoreImprovementPercent())).append("\n");
+        sb.append("  scoreImprovement: ").append(formatAsPercent(history.scoreImprovement())).append("\n");
 
         // Termination reason
         if (history.terminationReason() != null) {
@@ -216,16 +223,19 @@ public class OptimizeSpecGenerator {
 
         sb.append("  - iterationNumber: ").append(agg.iterationNumber()).append("\n");
         sb.append("    status: ").append(record.status().name()).append("\n");
-        sb.append("    score: ").append(String.format("%.6f", record.score())).append("\n");
+        sb.append("    score: ").append(formatAsPercent(record.score())).append("\n");
 
-        // Treatment value for this iteration
-        Object treatmentValue = agg.treatmentFactorValue();
-        sb.append("    treatmentValue: ");
-        if (treatmentValue instanceof String s && s.length() > 80) {
-            // Truncate long strings in the iteration list
-            sb.append("\"").append(escapeYamlString(s.substring(0, 80))).append("...\"\n");
+        // Control factor value for this iteration
+        Object controlFactorValue = agg.controlFactorValue();
+        sb.append("    controlFactor: ");
+        if (controlFactorValue instanceof String s && s.contains("\n")) {
+            // Use YAML block scalar for multiline strings
+            sb.append("|\n");
+            for (String line : s.split("\n")) {
+                sb.append("      ").append(line).append("\n");
+            }
         } else {
-            appendYamlValue(sb, treatmentValue);
+            appendYamlValue(sb, controlFactorValue);
             sb.append("\n");
         }
 
@@ -233,7 +243,7 @@ public class OptimizeSpecGenerator {
         OptimizeStatistics stats = agg.statistics();
         sb.append("    statistics:\n");
         sb.append("      sampleCount: ").append(stats.sampleCount()).append("\n");
-        sb.append("      successRate: ").append(String.format("%.4f", stats.successRate())).append("\n");
+        sb.append("      successRate: ").append(formatAsPercent(stats.successRate())).append("\n");
         sb.append("      successCount: ").append(stats.successCount()).append("\n");
         sb.append("      failureCount: ").append(stats.failureCount()).append("\n");
         sb.append("      totalTokens: ").append(stats.totalTokens()).append("\n");
@@ -262,11 +272,42 @@ public class OptimizeSpecGenerator {
             } else {
                 sb.append(str);
             }
+        } else if (value instanceof Double d) {
+            // Format doubles cleanly, avoiding floating-point ugliness like 0.7000000000000001
+            sb.append(formatDouble(d));
+        } else if (value instanceof Float f) {
+            sb.append(formatDouble(f.doubleValue()));
         } else if (value instanceof Boolean || value instanceof Number) {
             sb.append(value);
         } else {
             sb.append("\"").append(escapeYamlString(value.toString())).append("\"");
         }
+    }
+
+    /**
+     * Formats a double value cleanly, avoiding floating-point representation issues.
+     *
+     * <p>Values very close to integers are rounded. Values very close to zero
+     * are displayed as 0.0. Other values are displayed with up to 4 decimal places.
+     */
+    private static String formatDouble(double value) {
+        // Handle values very close to zero
+        if (Math.abs(value) < 1e-10) {
+            return "0.0";
+        }
+        // Handle values very close to integers
+        double rounded = Math.round(value * 10000.0) / 10000.0;
+        if (rounded == Math.floor(rounded) && rounded < 1e10) {
+            return String.format("%.1f", rounded);
+        }
+        // General case: up to 4 decimal places, strip trailing zeros
+        String formatted = String.format("%.4f", rounded);
+        // Strip trailing zeros but keep at least one decimal place
+        formatted = formatted.replaceAll("0+$", "");
+        if (formatted.endsWith(".")) {
+            formatted += "0";
+        }
+        return formatted;
     }
 
     private String quoteIfNeeded(String str) {
@@ -303,18 +344,17 @@ public class OptimizeSpecGenerator {
         context.publishReportEntry("punit.experiment.complete", "true");
         context.publishReportEntry("punit.mode", "OPTIMIZE");
         context.publishReportEntry("punit.useCaseId", history.useCaseId());
-        context.publishReportEntry("punit.treatmentFactor", history.treatmentFactorName());
+        context.publishReportEntry("punit.controlFactor", history.controlFactorName());
         context.publishReportEntry("punit.iterationsCompleted",
                 String.valueOf(history.iterationCount()));
 
         history.bestScore().ifPresent(score ->
-                context.publishReportEntry("punit.bestScore", String.format("%.4f", score)));
+                context.publishReportEntry("punit.bestScore", formatAsPercent(score)));
 
         history.initialScore().ifPresent(score ->
-                context.publishReportEntry("punit.initialScore", String.format("%.4f", score)));
+                context.publishReportEntry("punit.initialScore", formatAsPercent(score)));
 
-        context.publishReportEntry("punit.scoreImprovement",
-                String.format("%.4f (%.2f%%)", history.scoreImprovement(), history.scoreImprovementPercent()));
+        context.publishReportEntry("punit.scoreImprovement", formatAsPercent(history.scoreImprovement()));
 
         if (history.terminationReason() != null) {
             context.publishReportEntry("punit.terminationReason",

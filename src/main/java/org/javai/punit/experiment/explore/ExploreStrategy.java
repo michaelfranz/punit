@@ -18,6 +18,7 @@ import org.javai.punit.api.UseCase;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.experiment.engine.ExperimentConfig;
 import org.javai.punit.experiment.engine.ExperimentModeStrategy;
+import org.javai.punit.experiment.measure.MeasureInvocationContext;
 import org.javai.punit.experiment.engine.ExperimentResultAggregator;
 import org.javai.punit.experiment.engine.ResultProjectionBuilder;
 import org.javai.punit.experiment.engine.shared.FactorInfo;
@@ -92,8 +93,9 @@ public class ExploreStrategy implements ExperimentModeStrategy {
             return provideSimpleInvocationContexts(exploreConfig, store);
         }
 
-        // Resolve factor combinations
-        List<FactorArguments> argsList = FactorResolver.resolveFactorArguments(testMethod, factorSource);
+        // Resolve factor combinations (searches current class, then use case class)
+        List<FactorArguments> argsList = FactorResolver.resolveFactorArguments(
+                testMethod, factorSource, exploreConfig.useCaseClass());
         List<FactorInfo> factorInfos = FactorResolver.extractFactorInfos(testMethod, factorSource, argsList);
 
         // Store explore-mode metadata
@@ -140,7 +142,7 @@ public class ExploreStrategy implements ExperimentModeStrategy {
 
         return Stream.iterate(1, i -> i + 1)
                 .limit(samplesPerConfig)
-                .map(i -> new org.javai.punit.experiment.measure.MeasureInvocationContext(
+                .map(i -> new MeasureInvocationContext(
                         i, samplesPerConfig, useCaseId, new ResultCaptor()));
     }
 
@@ -248,7 +250,8 @@ public class ExploreStrategy implements ExperimentModeStrategy {
             return samplesPerConfig;
         }
 
-        List<FactorArguments> argsList = FactorResolver.resolveFactorArguments(testMethod, factorSource);
+        List<FactorArguments> argsList = FactorResolver.resolveFactorArguments(
+                testMethod, factorSource, exploreConfig.useCaseClass());
         return samplesPerConfig * argsList.size();
     }
 

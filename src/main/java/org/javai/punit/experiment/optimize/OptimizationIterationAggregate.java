@@ -1,9 +1,8 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.experiment.model.FactorSuit;
-
 import java.time.Duration;
 import java.time.Instant;
+import org.javai.punit.experiment.model.FactorSuit;
 
 /**
  * Aggregate result of one optimization iteration.
@@ -20,7 +19,7 @@ import java.time.Instant;
  *
  * @param iterationNumber 0-indexed iteration number
  * @param factorSuit the complete factor suit for this iteration (fixed + treatment)
- * @param treatmentFactorName the name of the factor being optimized
+ * @param controlFactorName the name of the factor being optimized
  * @param statistics statistics aggregated from N outcomes
  * @param startTime when this iteration started
  * @param endTime when this iteration completed
@@ -28,7 +27,7 @@ import java.time.Instant;
 public record OptimizationIterationAggregate(
         int iterationNumber,
         FactorSuit factorSuit,
-        String treatmentFactorName,
+        String controlFactorName,
         OptimizeStatistics statistics,
         Instant startTime,
         Instant endTime
@@ -43,12 +42,12 @@ public record OptimizationIterationAggregate(
         if (factorSuit == null) {
             throw new IllegalArgumentException("factorSuit must not be null");
         }
-        if (treatmentFactorName == null || treatmentFactorName.isBlank()) {
-            throw new IllegalArgumentException("treatmentFactorName must not be null or blank");
+        if (controlFactorName == null || controlFactorName.isBlank()) {
+            throw new IllegalArgumentException("controlFactorName must not be null or blank");
         }
-        if (!factorSuit.contains(treatmentFactorName)) {
+        if (!factorSuit.contains(controlFactorName)) {
             throw new IllegalArgumentException(
-                    "treatmentFactorName '" + treatmentFactorName + "' not found in factorSuit");
+                    "controlFactorName '" + controlFactorName + "' not found in factorSuit");
         }
         if (statistics == null) {
             throw new IllegalArgumentException("statistics must not be null");
@@ -65,14 +64,14 @@ public record OptimizationIterationAggregate(
     }
 
     /**
-     * Convenience method to get the current value of the treatment factor.
+     * Convenience method to get the current value of the control factor.
      *
-     * @param <F> the type of the treatment factor
-     * @return the treatment factor value
+     * @param <F> the type of the control factor
+     * @return the control factor value
      */
     @SuppressWarnings("unchecked")
-    public <F> F treatmentFactorValue() {
-        return (F) factorSuit.get(treatmentFactorName);
+    public <F> F controlFactorValue() {
+        return (F) factorSuit.get(controlFactorName);
     }
 
     /**

@@ -1,26 +1,68 @@
 /**
- * Example probabilistic tests demonstrating PUNIT features.
+ * Teaching examples demonstrating PUnit's probabilistic testing capabilities.
  *
- * <p><b>IMPORTANT:</b> All tests in this package contain failing samples BY DESIGN.
- * They use random or simulated behavior to demonstrate real-world probabilistic
- * testing scenarios where:
+ * <p>This package exists to <b>teach by example</b>. Each class is carefully crafted
+ * to illustrate a specific PUnit feature or testing pattern. The examples progress
+ * from simple to advanced, building understanding incrementally.
+ *
+ * <h2>Learning Path</h2>
+ * <p>We recommend exploring the examples in this order:
+ *
+ * <h3>1. Understanding Use Cases</h3>
+ * <p>Start with the {@code usecases} package to understand what we're testing:
  * <ul>
- *   <li>Individual invocations may fail while the overall test passes</li>
- *   <li>Budget constraints may cause early termination</li>
- *   <li>Pass rate thresholds determine success, not individual sample outcomes</li>
+ *   <li>{@link org.javai.punit.examples.usecases.ShoppingBasketUseCase} - LLM-based
+ *       natural language to JSON translation</li>
+ *   <li>{@link org.javai.punit.examples.usecases.PaymentGatewayUseCase} - Non-deterministic
+ *       external service with known SLA</li>
  * </ul>
  *
- * <h2>Console Output</h2>
- * <p>When running probabilistic tests, you will see assertion failure messages
- * for individual samples that fail. This is expected behavior — PUnit re-throws
- * sample failures so they appear as ❌ in the IDE test runner for accurate
- * visual feedback. The noise from these individual failures is normal; what
- * matters is whether the overall test passes based on the pass rate threshold.
+ * <h3>2. Running Experiments</h3>
+ * <p>The {@code experiments} package shows how to gather empirical data:
+ * <ul>
+ *   <li><b>Explore</b> - Compare factor configurations</li>
+ *   <li><b>Optimize</b> - Search for optimal parameters</li>
+ *   <li><b>Measure</b> - Establish baseline success rates</li>
+ * </ul>
  *
- * <p>These tests are {@code @Disabled} by default to avoid running in CI.
- * Enable them individually to explore PUNIT features.
+ * <h3>3. Writing Tests</h3>
+ * <p>The {@code tests} package demonstrates probabilistic testing patterns:
+ * <ul>
+ *   <li>Threshold approaches (sample-first, confidence-first, threshold-first)</li>
+ *   <li>Covariate-aware baselines</li>
+ *   <li>Budget management</li>
+ *   <li>Pacing for rate-limited APIs</li>
+ *   <li>Exception handling strategies</li>
+ * </ul>
+ *
+ * <h2>Running the Examples</h2>
+ * <p>All examples are {@code @Disabled} by default to prevent accidental execution
+ * in CI.
+ *
+ * <h3>Running Experiments</h3>
+ * <p>Use the dedicated {@code exp} task for experiments:
+ * <pre>{@code
+ * ./gradlew exp -Prun=ShoppingBasketMeasure
+ * ./gradlew exp -Prun=ShoppingBasketExplore.exploreTemperature
+ * }</pre>
+ *
+ * <h3>Running Tests</h3>
+ * <p>Use the standard test task for probabilistic tests:
+ * <pre>{@code
+ * ./gradlew test --tests "ShoppingBasketTest"
+ * }</pre>
+ *
+ * <h2>Package Structure</h2>
+ * <ul>
+ *   <li>{@code usecases/} - Domain use cases encapsulating non-deterministic behavior</li>
+ *   <li>{@code experiments/} - MEASURE, EXPLORE, and OPTIMIZE experiment examples</li>
+ *   <li>{@code tests/} - Probabilistic test examples for various scenarios</li>
+ *   <li>{@code infrastructure/} - Mock implementations supporting the examples</li>
+ * </ul>
  *
  * @see org.javai.punit.api.ProbabilisticTest
+ * @see org.javai.punit.api.MeasureExperiment
+ * @see org.javai.punit.api.ExploreExperiment
+ * @see org.javai.punit.api.OptimizeExperiment
  */
 package org.javai.punit.examples;
-

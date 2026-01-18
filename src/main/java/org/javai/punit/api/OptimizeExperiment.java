@@ -6,19 +6,19 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.javai.punit.experiment.engine.ExperimentExtension;
 import org.javai.punit.experiment.optimize.FactorMutator;
-import org.javai.punit.experiment.optimize.OptimizationObjective;
 import org.javai.punit.experiment.optimize.OptimizationIterationAggregate;
+import org.javai.punit.experiment.optimize.OptimizationObjective;
 import org.javai.punit.experiment.optimize.Scorer;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * Marks a method as an OPTIMIZE experiment that iteratively refines a single
- * treatment factor to find its optimal value.
+ * control factor to find its optimal value.
  *
  * <p>OPTIMIZE mode is designed for automated parameter tuning through iterative
  * mutation and evaluation. It runs multiple samples per iteration, scores each
- * iteration, and mutates the treatment factor until termination conditions are met.
+ * iteration, and mutates the control factor until termination conditions are met.
  *
  * <h2>When to Use OPTIMIZE</h2>
  * <ul>
@@ -39,7 +39,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * <pre>{@code
  * @OptimizeExperiment(
  *     useCase = ShoppingUseCase.class,
- *     treatmentFactor = "systemPrompt",
+ *     controlFactor = "systemPrompt",
  *     scorer = SuccessRateScorer.class,
  *     mutator = LLMStringFactorMutator.class,
  *     samplesPerIteration = 20,
@@ -48,7 +48,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * )
  * void optimizeSystemPrompt(
  *     ShoppingUseCase useCase,
- *     @TreatmentValue String initialPrompt,  // Injected from use case
+ *     @ControlFactor String currentPrompt,  // Current value for this iteration
  *     ResultCaptor captor
  * ) {
  *     UseCaseOutcome outcome = useCase.searchProducts("wireless headphones");
@@ -56,25 +56,38 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * }
  * }</pre>
  *
- * <p>The initial value is obtained from the use case via a method annotated
- * with {@link TreatmentValueSource}:
+ * <h2>Initial Value Resolution</h2>
+ * <p>The initial control factor value is resolved in this order:
+ * <ol>
+ *   <li>{@link #initialControlFactorValue()} - inline value (for short strings, numbers)</li>
+ *   <li>{@link #initialControlFactorSource()} - method reference returning the value</li>
+ *   <li>{@link FactorGetter} on the use case - fallback to use case's current value</li>
+ * </ol>
+ *
+ * <p>Example with initial value source:
  * <pre>{@code
- * @UseCase
- * public class ShoppingUseCase {
- *     @TreatmentValueSource("systemPrompt")
- *     public String getSystemPrompt() { return this.systemPrompt; }
+ * @OptimizeExperiment(
+ *     useCase = ShoppingUseCase.class,
+ *     controlFactor = "systemPrompt",
+ *     initialControlFactorSource = "createMinimalPrompt",
+ *     ...
+ * )
+ * void optimize(...) { }
+ *
+ * static String createMinimalPrompt() {
+ *     return "You are an assistant.";  // Deliberately weak starting point
  * }
  * }</pre>
  *
  * <h2>Output</h2>
  * <p>Produces a history file at: {@code src/test/resources/punit/optimizations/{UseCaseId}/{experimentId}.yaml}
  *
- * <p>The primary output is the best value found for the treatment factor.
+ * <p>The primary output is the best value found for the control factor.
  *
  * @see MeasureExperiment
  * @see ExploreExperiment
- * @see TreatmentValue
- * @see TreatmentValueSource
+ * @see ControlFactor
+ * @see FactorGetter
  * @see Scorer
  * @see FactorMutator
  */
@@ -98,16 +111,57 @@ public @interface OptimizeExperiment {
     Class<?> useCase() default Void.class;
 
     /**
-     * Name of the factor to optimize (treatment factor).
+     * Name of the factor to optimize (control factor).
      *
      * <p>Must match a factor name known to the use case (via {@code @FactorSetter}).
      * This is the factor whose value will be mutated between iterations.
      *
      * <p><b>Required.</b>
      *
-     * @return the treatment factor name
+     * @return the control factor name
      */
-    String treatmentFactor();
+    String controlFactor();
+
+    /**
+     * Initial value for the control factor.
+     *
+     * <p>Use this for simple inline values (short strings, numbers as strings).
+     * For complex or long values, use {@link #initialControlFactorSource()} instead.
+     *
+     * <p>If both this and {@link #initialControlFactorSource()} are empty,
+     * the initial value is obtained from the use case via {@link FactorGetter}.
+     *
+     * <p>Mutually exclusive with {@link #initialControlFactorSource()}.
+     *
+     * @return the initial value as a string, or empty to use other resolution
+     */
+    String initialControlFactorValue() default "";
+
+    /**
+     * Method name that provides the initial control factor value.
+     *
+     * <p>The method must be static, take no parameters, and return the appropriate type.
+     * It is looked up on the experiment class.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * @OptimizeExperiment(
+     *     controlFactor = "systemPrompt",
+     *     initialControlFactorSource = "createStartingPrompt",
+     *     ...
+     * )
+     * void optimize(...) { }
+     *
+     * static String createStartingPrompt() {
+     *     return "You are an assistant that...";
+     * }
+     * }</pre>
+     *
+     * <p>Mutually exclusive with {@link #initialControlFactorValue()}.
+     *
+     * @return the method name, or empty to use other resolution
+     */
+    String initialControlFactorSource() default "";
 
     /**
      * Scorer class for evaluating iteration aggregates.
@@ -123,10 +177,10 @@ public @interface OptimizeExperiment {
     Class<? extends Scorer<OptimizationIterationAggregate>> scorer();
 
     /**
-     * FactorMutator class for generating new treatment factor values.
+     * FactorMutator class for generating new control factor values.
      *
      * <p>Must have a no-arg constructor. The mutator receives the current
-     * treatment factor value and optimization history, and returns a new
+     * control factor value and optimization history, and returns a new
      * value to try in the next iteration.
      *
      * <p><b>Required.</b>

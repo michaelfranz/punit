@@ -25,41 +25,195 @@ public final class FactorResolver {
     /**
      * Resolves factor arguments from the @FactorSource annotation.
      *
+     * <p>This overload does not search the use case class for simple names.
+     * Prefer {@link #resolveFactorArguments(Method, FactorSource, Class)} when
+     * a use case class is available.
+     *
      * @param testMethod the test method
      * @param factorSource the @FactorSource annotation
      * @return list of factor arguments
      */
-    @SuppressWarnings("unchecked")
     public static List<FactorArguments> resolveFactorArguments(
             Method testMethod, FactorSource factorSource) {
+        return resolveFactorArguments(testMethod, factorSource, null);
+    }
+
+    /**
+     * Resolves factor arguments from the @FactorSource annotation.
+     *
+     * <p>Resolution order depends on the reference format:
+     * <ul>
+     *   <li><b>Simple name</b> (e.g., {@code "myFactors"}): Search current class,
+     *       then use case class</li>
+     *   <li><b>Class#method</b> (e.g., {@code "MyClass#myFactors"}): Search current
+     *       package, then use case's package</li>
+     *   <li><b>Fully qualified</b> (e.g., {@code "com.example.MyClass#myFactors"}):
+     *       Direct lookup</li>
+     * </ul>
+     *
+     * @param testMethod the test method
+     * @param factorSource the @FactorSource annotation
+     * @param useCaseClass the use case class to search (may be null)
+     * @return list of factor arguments
+     */
+    @SuppressWarnings("unchecked")
+    public static List<FactorArguments> resolveFactorArguments(
+            Method testMethod, FactorSource factorSource, Class<?> useCaseClass) {
 
         String sourceReference = factorSource.value();
+        Class<?> currentClass = testMethod.getDeclaringClass();
 
         try {
             Stream<FactorArguments> factorStream;
 
-            if (sourceReference.contains("#")) {
-                // Cross-class reference
-                String[] parts = sourceReference.split("#", 2);
-                String className = parts[0];
-                String methodName = parts[1];
-                Class<?> targetClass = resolveClass(className, testMethod.getDeclaringClass());
-                Method sourceMethod = targetClass.getDeclaredMethod(methodName);
-                factorStream = invokeFactorSource(sourceMethod, sourceReference);
+            if (!sourceReference.contains("#")) {
+                // Simple name - search current class, then use case class
+                factorStream = resolveSimpleName(sourceReference, currentClass, useCaseClass);
             } else {
-                // Same-class reference
-                Method sourceMethod = testMethod.getDeclaringClass().getDeclaredMethod(sourceReference);
-                factorStream = invokeFactorSource(sourceMethod, sourceReference);
+                String[] parts = sourceReference.split("#", 2);
+                String classRef = parts[0];
+                String methodName = parts[1];
+
+                if (classRef.contains(".")) {
+                    // Fully qualified - direct lookup
+                    factorStream = resolveFullyQualified(classRef, methodName);
+                } else {
+                    // Class#method - search current package, then use case's package
+                    factorStream = resolveClassMethod(classRef, methodName, currentClass, useCaseClass);
+                }
             }
 
             return factorStream.toList();
 
-        } catch (NoSuchMethodException e) {
-            throw new ExtensionConfigurationException(
-                    "Cannot find @FactorSource method '" + sourceReference + "'", e);
+        } catch (ExtensionConfigurationException e) {
+            throw e; // Re-throw with detailed message
         } catch (Exception e) {
             throw new ExtensionConfigurationException(
                     "Cannot invoke @FactorSource method '" + sourceReference + "': " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Resolves a simple method name by searching current class, then use case class.
+     */
+    private static Stream<FactorArguments> resolveSimpleName(
+            String methodName, Class<?> currentClass, Class<?> useCaseClass) throws Exception {
+
+        // 1. Try current class
+        Method method = findMethodInClass(methodName, currentClass);
+        if (method != null) {
+            return invokeFactorSource(method, methodName);
+        }
+
+        // 2. Try use case class
+        if (useCaseClass != null && useCaseClass != Void.class && useCaseClass != currentClass) {
+            method = findMethodInClass(methodName, useCaseClass);
+            if (method != null) {
+                return invokeFactorSource(method, methodName);
+            }
+        }
+
+        // Not found - build helpful error message
+        StringBuilder searched = new StringBuilder();
+        searched.append("\n  - ").append(currentClass.getName());
+        if (useCaseClass != null && useCaseClass != Void.class && useCaseClass != currentClass) {
+            searched.append("\n  - ").append(useCaseClass.getName());
+        }
+
+        throw new ExtensionConfigurationException(
+                "Cannot find @FactorSource method '" + methodName + "'.\n" +
+                        "Searched in:" + searched +
+                        "\nHint: Use 'ClassName#methodName' or fully qualified 'pkg.ClassName#methodName' for explicit resolution.");
+    }
+
+    /**
+     * Resolves Class#method by searching current package, then use case's package.
+     */
+    private static Stream<FactorArguments> resolveClassMethod(
+            String className, String methodName, Class<?> currentClass, Class<?> useCaseClass) throws Exception {
+
+        List<String> searchedLocations = new ArrayList<>();
+
+        // 1. Try current class's package
+        String currentPackage = currentClass.getPackageName();
+        Class<?> targetClass = tryLoadClass(currentPackage + "." + className);
+        if (targetClass != null) {
+            Method method = findMethodInClass(methodName, targetClass);
+            if (method != null) {
+                return invokeFactorSource(method, className + "#" + methodName);
+            }
+        }
+        searchedLocations.add(currentPackage + "." + className);
+
+        // 2. Try use case class's package (if different)
+        if (useCaseClass != null && useCaseClass != Void.class) {
+            String useCasePackage = useCaseClass.getPackageName();
+            if (!useCasePackage.equals(currentPackage)) {
+                targetClass = tryLoadClass(useCasePackage + "." + className);
+                if (targetClass != null) {
+                    Method method = findMethodInClass(methodName, targetClass);
+                    if (method != null) {
+                        return invokeFactorSource(method, className + "#" + methodName);
+                    }
+                }
+                searchedLocations.add(useCasePackage + "." + className);
+            }
+        }
+
+        // Not found - build helpful error message
+        StringBuilder searched = new StringBuilder();
+        for (String loc : searchedLocations) {
+            searched.append("\n  - ").append(loc);
+        }
+
+        throw new ExtensionConfigurationException(
+                "Cannot find @FactorSource '" + className + "#" + methodName + "'.\n" +
+                        "Searched in:" + searched +
+                        "\nHint: Use fully qualified 'pkg.ClassName#methodName' for explicit resolution.");
+    }
+
+    /**
+     * Resolves a fully qualified class#method reference.
+     */
+    private static Stream<FactorArguments> resolveFullyQualified(
+            String fullyQualifiedClassName, String methodName) throws Exception {
+
+        Class<?> targetClass;
+        try {
+            targetClass = Class.forName(fullyQualifiedClassName);
+        } catch (ClassNotFoundException e) {
+            throw new ExtensionConfigurationException(
+                    "Cannot find class '" + fullyQualifiedClassName + "' for @FactorSource.");
+        }
+
+        Method method = findMethodInClass(methodName, targetClass);
+        if (method == null) {
+            throw new ExtensionConfigurationException(
+                    "Cannot find method '" + methodName + "' in class " + fullyQualifiedClassName);
+        }
+
+        return invokeFactorSource(method, fullyQualifiedClassName + "#" + methodName);
+    }
+
+    /**
+     * Attempts to find a method in a class, returning null if not found.
+     */
+    private static Method findMethodInClass(String methodName, Class<?> clazz) {
+        try {
+            return clazz.getDeclaredMethod(methodName);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Attempts to load a class, returning null if not found.
+     */
+    private static Class<?> tryLoadClass(String className) {
+        try {
+            return Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            return null;
         }
     }
 

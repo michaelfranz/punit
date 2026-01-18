@@ -97,7 +97,7 @@ class FactorSourceAdapterTest {
             assertThatThrownBy(() ->
                     FactorSourceAdapter.fromReference("nonExistent", ValidFactorSources.class))
                     .isInstanceOf(FactorSourceResolutionException.class)
-                    .hasMessageContaining("not found");
+                    .hasMessageContaining("Cannot find");
         }
     }
 
@@ -122,7 +122,7 @@ class FactorSourceAdapterTest {
             assertThatThrownBy(() ->
                     FactorSourceAdapter.fromReference("NonExistentClass#method", ValidFactorSources.class))
                     .isInstanceOf(FactorSourceResolutionException.class)
-                    .hasMessageContaining("Cannot resolve class");
+                    .hasMessageContaining("Cannot find factor source");
         }
     }
 
@@ -145,7 +145,7 @@ class FactorSourceAdapterTest {
             assertThatThrownBy(() ->
                     FactorSourceAdapter.fromReference("withParameters", InvalidFactorSources.class))
                     .isInstanceOf(FactorSourceResolutionException.class)
-                    .hasMessageContaining("not found");  // Method takes params, so not found with no-arg signature
+                    .hasMessageContaining("Cannot find");  // Method takes params, so not found with no-arg signature
         }
 
         @Test

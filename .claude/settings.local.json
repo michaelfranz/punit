@@ -21,7 +21,21 @@
       "Bash(git rm:*)",
       "Bash(gh pr list:*)",
       "Bash(.git/hooks/pre-commit)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(./gradlew compileTestJava:*)",
+      "Bash(./gradlew build:*)",
+      "Bash(./gradlew exp:*)",
+      "Bash(for:*)",
+      "Bash(do)",
+      "Bash(if grep -q \"UseCase useCase\" \"$f\")",
+      "Bash(! grep -q \"UseCaseProvider\" \"$f\")",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(git -C /Users/mikemannion/workspace/punit log --oneline --all --grep=\"hook\")",
+      "Bash(git -C /Users/mikemannion/workspace/punit config:*)",
+      "Bash(cat:*)"
     ]
   }
 }
