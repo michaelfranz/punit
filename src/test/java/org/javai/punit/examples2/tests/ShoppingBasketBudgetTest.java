@@ -6,9 +6,12 @@ import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.ProbabilisticTestBudget;
 import org.javai.punit.api.TokenChargeRecorder;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples2.usecases.ShoppingBasketUseCase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Demonstrates budget management features in probabilistic testing.
@@ -44,6 +47,14 @@ import org.junit.jupiter.api.TestTemplate;
         tokenBudget = 100000     // 100K token class budget
 )
 public class ShoppingBasketBudgetTest {
+
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
+    @BeforeEach
+    void setUp() {
+        provider.register(ShoppingBasketUseCase.class, ShoppingBasketUseCase::new);
+    }
 
     /**
      * Test with time budget that fails on exhaustion.

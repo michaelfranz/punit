@@ -90,7 +90,8 @@ public class MeasureStrategy implements ExperimentModeStrategy {
 
         if (factorSource != null) {
             return provideWithFactorsInvocationContexts(
-                    testMethod, factorSource, samples, useCaseId, store, terminated);
+                    testMethod, factorSource, measureConfig.useCaseClass(),
+                    samples, useCaseId, store, terminated);
         }
 
         // No factor source - simple sample stream
@@ -104,14 +105,15 @@ public class MeasureStrategy implements ExperimentModeStrategy {
     private Stream<TestTemplateInvocationContext> provideWithFactorsInvocationContexts(
             Method testMethod,
             FactorSource factorSource,
+            Class<?> useCaseClass,
             int samples,
             String useCaseId,
             ExtensionContext.Store store,
             AtomicBoolean terminated) {
 
-        // Resolve factor stream
+        // Resolve factor stream (searches current class, then use case class)
         List<FactorArguments> factorsList = FactorResolver.resolveFactorArguments(
-                testMethod, factorSource);
+                testMethod, factorSource, useCaseClass);
 
         if (factorsList.isEmpty()) {
             throw new ExtensionConfigurationException(

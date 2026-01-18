@@ -4,9 +4,12 @@ import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.Factor;
 import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples2.usecases.ShoppingBasketUseCase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Demonstrates exception handling modes in probabilistic testing.
@@ -52,6 +55,14 @@ import org.junit.jupiter.api.TestTemplate;
  */
 @Disabled("Example test - run manually after generating baseline")
 public class ShoppingBasketExceptionTest {
+
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
+    @BeforeEach
+    void setUp() {
+        provider.register(ShoppingBasketUseCase.class, ShoppingBasketUseCase::new);
+    }
 
     /**
      * Test with FAIL_SAMPLE exception handling.

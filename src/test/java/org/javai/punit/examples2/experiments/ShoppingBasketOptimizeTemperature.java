@@ -3,10 +3,13 @@ package org.javai.punit.examples2.experiments;
 import org.javai.punit.api.OptimizeExperiment;
 import org.javai.punit.api.ResultCaptor;
 import org.javai.punit.api.TreatmentValue;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples2.usecases.ShoppingBasketUseCase;
 import org.javai.punit.experiment.optimize.OptimizationObjective;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * OPTIMIZE experiment for tuning the temperature numeric parameter.
@@ -44,6 +47,14 @@ import org.junit.jupiter.api.TestTemplate;
  */
 @Disabled("Example experiment - run manually with ./gradlew test --tests ShoppingBasketOptimizeTemperature")
 public class ShoppingBasketOptimizeTemperature {
+
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
+    @BeforeEach
+    void setUp() {
+        provider.register(ShoppingBasketUseCase.class, ShoppingBasketUseCase::new);
+    }
 
     /**
      * Optimizes temperature to maximize success rate.

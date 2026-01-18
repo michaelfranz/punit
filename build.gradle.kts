@@ -145,13 +145,13 @@ val explorationsDir = "src/test/resources/punit/explorations"
 // Shared configuration for experiment tasks
 fun Test.configureAsExperimentTask() {
     group = "verification"
-    
-    // Use the experiment source set
-    testClassesDirs = sourceSets["experiment"].output.classesDirs
-    classpath = sourceSets["experiment"].runtimeClasspath
-    
+
+    // Use the test source set (experiments live alongside tests)
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+
     useJUnitPlatform()
-    
+
     testLogging {
         events("passed", "skipped", "failed", "standardOut", "standardError")
         showExceptions = true
@@ -160,22 +160,25 @@ fun Test.configureAsExperimentTask() {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showStandardStreams = true
     }
-    
+
     // Configure reports output directory
     reports {
         html.outputLocation.set(layout.buildDirectory.dir("reports/experiment"))
         junitXml.outputLocation.set(layout.buildDirectory.dir("experiment-results"))
     }
-    
+
     // Output directories for each mode (used by the framework based on annotation mode)
     systemProperty("punit.specs.outputDir", specsDir)
     systemProperty("punit.explorations.outputDir", explorationsDir)
-    
+
     // Experiments never fail the build (they're exploratory, not conformance tests)
     ignoreFailures = true
-    
-    // Ensure experiment classes are compiled first
-    dependsOn("compileExperimentJava", "processExperimentResources")
+
+    // Exclude test subject classes (they are executed via TestKit in integration tests)
+    exclude("**/testsubjects/**")
+
+    // Ensure test classes are compiled first
+    dependsOn("compileTestJava", "processTestResources")
     
     // Support simplified syntax: ./gradlew exp -Prun=TestName
     // This avoids the verbose --tests "TestName" syntax

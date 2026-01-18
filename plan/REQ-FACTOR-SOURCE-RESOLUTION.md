@@ -14,11 +14,11 @@ class, not the experiment class.
 
 ### Resolution Forms
 
-| Form | Example | Description |
-|------|---------|-------------|
-| Simple name | `multipleBasketInstructions` | Method name only |
-| Class#method | `MyUseCase#factorMethod` | Class name with method |
-| Fully qualified | `com.example.MyUseCase#factorMethod` | Full package path |
+| Form            | Example                              | Description            |
+|-----------------|--------------------------------------|------------------------|
+| Simple name     | `multipleBasketInstructions`         | Method name only       |
+| Class#method    | `MyUseCase#factorMethod`             | Class name with method |
+| Fully qualified | `com.example.MyUseCase#factorMethod` | Full package path      |
 
 ### Resolution Order by Form
 

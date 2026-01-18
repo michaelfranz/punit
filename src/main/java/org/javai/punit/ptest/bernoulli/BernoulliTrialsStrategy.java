@@ -342,8 +342,9 @@ public class BernoulliTrialsStrategy implements ProbabilisticTestStrategy {
 
         HashableFactorSource testFactorSource;
         try {
+            Class<?> useCaseClass = annotation.useCase();
             testFactorSource = FactorSourceAdapter.fromAnnotation(
-                    factorSourceAnnotation, testMethod.getDeclaringClass());
+                    factorSourceAnnotation, testMethod.getDeclaringClass(), useCaseClass);
         } catch (Exception e) {
             logger.warn("Could not resolve factor source for consistency check: {}", e.getMessage());
             return;

@@ -4,9 +4,12 @@ import org.javai.punit.api.Factor;
 import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.Pacing;
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples2.usecases.ShoppingBasketUseCase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Demonstrates rate limiting with the {@code @Pacing} annotation.
@@ -38,6 +41,14 @@ import org.junit.jupiter.api.TestTemplate;
  */
 @Disabled("Example test - run manually")
 public class ShoppingBasketPacingTest {
+
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
+    @BeforeEach
+    void setUp() {
+        provider.register(ShoppingBasketUseCase.class, ShoppingBasketUseCase::new);
+    }
 
     /**
      * Test with requests-per-second limit.

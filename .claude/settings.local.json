@@ -23,7 +23,16 @@
       "Bash(.git/hooks/pre-commit)",
       "Bash(git restore:*)",
       "Bash(./gradlew compileTestJava:*)",
-      "Bash(./gradlew build:*)"
+      "Bash(./gradlew build:*)",
+      "Bash(./gradlew exp:*)",
+      "Bash(for:*)",
+      "Bash(do)",
+      "Bash(if grep -q \"UseCase useCase\" \"$f\")",
+      "Bash(! grep -q \"UseCaseProvider\" \"$f\")",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(fi)",
+      "Bash(done)"
     ]
   }
 }

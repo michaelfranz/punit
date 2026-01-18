@@ -4,9 +4,12 @@ import org.javai.punit.api.Factor;
 import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.ThresholdOrigin;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples2.usecases.PaymentGatewayUseCase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * SLA-driven probabilistic test for payment gateway reliability.
@@ -62,6 +65,14 @@ import org.junit.jupiter.api.TestTemplate;
  */
 @Disabled("Example test - run manually")
 public class PaymentGatewaySlaTest {
+
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
+    @BeforeEach
+    void setUp() {
+        provider.register(PaymentGatewayUseCase.class, PaymentGatewayUseCase::new);
+    }
 
     /**
      * Tests payment gateway against 99.99% SLA target.

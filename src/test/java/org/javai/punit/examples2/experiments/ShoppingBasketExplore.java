@@ -6,9 +6,12 @@ import org.javai.punit.api.Factor;
 import org.javai.punit.api.FactorArguments;
 import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.ResultCaptor;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples2.usecases.ShoppingBasketUseCase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * EXPLORE experiments for finding the best model and temperature configuration.
@@ -42,6 +45,14 @@ import org.junit.jupiter.api.TestTemplate;
  */
 @Disabled("Example experiment - run with ./gradlew exp -Prun=ShoppingBasketExplore")
 public class ShoppingBasketExplore {
+
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
+    @BeforeEach
+    void setUp() {
+        provider.register(ShoppingBasketUseCase.class, ShoppingBasketUseCase::new);
+    }
 
     // Simple instruction used for all exploration - keeps focus on configuration comparison
     private static final String SIMPLE_INSTRUCTION = "Add 2 apples";

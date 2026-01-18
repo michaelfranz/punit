@@ -4,9 +4,11 @@ import org.javai.punit.api.Factor;
 import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.MeasureExperiment;
 import org.javai.punit.api.ResultCaptor;
+import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples2.usecases.ShoppingBasketUseCase;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * MEASURE experiment for establishing the production baseline.
@@ -48,8 +50,22 @@ import org.junit.jupiter.api.TestTemplate;
  * @see ShoppingBasketUseCase#multipleBasketInstructions()
  * @see org.javai.punit.examples2.tests.ShoppingBasketTest
  */
-@Disabled("Example experiment - run with ./gradlew exp -Prun=ShoppingBasketMeasure")
+//@Disabled("Example experiment - run with ./gradlew exp -Prun=ShoppingBasketMeasure")
 public class ShoppingBasketMeasure {
+
+    /**
+     * The use case provider handles construction and injection of use cases.
+     */
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
+    /**
+     * Configures the use case provider before each experiment sample.
+     */
+    @BeforeEach
+    void setUp() {
+        provider.register(ShoppingBasketUseCase.class, ShoppingBasketUseCase::new);
+    }
 
     /**
      * Establishes the production baseline for shopping basket instruction translation.

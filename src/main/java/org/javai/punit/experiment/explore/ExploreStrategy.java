@@ -93,8 +93,9 @@ public class ExploreStrategy implements ExperimentModeStrategy {
             return provideSimpleInvocationContexts(exploreConfig, store);
         }
 
-        // Resolve factor combinations
-        List<FactorArguments> argsList = FactorResolver.resolveFactorArguments(testMethod, factorSource);
+        // Resolve factor combinations (searches current class, then use case class)
+        List<FactorArguments> argsList = FactorResolver.resolveFactorArguments(
+                testMethod, factorSource, exploreConfig.useCaseClass());
         List<FactorInfo> factorInfos = FactorResolver.extractFactorInfos(testMethod, factorSource, argsList);
 
         // Store explore-mode metadata
@@ -249,7 +250,8 @@ public class ExploreStrategy implements ExperimentModeStrategy {
             return samplesPerConfig;
         }
 
-        List<FactorArguments> argsList = FactorResolver.resolveFactorArguments(testMethod, factorSource);
+        List<FactorArguments> argsList = FactorResolver.resolveFactorArguments(
+                testMethod, factorSource, exploreConfig.useCaseClass());
         return samplesPerConfig * argsList.size();
     }
 
