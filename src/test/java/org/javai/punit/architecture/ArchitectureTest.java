@@ -196,22 +196,22 @@ class ArchitectureTest {
 
             // Check classes ending with "Test"
             ArchRule testRule = classes()
-                    .that().resideInAPackage("org.javai.punit.examples")
+                    .that().resideInAnyPackage("org.javai.punit.examples..")
                     .and().areTopLevelClasses()
                     .and().haveSimpleNameEndingWith("Test")
                     .should().beAnnotatedWith(org.junit.jupiter.api.Disabled.class)
                     .because("example tests are designed to fail and must be @Disabled to prevent CI failures");
 
-            // Check classes ending with "Example" (e.g., ShoppingAssistantSlaExample)
-            ArchRule exampleRule = classes()
-                    .that().resideInAPackage("org.javai.punit.examples")
+            // Check classes for experiments (Measure, Explore, Optimize)
+            ArchRule experimentRule = classes()
+                    .that().resideInAnyPackage("org.javai.punit.examples..")
                     .and().areTopLevelClasses()
-                    .and().haveSimpleNameEndingWith("Example")
+                    .and().haveSimpleNameContaining("Measure").or().haveSimpleNameContaining("Explore").or().haveSimpleNameContaining("Optimize")
                     .should().beAnnotatedWith(org.junit.jupiter.api.Disabled.class)
-                    .because("example tests are designed to fail and must be @Disabled to prevent CI failures");
+                    .because("example experiments are designed to fail and must be @Disabled to prevent CI failures");
 
             testRule.check(exampleClasses);
-            exampleRule.check(exampleClasses);
+            experimentRule.check(exampleClasses);
         }
     }
 }

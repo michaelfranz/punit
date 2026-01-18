@@ -31,33 +31,6 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-// Define the experiment source set
-sourceSets {
-    val experiment by creating {
-        java.srcDir("src/experiment/java")
-        resources.srcDir("src/experiment/resources")
-        
-        // experiment depends on main's output
-        compileClasspath += sourceSets.main.get().output
-        runtimeClasspath += sourceSets.main.get().output
-    }
-    
-    test {
-        // test depends on both main and experiment
-        compileClasspath += experiment.output
-        runtimeClasspath += experiment.output
-    }
-}
-
-// Configure dependencies for experiment source set
-val experimentImplementation: Configuration by configurations.getting {
-    extendsFrom(configurations.implementation.get())
-}
-
-val experimentRuntimeOnly: Configuration by configurations.getting {
-    extendsFrom(configurations.runtimeOnly.get())
-}
-
 repositories {
     mavenCentral()
 }
@@ -84,28 +57,6 @@ dependencies {
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    
-    // Experiment dependencies - experiments use JUnit's TestTemplate mechanism
-    experimentImplementation("org.junit.jupiter:junit-jupiter")
-    experimentImplementation("org.assertj:assertj-core:3.27.6")
-    experimentRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
-// Ensure build order: main -> experiment -> test
-tasks.named("compileExperimentJava") {
-    dependsOn(tasks.compileJava)
-}
-
-tasks.named("compileTestJava") {
-    dependsOn("compileExperimentJava")
-}
-
-tasks.named("processExperimentResources") {
-    dependsOn(tasks.processResources)
-}
-
-tasks.named("processTestResources") {
-    dependsOn("processExperimentResources")
 }
 
 tasks.test {
@@ -170,6 +121,10 @@ fun Test.configureAsExperimentTask() {
     // Output directories for each mode (used by the framework based on annotation mode)
     systemProperty("punit.specs.outputDir", specsDir)
     systemProperty("punit.explorations.outputDir", explorationsDir)
+
+    // Deactivate @Disabled so experiments can run even when disabled
+    // (they're @Disabled to prevent accidental execution in regular test runs)
+    systemProperty("junit.jupiter.conditions.deactivate", "org.junit.*DisabledCondition")
 
     // Experiments never fail the build (they're exploratory, not conformance tests)
     ignoreFailures = true
@@ -327,10 +282,7 @@ tasks.jacocoTestReport {
     classDirectories.setFrom(
         files(classDirectories.files.map {
             fileTree(it) {
-                exclude(
-                    "**/examples/**",
-                    "**/experiment/**"
-                )
+                exclude("**/examples/**")
             }
         })
     )
