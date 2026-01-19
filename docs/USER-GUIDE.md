@@ -926,10 +926,28 @@ void tokenConstrainedTest(TokenChargeRecorder recorder) {
 }
 ```
 
+**What happens when the budget runs out?** The `onBudgetExhausted` parameter controls this:
 
-
+| Behavior | Description |
+|----------|-------------|
+| `FAIL` | Immediately fail the test when budget is exhausted. This is the **default** and most conservative option—you asked for N samples but couldn't afford them. |
+| `EVALUATE_PARTIAL` | Evaluate results from the samples completed before budget exhaustion. The test passes if the observed pass rate meets `minPassRate`. Use with caution: a small sample may not be statistically significant. |
 
 ```java
+// Default behavior: FAIL when budget exhausted
+@ProbabilisticTest(
+    samples = 1000,
+    minPassRate = 0.90,
+    tokenBudget = 50000
+    // onBudgetExhausted = BudgetExhaustedBehavior.FAIL (implicit default)
+)
+void strictBudgetTest(TokenChargeRecorder recorder) {
+    // If budget runs out after 200 samples → FAIL
+    // Rationale: You requested 1000 samples for statistical confidence;
+    // 200 samples may not provide reliable results
+}
+
+// Alternative: Evaluate whatever we managed to collect
 @ProbabilisticTest(
     samples = 1000,
     minPassRate = 0.90,
@@ -939,6 +957,7 @@ void tokenConstrainedTest(TokenChargeRecorder recorder) {
 void evaluateWhatWeHave(TokenChargeRecorder recorder) {
     // If budget runs out after 200 samples with 185 successes:
     // 185/200 = 92.5% >= 90% → PASS (instead of automatic FAIL)
+    // Warning: 200 samples may not be statistically rigorous
 }
 ```
 
@@ -963,12 +982,12 @@ void rateLimitedApiTest() {
 
 **Pacing parameters:**
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `maxRequestsPerSecond` | Max RPS | `2.0` → 500ms delay |
-| `maxRequestsPerMinute` | Max RPM | `60` → 1000ms delay |
-| `maxRequestsPerHour` | Max RPH | `3600` → 1000ms delay |
-| `minMsPerSample` | Explicit minimum delay | `500` → 500ms delay |
+| Parameter               | Description              | Example                  |
+|-------------------------|--------------------------|--------------------------|
+| `maxRequestsPerSecond`  | Max RPS                  | `2.0` → 500ms delay      |
+| `maxRequestsPerMinute`  | Max RPM                  | `60` → 1000ms delay      |
+| `maxRequestsPerHour`    | Max RPH                  | `3600` → 1000ms delay    |
+| `minMsPerSample`        | Explicit minimum delay   | `500` → 500ms delay      |
 | `maxConcurrentRequests` | Parallel execution limit | `3` → up to 3 concurrent |
 
 When multiple constraints are specified, the **most restrictive** wins.
@@ -989,11 +1008,11 @@ void exceptionsCountAsFailures() {
 }
 ```
 
-| Strategy | Behavior |
-|----------|----------|
+| Strategy      | Behavior                                            |
+|---------------|-----------------------------------------------------|
 | `FAIL_SAMPLE` | Exception counts as failed sample; continue testing |
-| `PROPAGATE` | Exception immediately fails the test |
-| `IGNORE` | Exception is ignored; sample not counted |
+| `PROPAGATE`   | Exception immediately fails the test                |
+| `IGNORE`      | Exception is ignored; sample not counted            |
 
 *Source: `org.javai.punit.examples.tests.ShoppingBasketExceptionTest`*
 
@@ -1073,12 +1092,12 @@ For the mathematical foundations—confidence interval calculations, power analy
 
 PUnit configuration follows this resolution order: System property → Environment variable → Annotation value → Framework default.
 
-| Property | Environment Variable | Description |
-|----------|---------------------|-------------|
-| `punit.samples` | `PUNIT_SAMPLES` | Override sample count |
-| `punit.stats.transparent` | `PUNIT_STATS_TRANSPARENT` | Enable transparent statistics |
-| `punit.specs.outputDir` | `PUNIT_SPECS_OUTPUT_DIR` | Spec output directory |
-| `punit.explorations.outputDir` | `PUNIT_EXPLORATIONS_OUTPUT_DIR` | Exploration output directory |
+| Property                       | Environment Variable            | Description                   |
+|--------------------------------|---------------------------------|-------------------------------|
+| `punit.samples`                | `PUNIT_SAMPLES`                 | Override sample count         |
+| `punit.stats.transparent`      | `PUNIT_STATS_TRANSPARENT`       | Enable transparent statistics |
+| `punit.specs.outputDir`        | `PUNIT_SPECS_OUTPUT_DIR`        | Spec output directory         |
+| `punit.explorations.outputDir` | `PUNIT_EXPLORATIONS_OUTPUT_DIR` | Exploration output directory  |
 
 ### B: Experiment Output Formats
 
@@ -1182,16 +1201,16 @@ bestIteration:
 
 ### C: Glossary
 
-| Term | Definition |
-|------|------------|
-| **Baseline** | Empirically measured success rate used as reference for regression testing |
-| **Compliance testing** | Verifying a system meets a mandated threshold (SLA, SLO, policy) |
-| **Covariate** | Environmental factor that may affect system behavior |
-| **Factor** | Input or configuration that varies across test executions |
-| **Regression testing** | Detecting when performance drops below an established baseline |
-| **Sample** | A single execution of the system under test |
-| **Spec** | YAML file containing baseline measurements and metadata |
-| **Use case** | A behavioral contract defining an operation and its success criteria |
+| Term                   | Definition                                                                 |
+|------------------------|----------------------------------------------------------------------------|
+| **Baseline**           | Empirically measured success rate used as reference for regression testing |
+| **Compliance testing** | Verifying a system meets a mandated threshold (SLA, SLO, policy)           |
+| **Covariate**          | Environmental factor that may affect system behavior                       |
+| **Factor**             | Input or configuration that varies across test executions                  |
+| **Regression testing** | Detecting when performance drops below an established baseline             |
+| **Sample**             | A single execution of the system under test                                |
+| **Spec**               | YAML file containing baseline measurements and metadata                    |
+| **Use case**           | A behavioral contract defining an operation and its success criteria       |
 
 ---
 
