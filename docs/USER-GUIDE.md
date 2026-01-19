@@ -166,7 +166,7 @@ public class ShoppingBasketUseCase implements UseCaseContract {
 
 The criteria define what "success" means. Each invocation either satisfies all criteria (success) or fails one (failure). PUnit counts successes across many invocations to determine reliability.
 
-Note a key difference between an experiment and a test: An experiment *observes* how a use case's result compares to the contract, while a test *checks* that the results meets the contract (and signals a fail if it does not). 
+Note a key difference between an experiment and a test: An experiment *observes* how a use case's result compares to the contract, while a test *checks* that the result meets the contract (and signals a fail if it does not). 
 
 ### Domain Overview
 
@@ -232,7 +232,7 @@ public class ShoppingBasketUseCase implements UseCaseContract {
 
 Key elements:
 
-- **`@UseCase`** — Declares covariates that may affect behavior
+- **`@UseCase`** — Declares covariates that may affect behavior. Covariates are discussed later in this guide
 - **`UseCaseContract`** — Interface for defining success criteria
 - **`@FactorGetter` / `@FactorSetter`** — Allow experiments to manipulate configuration
 - **`@CovariateSource`** — Links factors to covariate tracking
@@ -290,14 +290,14 @@ Key elements:
 
 The `thresholdOrigin` attribute documents where the threshold came from:
 
-| Origin | Use When |
-|--------|----------|
-| `SLA` | External Service Level Agreement with customer |
-| `SLO` | Internal Service Level Objective |
-| `POLICY` | Compliance or organizational policy |
+| Origin      | Use When                                               |
+|-------------|--------------------------------------------------------|
+| `SLA`       | External Service Level Agreement with customer         |
+| `SLO`       | Internal Service Level Objective                       |
+| `POLICY`    | Compliance or organizational policy                    |
 | `EMPIRICAL` | Derived from baseline measurement (regression testing) |
 
-This information appears in the verdict output, providing audit trail:
+This information appears in the verdict output, providing an audit trail:
 
 ```
 ═══════════════════════════════════════════════════════════════
@@ -313,10 +313,10 @@ PUnit PASSED: testSlaCompliance
 When testing high thresholds (99.9%+), sample size matters significantly:
 
 | Samples | Can Detect Deviation Of |
-|---------|------------------------|
-| 1,000 | ~1% |
-| 10,000 | ~0.1% |
-| 100,000 | ~0.03% |
+|---------|-------------------------|
+| 1,000   | ~1%                     |
+| 10,000  | ~0.1%                   |
+| 100,000 | ~0.03%                  |
 
 To detect that a system is at 99.97% when the SLA requires 99.99%, you need enough samples to distinguish a 0.02% difference. With 1,000 samples, this gap is statistically invisible.
 
@@ -326,7 +326,7 @@ To detect that a system is at 99.97% when the SLA requires 99.99%, you need enou
 
 ## Part 3: The Experimentation Workflow
 
-When no external mandate defines your threshold, you need to **discover** what "normal" looks like through experimentation. This enables regression testing.
+When no external mandate defines your threshold, you need to **discover** what "normal" looks like through experimentation. This enables regression testing later.
 
 The experimentation workflow:
 
@@ -439,7 +439,7 @@ src/test/resources/punit/explorations/ShoppingBasketUseCase/
 └── ...
 ```
 
-Compare with standard diff tools to identify the best configuration.
+Compare with standard diff tools to identify the preferred configuration.
 
 *Source: `org.javai.punit.examples.experiments.ShoppingBasketExplore`*
 
@@ -528,6 +528,8 @@ src/test/resources/punit/optimizations/ShoppingBasketUseCase/
 └── temperature-optimization-v1_20260119_103045.yaml
 ```
 
+The output file contains the optimized configuration as well as the history of iterations and their results.
+
 *Source: `org.javai.punit.examples.experiments.ShoppingBasketOptimizeTemperature`, `ShoppingBasketOptimizePrompt`*
 
 ### MEASURE: Establish Baseline
@@ -583,7 +585,7 @@ src/test/resources/punit/specs/ShoppingBasketUseCase.yaml
 
 **Committing Baselines:**
 
-The developer is encouraged to commit baselines to the repository. By default they are placed in the **test** folder (of the standard gradle folder layout). This is because a probabilistic regression test uses the baseline as input. The test cannot be performed without it, and if it is not present in the CI environment the test will alert operators to this by failing. 
+The developer is encouraged to commit baselines to the repository. By default, they are placed in the **test** folder (of the standard gradle folder layout). This is because a probabilistic regression test uses the baseline as input. The test cannot be performed without it, and if it is not present in the CI environment, the test will alert operators to this by failing. 
 
 ```bash
 git add src/test/resources/punit/specs/
@@ -613,21 +615,26 @@ PUnit operates with three interdependent parameters. You control **two**; statis
     (how sure)      (how strict)
 ```
 
-| You Fix | And Fix | Statistics Determines |
-|---------|---------|----------------------|
-| Sample size | Threshold | Confidence level |
-| Sample size | Confidence | Achievable threshold |
-| Confidence + Power | Effect size | Required samples |
+| You Fix            | And Fix     | Statistics Determines |
+|--------------------|-------------|-----------------------|
+| Sample size        | Threshold   | Confidence level      |
+| Sample size        | Confidence  | Achievable threshold  |
+| Confidence + Power | Effect size | Required samples      |
 
 This isn't a PUnit limitation—it's fundamental to statistical inference. PUnit makes these trade-offs explicit and computable.
 
 ### Threshold Approaches (No Baseline Required)
 
-Three operational modes for `@ProbabilisticTest` that work without baselines:
+Three operational modes for `@ProbabilisticTest` that work without baselines. Each approach fixes two parameters and lets PUnit compute the third.
+
+**You cannot specify all three parameters.** Attempting to fix sample size, threshold, *and* confidence simultaneously is statistically nonsensical—the parameter triangle means these values are interdependent. If you try, you'll either over-constrain the problem (no valid solution exists) or create redundant specifications that may contradict each other.
 
 **1. Sample-Size-First**
 
 *"I have budget for 100 samples. What threshold can I verify with 95% confidence?"*
+
+- **You specify**: Sample size + Confidence level
+- **PUnit computes**: The achievable threshold (the strictest pass rate you can verify with these constraints)
 
 ```java
 @ProbabilisticTest(
@@ -644,6 +651,9 @@ void sampleSizeFirst(ShoppingBasketUseCase useCase, @Factor("instruction") Strin
 
 *"I need to detect a 5% degradation with 95% confidence and 80% power."*
 
+- **You specify**: Confidence level + Power + Minimum detectable effect
+- **PUnit computes**: The required sample size (how many samples are needed to achieve this detection capability)
+
 ```java
 @ProbabilisticTest(
     useCase = ShoppingBasketUseCase.class,
@@ -659,6 +669,9 @@ void confidenceFirst(ShoppingBasketUseCase useCase, @Factor("instruction") Strin
 **3. Threshold-First**
 
 *"I know the pass rate must be ≥90%. Run 100 samples to verify."*
+
+- **You specify**: Sample size + Threshold
+- **PUnit computes**: The implied confidence level (how certain you can be about the verdict given these constraints)
 
 ```java
 @ProbabilisticTest(
