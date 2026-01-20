@@ -12,6 +12,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
+import org.javai.punit.experiment.engine.YamlBuilder;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
 /**
@@ -113,144 +114,137 @@ public class OptimizeSpecGenerator {
     }
 
     private String buildYamlContent(OptimizeHistory history) {
-        StringBuilder sb = new StringBuilder();
+        YamlBuilder builder = YamlBuilder.create()
+            .comment("Optimization History for " + history.useCaseId())
+            .comment("Primary output: the best value for the control factor")
+            .comment("Generated automatically by punit @OptimizeExperiment")
+            .blankLine()
+            .field("schemaVersion", SCHEMA_VERSION)
+            .field("useCaseId", history.useCaseId())
+            .fieldIfNotEmpty("experimentId", history.experimentId());
 
-        // Header
-        sb.append("# Optimization History for ").append(history.useCaseId()).append("\n");
-        sb.append("# Primary output: the best value for the control factor\n");
-        sb.append("# Generated automatically by punit @OptimizeExperiment\n\n");
-
-        sb.append("schemaVersion: ").append(SCHEMA_VERSION).append("\n");
-
-        // Identification
-        sb.append("useCaseId: ").append(history.useCaseId()).append("\n");
-        if (history.experimentId() != null && !history.experimentId().isEmpty()) {
-            sb.append("experimentId: ").append(history.experimentId()).append("\n");
-        }
-
-        // Treatment factor
-        sb.append("\ncontrolFactor:\n");
-        sb.append("  name: ").append(history.controlFactorName()).append("\n");
-        if (history.controlFactorType() != null) {
-            sb.append("  type: ").append(history.controlFactorType()).append("\n");
-        }
+        // Control factor
+        builder.startObject("controlFactor")
+            .field("name", history.controlFactorName())
+            .fieldIfPresent("type", history.controlFactorType())
+            .endObject();
 
         // Fixed factors
         if (history.fixedFactors() != null && history.fixedFactors().size() > 0) {
-            sb.append("\nfixedFactors:\n");
+            builder.startObject("fixedFactors");
             for (Map.Entry<String, Object> entry : history.fixedFactors().asMap().entrySet()) {
-                sb.append("  ").append(entry.getKey()).append(": ");
-                appendYamlValue(sb, entry.getValue());
-                sb.append("\n");
+                builder.field(entry.getKey(), entry.getValue());
             }
+            builder.endObject();
         }
 
         // Optimization settings
-        sb.append("\noptimization:\n");
-        sb.append("  objective: ").append(history.objective().name()).append("\n");
-        sb.append("  scorer: ").append(quoteIfNeeded(history.scorerDescription())).append("\n");
-        sb.append("  mutator: ").append(quoteIfNeeded(history.mutatorDescription())).append("\n");
-        sb.append("  terminationPolicy: ").append(quoteIfNeeded(history.terminationPolicyDescription())).append("\n");
+        builder.startObject("optimization")
+            .field("objective", history.objective().name())
+            .field("scorer", history.scorerDescription())
+            .field("mutator", history.mutatorDescription())
+            .field("terminationPolicy", history.terminationPolicyDescription())
+            .endObject();
 
         // Timing
-        sb.append("\ntiming:\n");
+        builder.startObject("timing");
         if (history.startTime() != null) {
-            sb.append("  startTime: ").append(ISO_FORMATTER.format(history.startTime())).append("\n");
+            builder.field("startTime", ISO_FORMATTER.format(history.startTime()));
         }
         if (history.endTime() != null) {
-            sb.append("  endTime: ").append(ISO_FORMATTER.format(history.endTime())).append("\n");
+            builder.field("endTime", ISO_FORMATTER.format(history.endTime()));
         }
-        sb.append("  totalDurationMs: ").append(history.totalDuration().toMillis()).append("\n");
+        builder.field("totalDurationMs", history.totalDuration().toMillis())
+            .endObject();
 
         // Best iteration (highlighted early for easy access)
         Optional<OptimizationRecord> bestOpt = history.bestIteration();
         if (bestOpt.isPresent()) {
             OptimizationRecord best = bestOpt.get();
-            sb.append("\nbestIteration:\n");
-            sb.append("  iterationNumber: ").append(best.aggregate().iterationNumber()).append("\n");
-            sb.append("  score: ").append(formatAsPercent(best.score())).append("\n");
-
-            // Emphasize the best treatment value
             Object bestValue = best.aggregate().controlFactorValue();
-            sb.append("  bestControlFactor: ");
+
+            builder.startObject("bestIteration")
+                .field("iterationNumber", best.aggregate().iterationNumber())
+                .field("score", formatAsPercent(best.score()));
+
+            // Handle multiline control factor values
             if (bestValue instanceof String s && s.contains("\n")) {
-                sb.append("|\n");
-                for (String line : s.split("\n")) {
-                    sb.append("    ").append(line).append("\n");
-                }
+                builder.blockScalar("bestControlFactor", s);
             } else {
-                appendYamlValue(sb, bestValue);
-                sb.append("\n");
+                builder.field("bestControlFactor", bestValue);
             }
 
             OptimizeStatistics stats = best.aggregate().statistics();
-            sb.append("  statistics:\n");
-            sb.append("    sampleCount: ").append(stats.sampleCount()).append("\n");
-            sb.append("    successRate: ").append(formatAsPercent(stats.successRate())).append("\n");
-            sb.append("    totalTokens: ").append(stats.totalTokens()).append("\n");
+            builder.startObject("statistics")
+                .field("sampleCount", stats.sampleCount())
+                .field("successRate", formatAsPercent(stats.successRate()))
+                .field("totalTokens", stats.totalTokens())
+                .endObject()
+                .endObject();
         }
 
         // Summary
-        sb.append("\nsummary:\n");
-        sb.append("  totalIterations: ").append(history.iterationCount()).append("\n");
-        sb.append("  totalTokens: ").append(history.totalTokens()).append("\n");
+        builder.startObject("summary")
+            .field("totalIterations", history.iterationCount())
+            .field("totalTokens", history.totalTokens());
 
         history.initialScore().ifPresent(score ->
-                sb.append("  initialScore: ").append(formatAsPercent(score)).append("\n"));
+            builder.field("initialScore", formatAsPercent(score)));
         history.bestScore().ifPresent(score ->
-                sb.append("  bestScore: ").append(formatAsPercent(score)).append("\n"));
+            builder.field("bestScore", formatAsPercent(score)));
 
-        sb.append("  scoreImprovement: ").append(formatAsPercent(history.scoreImprovement())).append("\n");
+        builder.field("scoreImprovement", formatAsPercent(history.scoreImprovement()))
+            .endObject();
 
         // Termination reason
         if (history.terminationReason() != null) {
-            sb.append("\nterminationReason:\n");
-            sb.append("  cause: ").append(history.terminationReason().cause().name()).append("\n");
-            sb.append("  message: ").append(quoteIfNeeded(history.terminationReason().message())).append("\n");
+            builder.startObject("terminationReason")
+                .field("cause", history.terminationReason().cause().name())
+                .field("message", history.terminationReason().message())
+                .endObject();
         }
 
         // All iterations
-        sb.append("\niterations:\n");
+        builder.startList("iterations");
         for (OptimizationRecord record : history.iterations()) {
-            appendIteration(sb, record);
+            appendIteration(builder, record);
         }
+        builder.endList();
 
-        return sb.toString();
+        return builder.build();
     }
 
-    private void appendIteration(StringBuilder sb, OptimizationRecord record) {
+    private void appendIteration(YamlBuilder builder, OptimizationRecord record) {
         OptimizationIterationAggregate agg = record.aggregate();
-
-        sb.append("  - iterationNumber: ").append(agg.iterationNumber()).append("\n");
-        sb.append("    status: ").append(record.status().name()).append("\n");
-        sb.append("    score: ").append(formatAsPercent(record.score())).append("\n");
-
-        // Control factor value for this iteration
         Object controlFactorValue = agg.controlFactorValue();
-        sb.append("    controlFactor: ");
+
+        builder.startListItem()
+            .field("iterationNumber", agg.iterationNumber())
+            .field("status", record.status().name())
+            .field("score", formatAsPercent(record.score()));
+
+        // Handle multiline control factor values
         if (controlFactorValue instanceof String s && s.contains("\n")) {
-            // Use YAML block scalar for multiline strings
-            sb.append("|\n");
-            for (String line : s.split("\n")) {
-                sb.append("      ").append(line).append("\n");
-            }
+            builder.blockScalar("controlFactor", s);
         } else {
-            appendYamlValue(sb, controlFactorValue);
-            sb.append("\n");
+            builder.field("controlFactor", controlFactorValue);
         }
 
         // Statistics
         OptimizeStatistics stats = agg.statistics();
-        sb.append("    statistics:\n");
-        sb.append("      sampleCount: ").append(stats.sampleCount()).append("\n");
-        sb.append("      successRate: ").append(formatAsPercent(stats.successRate())).append("\n");
-        sb.append("      successCount: ").append(stats.successCount()).append("\n");
-        sb.append("      failureCount: ").append(stats.failureCount()).append("\n");
-        sb.append("      totalTokens: ").append(stats.totalTokens()).append("\n");
-        sb.append("      meanLatencyMs: ").append(String.format("%.2f", stats.meanLatencyMs())).append("\n");
+        builder.startObject("statistics")
+            .field("sampleCount", stats.sampleCount())
+            .field("successRate", formatAsPercent(stats.successRate()))
+            .field("successCount", stats.successCount())
+            .field("failureCount", stats.failureCount())
+            .field("totalTokens", stats.totalTokens())
+            .field("meanLatencyMs", stats.meanLatencyMs(), "%.2f")
+            .endObject();
 
         record.failureReason().ifPresent(reason ->
-                sb.append("    failureReason: ").append(quoteIfNeeded(reason)).append("\n"));
+            builder.field("failureReason", reason));
+
+        builder.endListItem();
     }
 
     private String computeFingerprint(String content) {
@@ -261,83 +255,6 @@ public class OptimizeSpecGenerator {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 not available", e);
         }
-    }
-
-    private void appendYamlValue(StringBuilder sb, Object value) {
-        if (value == null) {
-            sb.append("null");
-        } else if (value instanceof String str) {
-            if (needsYamlQuoting(str)) {
-                sb.append("\"").append(escapeYamlString(str)).append("\"");
-            } else {
-                sb.append(str);
-            }
-        } else if (value instanceof Double d) {
-            // Format doubles cleanly, avoiding floating-point ugliness like 0.7000000000000001
-            sb.append(formatDouble(d));
-        } else if (value instanceof Float f) {
-            sb.append(formatDouble(f.doubleValue()));
-        } else if (value instanceof Boolean || value instanceof Number) {
-            sb.append(value);
-        } else {
-            sb.append("\"").append(escapeYamlString(value.toString())).append("\"");
-        }
-    }
-
-    /**
-     * Formats a double value cleanly, avoiding floating-point representation issues.
-     *
-     * <p>Values very close to integers are rounded. Values very close to zero
-     * are displayed as 0.0. Other values are displayed with up to 4 decimal places.
-     */
-    private static String formatDouble(double value) {
-        // Handle values very close to zero
-        if (Math.abs(value) < 1e-10) {
-            return "0.0";
-        }
-        // Handle values very close to integers
-        double rounded = Math.round(value * 10000.0) / 10000.0;
-        if (rounded == Math.floor(rounded) && rounded < 1e10) {
-            return String.format("%.1f", rounded);
-        }
-        // General case: up to 4 decimal places, strip trailing zeros
-        String formatted = String.format("%.4f", rounded);
-        // Strip trailing zeros but keep at least one decimal place
-        formatted = formatted.replaceAll("0+$", "");
-        if (formatted.endsWith(".")) {
-            formatted += "0";
-        }
-        return formatted;
-    }
-
-    private String quoteIfNeeded(String str) {
-        if (str == null) return "null";
-        if (needsYamlQuoting(str)) {
-            return "\"" + escapeYamlString(str) + "\"";
-        }
-        return str;
-    }
-
-    private boolean needsYamlQuoting(String str) {
-        if (str == null || str.isEmpty()) return true;
-        if (str.contains(":") || str.contains("#") || str.contains("\"") ||
-                str.contains("'") || str.contains("\n") || str.contains("\r") ||
-                str.contains("[") || str.contains("]") || str.contains("{") ||
-                str.contains("}")) {
-            return true;
-        }
-        // Check for YAML special values
-        String lower = str.toLowerCase();
-        return lower.equals("true") || lower.equals("false") ||
-                lower.equals("null") || lower.equals("yes") || lower.equals("no");
-    }
-
-    private String escapeYamlString(String str) {
-        return str.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
     }
 
     private void publishFinalReport(ExtensionContext context, OptimizeHistory history) {

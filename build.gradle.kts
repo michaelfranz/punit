@@ -45,6 +45,9 @@ dependencies {
     // Apache Commons Statistics - for statistical calculations (confidence intervals, distributions)
     implementation("org.apache.commons:commons-statistics-distribution:1.2")
 
+    // SnakeYAML - for YAML serialization in spec generation
+    implementation("org.yaml:snakeyaml:2.2")
+
     // Log4j 2 - structured logging for runtime output
     implementation("org.apache.logging.log4j:log4j-api:2.23.1")
     runtimeOnly("org.apache.logging.log4j:log4j-core:2.23.1")

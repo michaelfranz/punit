@@ -8,7 +8,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
-import java.util.Map;
 import java.util.Objects;
 import org.javai.punit.experiment.model.EmpiricalBaseline;
 import org.javai.punit.experiment.model.ResultProjection;
@@ -82,128 +81,113 @@ public class BaselineWriter {
      * Builds the YAML content (without the fingerprint line).
      */
     private String buildYamlContent(EmpiricalBaseline baseline) {
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append("# Empirical Baseline for ").append(baseline.getUseCaseId()).append("\n");
-        sb.append("# Generated automatically by punit experiment runner\n");
-        sb.append("# DO NOT EDIT - create a specification based on this baseline instead\n\n");
-        
-        sb.append("schemaVersion: ").append(SCHEMA_VERSION).append("\n");
-        sb.append("useCaseId: ").append(baseline.getUseCaseId()).append("\n");
-        if (baseline.getExperimentId() != null) {
-            sb.append("experimentId: ").append(baseline.getExperimentId()).append("\n");
-        }
-        sb.append("generatedAt: ").append(ISO_FORMATTER.format(baseline.getGeneratedAt())).append("\n");
-        
-        if (baseline.getExperimentClass() != null) {
-            sb.append("experimentClass: ").append(baseline.getExperimentClass()).append("\n");
-        }
-        if (baseline.getExperimentMethod() != null) {
-            sb.append("experimentMethod: ").append(baseline.getExperimentMethod()).append("\n");
-        }
-        
+        YamlBuilder builder = YamlBuilder.create()
+            .comment("Empirical Baseline for " + baseline.getUseCaseId())
+            .comment("Generated automatically by punit experiment runner")
+            .comment("DO NOT EDIT - create a specification based on this baseline instead")
+            .blankLine()
+            .field("schemaVersion", SCHEMA_VERSION)
+            .field("useCaseId", baseline.getUseCaseId())
+            .fieldIfPresent("experimentId", baseline.getExperimentId())
+            .field("generatedAt", ISO_FORMATTER.format(baseline.getGeneratedAt()))
+            .fieldIfPresent("experimentClass", baseline.getExperimentClass())
+            .fieldIfPresent("experimentMethod", baseline.getExperimentMethod());
+
         // Footprint
         if (baseline.hasFootprint()) {
-            sb.append("footprint: ").append(baseline.getFootprint()).append("\n");
+            builder.field("footprint", baseline.getFootprint());
         }
-        
+
         // Covariates
         if (baseline.hasCovariates()) {
-            sb.append("\ncovariates:\n");
+            builder.startObject("covariates");
             CovariateProfile profile = baseline.getCovariateProfile();
             for (String key : profile.orderedKeys()) {
                 CovariateValue value = profile.get(key);
-                sb.append("  ").append(key).append(": ");
-                String canonicalValue = value.toCanonicalString();
-                if (needsYamlQuoting(canonicalValue)) {
-                    sb.append("\"").append(escapeYamlString(canonicalValue)).append("\"");
-                } else {
-                    sb.append(canonicalValue);
-                }
-                sb.append("\n");
+                builder.field(key, value.toCanonicalString());
             }
+            builder.endObject();
         }
-        
+
         // Execution
-        sb.append("\nexecution:\n");
-        sb.append("  samplesPlanned: ").append(baseline.getExecution().samplesPlanned()).append("\n");
-        sb.append("  samplesExecuted: ").append(baseline.getExecution().samplesExecuted()).append("\n");
-        sb.append("  terminationReason: ").append(baseline.getExecution().terminationReason()).append("\n");
-        if (baseline.getExecution().terminationDetails() != null) {
-            sb.append("  terminationDetails: ").append(baseline.getExecution().terminationDetails()).append("\n");
-        }
-        
+        builder.startObject("execution")
+            .field("samplesPlanned", baseline.getExecution().samplesPlanned())
+            .field("samplesExecuted", baseline.getExecution().samplesExecuted())
+            .field("terminationReason", baseline.getExecution().terminationReason().toString())
+            .fieldIfPresent("terminationDetails", baseline.getExecution().terminationDetails())
+            .endObject();
+
         // Requirements (derived from empirical data)
         // minPassRate is set to the lower bound of the 95% confidence interval
-        // This is statistically sound: if the true rate is at this bound, there's
-        // a 95% chance the test will pass (given sufficient samples)
         double derivedMinPassRate = baseline.getStatistics().confidenceIntervalLower();
-        sb.append("\nrequirements:\n");
-        sb.append("  minPassRate: ").append(String.format("%.4f", derivedMinPassRate)).append("\n");
-        
+        builder.startObject("requirements")
+            .field("minPassRate", derivedMinPassRate, "%.4f")
+            .endObject();
+
         // Statistics
-        sb.append("\nstatistics:\n");
-        sb.append("  successRate:\n");
-        sb.append("    observed: ").append(String.format("%.4f", baseline.getStatistics().observedSuccessRate())).append("\n");
-        sb.append("    standardError: ").append(String.format("%.4f", baseline.getStatistics().standardError())).append("\n");
-        sb.append("    confidenceInterval95: [")
-            .append(String.format("%.4f", baseline.getStatistics().confidenceIntervalLower()))
-            .append(", ")
-            .append(String.format("%.4f", baseline.getStatistics().confidenceIntervalUpper()))
-            .append("]\n");
-        sb.append("  successes: ").append(baseline.getStatistics().successes()).append("\n");
-        sb.append("  failures: ").append(baseline.getStatistics().failures()).append("\n");
-        
+        builder.startObject("statistics")
+            .startObject("successRate")
+                .field("observed", baseline.getStatistics().observedSuccessRate(), "%.4f")
+                .field("standardError", baseline.getStatistics().standardError(), "%.4f")
+                .formattedInlineArray("confidenceInterval95", "%.4f",
+                    baseline.getStatistics().confidenceIntervalLower(),
+                    baseline.getStatistics().confidenceIntervalUpper())
+            .endObject()
+            .field("successes", baseline.getStatistics().successes())
+            .field("failures", baseline.getStatistics().failures());
+
         if (!baseline.getStatistics().failureDistribution().isEmpty()) {
-            sb.append("  failureDistribution:\n");
-            for (Map.Entry<String, Integer> entry : baseline.getStatistics().failureDistribution().entrySet()) {
-                sb.append("    ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+            builder.startObject("failureDistribution");
+            for (var entry : baseline.getStatistics().failureDistribution().entrySet()) {
+                builder.field(entry.getKey(), entry.getValue());
             }
+            builder.endObject();
         }
-        
+        builder.endObject();
+
         // Cost
-        sb.append("\ncost:\n");
-        sb.append("  totalTimeMs: ").append(baseline.getCost().totalTimeMs()).append("\n");
-        sb.append("  avgTimePerSampleMs: ").append(baseline.getCost().avgTimePerSampleMs()).append("\n");
-        sb.append("  totalTokens: ").append(baseline.getCost().totalTokens()).append("\n");
-        sb.append("  avgTokensPerSample: ").append(baseline.getCost().avgTokensPerSample()).append("\n");
-        
+        builder.startObject("cost")
+            .field("totalTimeMs", baseline.getCost().totalTimeMs())
+            .field("avgTimePerSampleMs", baseline.getCost().avgTimePerSampleMs())
+            .field("totalTokens", baseline.getCost().totalTokens())
+            .field("avgTokensPerSample", baseline.getCost().avgTokensPerSample())
+            .endObject();
+
         // Success criteria
         if (baseline.getUseCaseCriteria() != null) {
-            sb.append("\nsuccessCriteria:\n");
-            sb.append("  definition: \"").append(escapeYamlString(baseline.getUseCaseCriteria())).append("\"\n");
+            builder.startObject("successCriteria")
+                .field("definition", baseline.getUseCaseCriteria())
+                .endObject();
         }
-        
+
         // Result projections (EXPLORE mode only)
         if (baseline.hasResultProjections()) {
-            sb.append("\nresultProjection:\n");
-            
+            builder.startObject("resultProjection");
             for (ResultProjection projection : baseline.getResultProjections()) {
-                sb.append("  sample[").append(projection.sampleIndex()).append("]:\n");
-                sb.append("    executionTimeMs: ")
-                  .append(projection.executionTimeMs())
-                  .append("\n");
-                sb.append("    diffableContent:\n");
-                
+                String sampleKey = "sample[" + projection.sampleIndex() + "]";
+                builder.startObject(sampleKey)
+                    .field("executionTimeMs", projection.executionTimeMs())
+                    .startList("diffableContent");
                 for (String line : projection.diffableLines()) {
-                    sb.append("      - \"")
-                      .append(escapeYamlString(line))
-                      .append("\"\n");
+                    builder.listItem(line);
                 }
+                builder.endList().endObject();
             }
+            builder.endObject();
         }
 
         // Expiration policy
         if (baseline.hasExpirationPolicy()) {
             ExpirationPolicy policy = baseline.getExpirationPolicy();
-            sb.append("\nexpiration:\n");
-            sb.append("  expiresInDays: ").append(policy.expiresInDays()).append("\n");
-            sb.append("  baselineEndTime: ").append(ISO_FORMATTER.format(policy.baselineEndTime())).append("\n");
+            builder.startObject("expiration")
+                .field("expiresInDays", policy.expiresInDays())
+                .field("baselineEndTime", ISO_FORMATTER.format(policy.baselineEndTime()));
             policy.expirationTime().ifPresent(exp ->
-                sb.append("  expirationDate: ").append(ISO_FORMATTER.format(exp)).append("\n"));
+                builder.field("expirationDate", ISO_FORMATTER.format(exp)));
+            builder.endObject();
         }
-        
-        return sb.toString();
+
+        return builder.build();
     }
     
     /**
@@ -219,39 +203,4 @@ public class BaselineWriter {
         }
     }
     
-    private void appendYamlValue(StringBuilder sb, Object value) {
-        if (value == null) {
-            sb.append("null");
-        } else if (value instanceof String str) {
-            if (needsYamlQuoting(str)) {
-                sb.append("\"").append(escapeYamlString(str)).append("\"");
-            } else {
-                sb.append(str);
-            }
-        } else if (value instanceof Boolean || value instanceof Number) {
-            sb.append(value);
-        } else {
-            sb.append("\"").append(escapeYamlString(value.toString())).append("\"");
-        }
-    }
-    
-    private boolean needsYamlQuoting(String str) {
-        if (str.isEmpty()) return true;
-        if (str.contains(":") || str.contains("#") || str.contains("\"") || 
-            str.contains("'") || str.contains("\n") || str.contains("\r")) {
-            return true;
-        }
-        // Check for YAML special values
-        String lower = str.toLowerCase();
-        return lower.equals("true") || lower.equals("false") || 
-               lower.equals("null") || lower.equals("yes") || lower.equals("no");
-    }
-    
-    private String escapeYamlString(String str) {
-        return str.replace("\\", "\\\\")
-                  .replace("\"", "\\\"")
-                  .replace("\n", "\\n")
-                  .replace("\r", "\\r")
-                  .replace("\t", "\\t");
-    }
 }
