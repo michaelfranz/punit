@@ -18,7 +18,8 @@ import java.util.function.Predicate;
  * <h2>Design by Contract</h2>
  * <p>The contract belongs to the <b>service</b> being invoked, but since Java lacks
  * Eiffel's built-in contract support, the use case formalizes it. The contract is
- * declared as a {@code static final} field—a pure specification with no free variables.
+ * typically declared as a {@code static final} field—a pure specification with no free
+ * variables.
  *
  * <h2>Usage</h2>
  * <pre>{@code
@@ -100,7 +101,7 @@ public final class ServiceContract<I, R> {
     /**
      * Returns the total number of postconditions in this contract.
      *
-     * <p>This counts both derivation descriptions (for fallible derivations)
+     * <p>This counts both derivations (each is a postcondition in its own right)
      * and ensure clauses within each derivation.
      *
      * @return total postcondition count
@@ -108,9 +109,7 @@ public final class ServiceContract<I, R> {
     public int postconditionCount() {
         int count = 0;
         for (Derivation<R, ?> derivation : derivations) {
-            if (derivation.isFallible()) {
-                count++; // The derivation itself is a postcondition
-            }
+            count++; // The derivation itself is a postcondition
             count += derivation.postconditions().size();
         }
         return count;
@@ -171,7 +170,7 @@ public final class ServiceContract<I, R> {
         }
 
         /**
-         * Starts a fallible derivation with a description.
+         * Starts a derivation with a description.
          *
          * <p>The description names this derivation as an ensure clause in its own right.
          * If the derivation fails, nested ensures are skipped.
@@ -188,21 +187,6 @@ public final class ServiceContract<I, R> {
                 throw new IllegalArgumentException("description must not be blank");
             }
             return new DerivingBuilder<>(this, description, function);
-        }
-
-        /**
-         * Starts an infallible derivation without a description.
-         *
-         * <p>Use this for trivial transformations that cannot fail.
-         * Consider using {@link Outcome#lift(Function)} for pure functions.
-         *
-         * @param function the derivation function
-         * @param <D> the derived type
-         * @return a deriving builder for adding postconditions
-         */
-        public <D> DerivingBuilder<I, R, D> deriving(Function<R, Outcome<D>> function) {
-            Objects.requireNonNull(function, "function must not be null");
-            return new DerivingBuilder<>(this, null, function);
         }
 
         /**
@@ -252,7 +236,7 @@ public final class ServiceContract<I, R> {
         }
 
         /**
-         * Starts a new fallible derivation.
+         * Starts a new derivation.
          *
          * <p>Finalizes the current derivation and starts a new one.
          *
@@ -264,20 +248,6 @@ public final class ServiceContract<I, R> {
         public <D2> DerivingBuilder<I, R, D2> deriving(String description, Function<R, Outcome<D2>> function) {
             finalizeCurrent();
             return parent.deriving(description, function);
-        }
-
-        /**
-         * Starts a new infallible derivation.
-         *
-         * <p>Finalizes the current derivation and starts a new one.
-         *
-         * @param function the new derivation function
-         * @param <D2> the new derived type
-         * @return a deriving builder for the new derivation
-         */
-        public <D2> DerivingBuilder<I, R, D2> deriving(Function<R, Outcome<D2>> function) {
-            finalizeCurrent();
-            return parent.deriving(function);
         }
 
         /**

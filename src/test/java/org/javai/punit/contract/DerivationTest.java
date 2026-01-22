@@ -17,28 +17,26 @@ class DerivationTest {
     class ConstructorTests {
 
         @Test
-        @DisplayName("creates fallible derivation with description")
-        void createsFallibleDerivation() {
+        @DisplayName("creates derivation with description")
+        void createsDerivation() {
             Derivation<String, Integer> derivation = new Derivation<>(
                     "Valid number",
                     s -> Outcome.success(Integer.parseInt(s)),
                     List.of(new Postcondition<>("Positive", n -> n > 0)));
 
             assertThat(derivation.description()).isEqualTo("Valid number");
-            assertThat(derivation.isFallible()).isTrue();
             assertThat(derivation.postconditions()).hasSize(1);
         }
 
         @Test
-        @DisplayName("creates infallible derivation without description")
-        void createsInfallibleDerivation() {
-            Derivation<String, String> derivation = new Derivation<>(
+        @DisplayName("throws when description is null")
+        void throwsWhenDescriptionIsNull() {
+            assertThatThrownBy(() -> new Derivation<>(
                     null,
-                    s -> Outcome.success(s.toUpperCase()),
-                    List.of(new Postcondition<>("Not empty", s -> !s.isEmpty())));
-
-            assertThat(derivation.description()).isNull();
-            assertThat(derivation.isFallible()).isFalse();
+                    s -> Outcome.success(s),
+                    List.of()))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("description must not be null");
         }
 
         @Test
@@ -76,8 +74,8 @@ class DerivationTest {
     }
 
     @Nested
-    @DisplayName("evaluate() - fallible derivation")
-    class FallibleEvaluateTests {
+    @DisplayName("evaluate()")
+    class EvaluateTests {
 
         @Test
         @DisplayName("returns passed derivation and evaluated postconditions when derivation succeeds")
@@ -143,43 +141,20 @@ class DerivationTest {
             assertThat(results.get(0).description()).isEqualTo("Valid number");
             assertThat(results.get(1)).isInstanceOf(PostconditionResult.Skipped.class);
         }
-    }
-
-    @Nested
-    @DisplayName("evaluate() - infallible derivation")
-    class InfallibleEvaluateTests {
 
         @Test
-        @DisplayName("evaluates postconditions without derivation result")
-        void evaluatesPostconditionsWithoutDerivationResult() {
+        @DisplayName("evaluates with no nested postconditions")
+        void evaluatesWithNoNestedPostconditions() {
             Derivation<String, String> derivation = new Derivation<>(
-                    null,
+                    "Uppercase",
                     s -> Outcome.success(s.toUpperCase()),
-                    List.of(
-                            new Postcondition<>("Not empty", s -> !s.isEmpty()),
-                            new Postcondition<>("Contains HELLO", s -> s.contains("HELLO"))));
+                    List.of());
 
             List<PostconditionResult> results = derivation.evaluate("hello");
 
-            assertThat(results).hasSize(2);
+            assertThat(results).hasSize(1);
             assertThat(results.get(0)).isInstanceOf(PostconditionResult.Passed.class);
-            assertThat(results.get(0).description()).isEqualTo("Not empty");
-            assertThat(results.get(1)).isInstanceOf(PostconditionResult.Passed.class);
-            assertThat(results.get(1).description()).isEqualTo("Contains HELLO");
-        }
-
-        @Test
-        @DisplayName("returns empty list when function throws and no description")
-        void returnsEmptyWhenFunctionThrowsAndInfallible() {
-            Derivation<String, Integer> derivation = new Derivation<>(
-                    null,
-                    s -> Outcome.success(s.length() / 0), // will throw
-                    List.of(new Postcondition<>("Positive", n -> n > 0)));
-
-            List<PostconditionResult> results = derivation.evaluate("test");
-
-            // Infallible derivation has no description, so no result is added
-            assertThat(results).isEmpty();
+            assertThat(results.get(0).description()).isEqualTo("Uppercase");
         }
     }
 }

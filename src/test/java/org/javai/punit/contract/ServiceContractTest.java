@@ -46,8 +46,8 @@ class ServiceContractTest {
         }
 
         @Test
-        @DisplayName("builds contract with fallible derivation and ensures")
-        void buildsContractWithFallibleDerivation() {
+        @DisplayName("builds contract with derivation and ensures")
+        void buildsContractWithDerivation() {
             ServiceContract<TestInput, String> contract = ServiceContract
                     .<TestInput, String>define()
                     .require("Value not null", in -> in.value() != null)
@@ -68,19 +68,6 @@ class ServiceContractTest {
         }
 
         @Test
-        @DisplayName("builds contract with infallible derivation")
-        void buildsContractWithInfallibleDerivation() {
-            ServiceContract<TestInput, String> contract = ServiceContract
-                    .<TestInput, String>define()
-                    .deriving(Outcome.lift(String::toUpperCase))
-                        .ensure("Not empty", s -> !s.isEmpty())
-                    .build();
-
-            assertThat(contract.derivations()).hasSize(1);
-            assertThat(contract.postconditionCount()).isEqualTo(1); // only the ensure
-        }
-
-        @Test
         @DisplayName("builds contract with multiple derivations")
         void buildsContractWithMultipleDerivations() {
             ServiceContract<TestInput, String> contract = ServiceContract
@@ -93,12 +80,12 @@ class ServiceContractTest {
                         }
                     })
                         .ensure("Positive", n -> n > 0)
-                    .deriving(Outcome.lift(String::toUpperCase))
+                    .deriving("Uppercase", Outcome.lift(String::toUpperCase))
                         .ensure("Not empty", s -> !s.isEmpty())
                     .build();
 
             assertThat(contract.derivations()).hasSize(2);
-            assertThat(contract.postconditionCount()).isEqualTo(3); // 1 fallible derivation + 2 ensures
+            assertThat(contract.postconditionCount()).isEqualTo(4); // 2 derivations + 2 ensures
         }
 
         @Test
@@ -246,22 +233,24 @@ class ServiceContractTest {
                         }
                     })
                         .ensure("Positive", n -> n > 0)
-                    .deriving(Outcome.lift(String::toUpperCase))
+                    .deriving("Uppercase", Outcome.lift(String::toUpperCase))
                         .ensure("Not empty", s -> !s.isEmpty())
                     .build();
 
             // First derivation fails, second succeeds
             List<PostconditionResult> results = contract.evaluatePostconditions("hello");
 
-            assertThat(results).hasSize(3);
-            // First derivation (fallible): Failed + Skipped
+            assertThat(results).hasSize(4);
+            // First derivation: Failed + Skipped
             assertThat(results.get(0).failed()).isTrue();
             assertThat(results.get(0).description()).isEqualTo("Valid number");
             assertThat(results.get(1).skipped()).isTrue();
             assertThat(results.get(1).description()).isEqualTo("Positive");
-            // Second derivation (infallible): only ensure is evaluated
+            // Second derivation: Passed + Passed
             assertThat(results.get(2).passed()).isTrue();
-            assertThat(results.get(2).description()).isEqualTo("Not empty");
+            assertThat(results.get(2).description()).isEqualTo("Uppercase");
+            assertThat(results.get(3).passed()).isTrue();
+            assertThat(results.get(3).description()).isEqualTo("Not empty");
         }
     }
 
@@ -270,27 +259,26 @@ class ServiceContractTest {
     class PostconditionCountTests {
 
         @Test
-        @DisplayName("counts fallible derivation as postcondition")
-        void countsFallibleDerivationAsPostcondition() {
+        @DisplayName("counts derivation as postcondition")
+        void countsDerivationAsPostcondition() {
             ServiceContract<TestInput, String> contract = ServiceContract
                     .<TestInput, String>define()
                     .deriving("Valid JSON", s -> Outcome.success(s))
                         .ensure("Has field", s -> true)
                     .build();
 
-            assertThat(contract.postconditionCount()).isEqualTo(2);
+            assertThat(contract.postconditionCount()).isEqualTo(2); // derivation + ensure
         }
 
         @Test
-        @DisplayName("does not count infallible derivation as postcondition")
-        void doesNotCountInfallibleDerivationAsPostcondition() {
+        @DisplayName("counts derivation without ensures")
+        void countsDerivationWithoutEnsures() {
             ServiceContract<TestInput, String> contract = ServiceContract
                     .<TestInput, String>define()
-                    .deriving(Outcome.lift(String::toUpperCase))
-                        .ensure("Not empty", s -> !s.isEmpty())
+                    .deriving("Uppercase", Outcome.lift(String::toUpperCase))
                     .build();
 
-            assertThat(contract.postconditionCount()).isEqualTo(1);
+            assertThat(contract.postconditionCount()).isEqualTo(1); // just the derivation
         }
     }
 
