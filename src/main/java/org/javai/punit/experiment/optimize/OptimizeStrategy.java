@@ -164,11 +164,9 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
         try {
             invocation.proceed();
 
-            // Record the outcome
+            // Record the outcome - prefer contract outcome, fall back to legacy
             if (captor != null && captor.hasResult()) {
-                UseCaseResult result = captor.getResult();
-                UseCaseCriteria criteria = captor.getCriteria();
-                UseCaseOutcome outcome = new UseCaseOutcome(result, criteria);
+                UseCaseOutcome outcome = buildOutcomeFromCaptor(captor);
                 state.recordOutcome(outcome);
             }
         } catch (Throwable e) {
@@ -359,6 +357,21 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Builds a model UseCaseOutcome from the captor.
+     *
+     * <p>The captor already handles bridging contract outcomes to legacy criteria
+     * via ContractCriteriaAdapter, so we just need to extract the result and criteria.
+     */
+    @SuppressWarnings("deprecation")
+    private UseCaseOutcome buildOutcomeFromCaptor(ResultCaptor captor) {
+        UseCaseResult result = captor.getResult();
+        UseCaseCriteria criteria = captor.hasCriteria()
+                ? captor.getCriteria()
+                : UseCaseCriteria.defaultCriteria();
+        return new UseCaseOutcome(result, criteria);
     }
 
     private void reportProgress(ExtensionContext context, OptimizeState state,
