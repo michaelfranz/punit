@@ -1,5 +1,7 @@
 package org.javai.punit.contract;
 
+import org.javai.outcome.Outcome;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -12,6 +14,7 @@ import java.util.function.Predicate;
  * <p>A contract consists of:
  * <ul>
  *   <li>Preconditions — what the service requires from its caller (checked eagerly)</li>
+ *   <li>Postconditions — conditions on the raw result (no transformation needed)</li>
  *   <li>Derivations — transformations of the result with associated postconditions</li>
  * </ul>
  *
@@ -31,6 +34,8 @@ import java.util.function.Predicate;
  *     .require("Prompt not null", in -> in.prompt() != null)
  *     .require("Instruction not blank", in -> !in.instruction().isBlank())
  *
+ *     .ensure("Response not empty", response -> !response.isEmpty())
+ *
  *     .deriving("Valid JSON", MyUseCase::parseJson)
  *         .ensure("Has operations array", json -> json.has("operations"))
  *         .ensure("All operations valid", json -> allOpsValid(json))
@@ -47,10 +52,15 @@ import java.util.function.Predicate;
 public final class ServiceContract<I, R> {
 
     private final List<Precondition<I>> preconditions;
+    private final List<Postcondition<R>> postconditions;
     private final List<Derivation<R, ?>> derivations;
 
-    private ServiceContract(List<Precondition<I>> preconditions, List<Derivation<R, ?>> derivations) {
+    private ServiceContract(
+            List<Precondition<I>> preconditions,
+            List<Postcondition<R>> postconditions,
+            List<Derivation<R, ?>> derivations) {
         this.preconditions = List.copyOf(preconditions);
+        this.postconditions = List.copyOf(postconditions);
         this.derivations = List.copyOf(derivations);
     }
 
@@ -61,6 +71,18 @@ public final class ServiceContract<I, R> {
      */
     public List<Precondition<I>> preconditions() {
         return preconditions;
+    }
+
+    /**
+     * Returns the direct postconditions for this contract.
+     *
+     * <p>These are postconditions evaluated directly against the raw result,
+     * without any derivation transformation.
+     *
+     * @return unmodifiable list of direct postconditions
+     */
+    public List<Postcondition<R>> postconditions() {
+        return postconditions;
     }
 
     /**
@@ -76,7 +98,7 @@ public final class ServiceContract<I, R> {
      * Checks all preconditions against an input value.
      *
      * @param input the input to check
-     * @throws UseCasePreconditionException if any precondition fails
+     * @throws PreconditionException if any precondition fails
      */
     public void checkPreconditions(I input) {
         for (Precondition<I> precondition : preconditions) {
@@ -87,11 +109,16 @@ public final class ServiceContract<I, R> {
     /**
      * Evaluates all postconditions against a result.
      *
+     * <p>Direct postconditions are evaluated first, followed by derivation postconditions.
+     *
      * @param result the result to evaluate
      * @return list of all postcondition results
      */
     public List<PostconditionResult> evaluatePostconditions(R result) {
         List<PostconditionResult> results = new ArrayList<>();
+        for (Postcondition<R> postcondition : postconditions) {
+            results.add(postcondition.evaluate(result));
+        }
         for (Derivation<R, ?> derivation : derivations) {
             results.addAll(derivation.evaluate(result));
         }
@@ -101,13 +128,17 @@ public final class ServiceContract<I, R> {
     /**
      * Returns the total number of postconditions in this contract.
      *
-     * <p>This counts both derivations (each is a postcondition in its own right)
-     * and ensure clauses within each derivation.
+     * <p>This counts:
+     * <ul>
+     *   <li>Direct postconditions on the raw result</li>
+     *   <li>Derivations (each is a postcondition in its own right)</li>
+     *   <li>Ensure clauses within each derivation</li>
+     * </ul>
      *
      * @return total postcondition count
      */
     public int postconditionCount() {
-        int count = 0;
+        int count = postconditions.size();
         for (Derivation<R, ?> derivation : derivations) {
             count++; // The derivation itself is a postcondition
             count += derivation.postconditions().size();
@@ -150,6 +181,7 @@ public final class ServiceContract<I, R> {
     public static final class ContractBuilder<I, R> {
 
         private final List<Precondition<I>> preconditions = new ArrayList<>();
+        private final List<Postcondition<R>> postconditions = new ArrayList<>();
         private final List<Derivation<R, ?>> derivations = new ArrayList<>();
 
         private ContractBuilder() {
@@ -166,6 +198,22 @@ public final class ServiceContract<I, R> {
          */
         public ContractBuilder<I, R> require(String description, Predicate<I> predicate) {
             preconditions.add(new Precondition<>(description, predicate));
+            return this;
+        }
+
+        /**
+         * Adds a postcondition on the raw result.
+         *
+         * <p>This postcondition is evaluated directly against the result without
+         * any derivation transformation. Use this for simple checks that don't
+         * require parsing or transforming the result.
+         *
+         * @param description the human-readable description
+         * @param predicate the condition to evaluate against the result
+         * @return this builder
+         */
+        public ContractBuilder<I, R> ensure(String description, Predicate<R> predicate) {
+            postconditions.add(new Postcondition<>(description, predicate));
             return this;
         }
 
@@ -195,7 +243,7 @@ public final class ServiceContract<I, R> {
          * @return the immutable service contract
          */
         public ServiceContract<I, R> build() {
-            return new ServiceContract<>(preconditions, derivations);
+            return new ServiceContract<>(preconditions, postconditions, derivations);
         }
 
         void addDerivation(Derivation<R, ?> derivation) {

@@ -81,6 +81,8 @@ public class ShoppingBasketUseCase implements UseCase<String> {
         .require("Temperature in range", in -> in.temperature() >= 0 && in.temperature() <= 1)
 
         // What the service guarantees (postconditions)
+        .ensure("Response not empty", response -> !response.isEmpty())
+
         .deriving("Valid JSON", ShoppingBasketUseCase::parseJson)
             .ensure("Has operations array", json -> json.has("operations"))
             .ensure("All operations valid", json -> allOpsValid(json.path("operations")))
@@ -281,7 +283,18 @@ Defines a precondition on the service input. Evaluated eagerly when `input()` is
 .require("Instruction not blank", input -> !input.instruction().isBlank())
 ```
 
-#### `deriving(description, function)` — fallible derivation
+#### `ensure(description, predicate)` — direct postcondition
+
+Defines a postcondition directly on the raw result. Use this for simple checks that don't require parsing or transforming the result.
+
+```java
+.ensure("Response not empty", response -> !response.isEmpty())
+.ensure("Reasonable length", response -> response.length() < 10000)
+```
+
+Direct postconditions are evaluated before any derivations. They are simple predicates on the raw result—no gate semantics, no skipping.
+
+#### `deriving(description, function)`
 
 Transforms the raw result into a derived perspective. The function always returns `Outcome<D>`. The description names this derivation as an ensure in its own right.
 
@@ -296,32 +309,22 @@ Transforms the raw result into a derived perspective. The function always return
 
 This prevents artificial inflation of failure counts when the real failure is the derivation itself.
 
-#### `deriving(function)` — infallible derivation
-
-For trivial transformations that cannot fail, the description is optional:
+For trivial transformations that cannot fail, use the `Outcomes.lift()` helper to wrap pure functions:
 
 ```java
-.deriving(response -> Outcome.success(response.toLowerCase()))
+.deriving("Lowercase", Outcomes.lift(String::toLowerCase))
     .ensure("Contains keyword", s -> s.contains("operations"))
 ```
-
-A convenience helper `Outcome.lift()` wraps pure functions:
-
-```java
-.deriving(Outcome.lift(String::toLowerCase))
-    .ensure("Contains keyword", s -> s.contains("operations"))
-```
-
-Both overloads return `Outcome<D>` for type uniformity. The description is what's optional—present when failure is meaningful, absent when it's not.
 
 Multiple `deriving` clauses branch from the raw result (parallel perspectives), not from each other (no chaining).
 
-#### `ensure(description, predicate)`
+#### `ensure(description, predicate)` — nested postcondition
 
-Defines a postcondition on the derived context. Evaluated lazily.
+Within a `deriving` block, defines a postcondition on the derived value. Evaluated lazily.
 
 ```java
-.ensure("Has operations array", json -> json.has("operations"))
+.deriving("Valid JSON", ShoppingBasketUseCase::parseJson)
+    .ensure("Has operations array", json -> json.has("operations"))
 ```
 
 ## Structural Overview
@@ -332,7 +335,10 @@ ServiceContract<I, R>
     ├─► require(...)                        // preconditions on I (eager)
     ├─► require(...)
     │
-    ├─► deriving("Valid JSON", parseJson)   // fallible derivation
+    ├─► ensure("Not empty", pred)           // direct postcondition on R
+    ├─► ensure("Reasonable length", pred)   // direct postcondition on R
+    │
+    ├─► deriving("Valid JSON", parseJson)   // derivation (acts as gate)
     │       │
     │       ├─► SUCCESS: "Valid JSON" passes
     │       │       ├─► ensure("Has ops", pred)      // evaluated
@@ -342,8 +348,8 @@ ServiceContract<I, R>
     │               ├─► ensure("Has ops", pred)      // skipped
     │               └─► ensure("All valid", pred)    // skipped
     │
-    └─► deriving(infallibleFn)              // infallible derivation (no description)
-            └─► ensure("...", pred)         // always evaluated
+    └─► deriving("Lowercase", Outcomes.lift(...))
+            └─► ensure("...", pred)         // evaluated if derivation succeeds
 
 
 UseCaseOutcome Builder
@@ -392,6 +398,16 @@ Postconditions are stored as lambdas and evaluated only when needed. This suppor
 - Parallel evaluation
 - Detailed failure reporting
 
+### Direct Postconditions vs Derivations
+
+The contract supports two ways to define postconditions:
+
+1. **Direct postconditions** — Simple predicates on the raw result. No transformation, no gate semantics. Always evaluated.
+
+2. **Derivations** — Transform the result and act as a gate for nested postconditions. If the derivation fails, nested ensures are skipped.
+
+Use direct postconditions for simple checks (not empty, reasonable length). Use derivations when you need to parse or transform the result before checking conditions.
+
 ### Derivation as a Gate
 
 A `deriving()` clause is an ensure in its own right. The description names the postcondition ("Valid JSON"). If the derivation:
@@ -400,8 +416,6 @@ A `deriving()` clause is an ensure in its own right. The description names the p
 - **Fails** → The named ensure fails, nested ensures are **skipped** (not evaluated, not counted)
 
 This prevents artificial inflation of failure counts. When JSON parsing fails, we count one failure ("Valid JSON"), not five (parsing + all the structural checks that couldn't run).
-
-For infallible derivations (pure transformations), omit the description—there's no failure to name.
 
 ## Comparison: Before and After
 
@@ -456,6 +470,8 @@ public class ShoppingBasketUseCase implements UseCase<String> {
         .require("Prompt not null", in -> in.prompt() != null)
         .require("Instruction not blank", in -> !in.instruction().isBlank())
         .require("Temperature in range", in -> in.temperature() >= 0 && in.temperature() <= 1)
+
+        .ensure("Response not empty", response -> !response.isEmpty())
 
         .deriving("Valid JSON", ShoppingBasketUseCase::parseJson)
             .ensure("Has operations array", json -> json.has("operations"))

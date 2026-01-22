@@ -21,7 +21,7 @@ class DerivationTest {
         void createsDerivation() {
             Derivation<String, Integer> derivation = new Derivation<>(
                     "Valid number",
-                    s -> Outcome.success(Integer.parseInt(s)),
+                    s -> Outcomes.ok(Integer.parseInt(s)),
                     List.of(new Postcondition<>("Positive", n -> n > 0)));
 
             assertThat(derivation.description()).isEqualTo("Valid number");
@@ -33,7 +33,7 @@ class DerivationTest {
         void throwsWhenDescriptionIsNull() {
             assertThatThrownBy(() -> new Derivation<>(
                     null,
-                    s -> Outcome.success(s),
+                    s -> Outcomes.ok(s),
                     List.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("description must not be null");
@@ -44,7 +44,7 @@ class DerivationTest {
         void throwsWhenDescriptionIsBlank() {
             assertThatThrownBy(() -> new Derivation<>(
                     "   ",
-                    s -> Outcome.success(s),
+                    s -> Outcomes.ok(s),
                     List.of()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("description must not be blank");
@@ -66,7 +66,7 @@ class DerivationTest {
         void throwsWhenPostconditionsIsNull() {
             assertThatThrownBy(() -> new Derivation<>(
                     "Test",
-                    s -> Outcome.success(s),
+                    s -> Outcomes.ok(s),
                     null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("postconditions must not be null");
@@ -82,7 +82,7 @@ class DerivationTest {
         void returnsPassedWhenDerivationSucceeds() {
             Derivation<String, Integer> derivation = new Derivation<>(
                     "Valid number",
-                    s -> Outcome.success(Integer.parseInt(s)),
+                    s -> Outcomes.ok(Integer.parseInt(s)),
                     List.of(
                             new Postcondition<>("Positive", n -> n > 0),
                             new Postcondition<>("Less than 100", n -> n < 100)));
@@ -105,9 +105,9 @@ class DerivationTest {
                     "Valid number",
                     s -> {
                         try {
-                            return Outcome.success(Integer.parseInt(s));
+                            return Outcomes.ok(Integer.parseInt(s));
                         } catch (NumberFormatException e) {
-                            return Outcome.failure("Not a number");
+                            return Outcomes.fail("Not a number");
                         }
                     },
                     List.of(
@@ -131,7 +131,7 @@ class DerivationTest {
         void returnsFailedWhenFunctionThrows() {
             Derivation<String, Integer> derivation = new Derivation<>(
                     "Valid number",
-                    s -> Outcome.success(Integer.parseInt(s)),
+                    s -> Outcomes.ok(Integer.parseInt(s)),
                     List.of(new Postcondition<>("Positive", n -> n > 0)));
 
             List<PostconditionResult> results = derivation.evaluate("not-a-number");
@@ -147,7 +147,7 @@ class DerivationTest {
         void evaluatesWithNoNestedPostconditions() {
             Derivation<String, String> derivation = new Derivation<>(
                     "Uppercase",
-                    s -> Outcome.success(s.toUpperCase()),
+                    s -> Outcomes.ok(s.toUpperCase()),
                     List.of());
 
             List<PostconditionResult> results = derivation.evaluate("hello");

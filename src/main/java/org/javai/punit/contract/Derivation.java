@@ -1,5 +1,7 @@
 package org.javai.punit.contract;
 
+import org.javai.outcome.Outcome;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -83,14 +85,14 @@ public record Derivation<R, D>(
             return results;
         }
 
-        if (derivationOutcome.isSuccess()) {
+        if (derivationOutcome.isOk()) {
             results.add(new PostconditionResult.Passed(description));
-            D derivedValue = derivationOutcome.value();
+            D derivedValue = derivationOutcome.getOrThrow();
             for (Postcondition<D> postcondition : postconditions) {
                 results.add(postcondition.evaluate(derivedValue));
             }
         } else {
-            results.add(new PostconditionResult.Failed(description, derivationOutcome.failureReason()));
+            results.add(new PostconditionResult.Failed(description, Outcomes.failureMessage(derivationOutcome)));
             for (Postcondition<D> postcondition : postconditions) {
                 results.add(postcondition.skip("Derivation '" + description + "' failed"));
             }

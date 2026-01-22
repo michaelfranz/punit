@@ -33,6 +33,7 @@ tasks.withType<JavaCompile> {
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
@@ -50,7 +51,9 @@ dependencies {
 
     // Log4j 2 - structured logging for runtime output
     implementation("org.apache.logging.log4j:log4j-api:2.23.1")
-    runtimeOnly("org.apache.logging.log4j:log4j-core:2.23.1")
+    implementation("com.github.javai-org:outcome:main-SNAPSHOT")
+
+    runtimeOnly("org.apache.logging.log4j:log4j-core:2.25.3")
     // Bridge SLF4J to Log4j2 (some dependencies use SLF4J)
     runtimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.23.1")
     

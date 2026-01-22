@@ -9,7 +9,7 @@
  * <h2>Core Types</h2>
  * <ul>
  *   <li>{@link org.javai.punit.contract.ServiceContract} — The contract definition with preconditions and postconditions</li>
- *   <li>{@link org.javai.punit.contract.Outcome} — Result type for fallible operations (success or failure)</li>
+ *   <li>{@link org.javai.punit.contract.Outcomes} — Factory methods for creating Outcome instances in derivations</li>
  *   <li>{@link org.javai.punit.contract.Precondition} — A single require clause with description and predicate</li>
  *   <li>{@link org.javai.punit.contract.Postcondition} — A single ensure clause with description and predicate</li>
  *   <li>{@link org.javai.punit.contract.Derivation} — Transforms raw result into derived perspective for postconditions</li>
@@ -39,7 +39,7 @@
  * }</pre>
  *
  * @see org.javai.punit.contract.ServiceContract
- * @see org.javai.punit.contract.Outcome
+ * @see org.javai.punit.contract.Outcomes
  * @see org.javai.punit.contract.Postcondition
  * @see org.javai.punit.contract.PostconditionResult
  */
