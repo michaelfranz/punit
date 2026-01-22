@@ -18,9 +18,9 @@ class PostconditionResultAdapterTest {
     class ToCriterionOutcomeTests {
 
         @Test
-        @DisplayName("converts Passed to CriterionOutcome.Passed")
+        @DisplayName("converts passed to CriterionOutcome.Passed")
         void convertsPassedToPassed() {
-            PostconditionResult.Passed passed = new PostconditionResult.Passed("Response not empty");
+            PostconditionResult passed = PostconditionResult.passed("Response not empty");
 
             CriterionOutcome outcome = PostconditionResultAdapter.toCriterionOutcome(passed);
 
@@ -30,10 +30,9 @@ class PostconditionResultAdapterTest {
         }
 
         @Test
-        @DisplayName("converts Failed with reason to CriterionOutcome.Failed")
+        @DisplayName("converts failed with reason to CriterionOutcome.Failed")
         void convertsFailedWithReasonToFailed() {
-            PostconditionResult.Failed failed = new PostconditionResult.Failed(
-                    "Valid JSON", "Parse error at line 5");
+            PostconditionResult failed = PostconditionResult.failed("Valid JSON", "Parse error at line 5");
 
             CriterionOutcome outcome = PostconditionResultAdapter.toCriterionOutcome(failed);
 
@@ -45,9 +44,9 @@ class PostconditionResultAdapterTest {
         }
 
         @Test
-        @DisplayName("converts Failed without reason to CriterionOutcome.Failed with default reason")
-        void convertsFailedWithoutReasonToFailedWithDefault() {
-            PostconditionResult.Failed failed = new PostconditionResult.Failed("Response not empty");
+        @DisplayName("converts failed with default reason to CriterionOutcome.Failed")
+        void convertsFailedWithDefaultReasonToFailed() {
+            PostconditionResult failed = PostconditionResult.failed("Response not empty");
 
             CriterionOutcome outcome = PostconditionResultAdapter.toCriterionOutcome(failed);
 
@@ -57,10 +56,11 @@ class PostconditionResultAdapterTest {
         }
 
         @Test
-        @DisplayName("converts Skipped to CriterionOutcome.NotEvaluated")
+        @DisplayName("converts skipped (failure with Skipped: prefix) to CriterionOutcome.NotEvaluated")
         void convertsSkippedToNotEvaluated() {
-            PostconditionResult.Skipped skipped = new PostconditionResult.Skipped(
-                    "Has products array", "JSON parsing failed");
+            // Skipped is now represented as a failure with "Skipped:" prefix
+            PostconditionResult skipped = PostconditionResult.failed(
+                    "Has products array", "Skipped: JSON parsing failed");
 
             CriterionOutcome outcome = PostconditionResultAdapter.toCriterionOutcome(skipped);
 
@@ -86,9 +86,9 @@ class PostconditionResultAdapterTest {
         @DisplayName("converts list of postcondition results")
         void convertsListOfResults() {
             List<PostconditionResult> results = List.of(
-                    new PostconditionResult.Passed("Not empty"),
-                    new PostconditionResult.Failed("Valid JSON", "Parse error"),
-                    new PostconditionResult.Skipped("Has field", "JSON not available")
+                    PostconditionResult.passed("Not empty"),
+                    PostconditionResult.failed("Valid JSON", "Parse error"),
+                    PostconditionResult.failed("Has field", "Skipped: JSON not available")
             );
 
             List<CriterionOutcome> outcomes = PostconditionResultAdapter.toCriterionOutcomes(results);

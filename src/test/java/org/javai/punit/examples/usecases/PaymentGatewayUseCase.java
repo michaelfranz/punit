@@ -3,7 +3,6 @@ package org.javai.punit.examples.usecases;
 import org.javai.punit.api.FactorArguments;
 import org.javai.punit.api.FactorProvider;
 import org.javai.punit.api.UseCase;
-import org.javai.punit.api.UseCaseContract;
 import org.javai.punit.examples.infrastructure.payment.MockPaymentGateway;
 import org.javai.punit.examples.infrastructure.payment.PaymentGateway;
 import org.javai.punit.examples.infrastructure.payment.PaymentResult;
@@ -35,7 +34,7 @@ import java.util.List;
  * @see org.javai.punit.examples.tests.PaymentGatewaySlaTest
  */
 @UseCase(description = "Process payment transactions through a payment gateway")
-public class PaymentGatewayUseCase implements UseCaseContract {
+public class PaymentGatewayUseCase {
 
     private final PaymentGateway gateway;
     private String region = "us-east-1";

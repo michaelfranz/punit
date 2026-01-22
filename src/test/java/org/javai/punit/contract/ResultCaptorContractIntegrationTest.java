@@ -14,6 +14,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("ResultCaptor contract integration")
+@SuppressWarnings("deprecation")
 class ResultCaptorContractIntegrationTest {
 
     private ResultCaptor captor;

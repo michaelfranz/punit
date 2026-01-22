@@ -39,14 +39,19 @@ public final class PostconditionResultAdapter {
      */
     public static CriterionOutcome toCriterionOutcome(PostconditionResult result) {
         Objects.requireNonNull(result, "result must not be null");
-        return switch (result) {
-            case PostconditionResult.Passed p -> new CriterionOutcome.Passed(p.description());
-            case PostconditionResult.Failed f -> new CriterionOutcome.Failed(
-                    f.description(),
-                    f.reason() != null ? f.reason() : "Postcondition not satisfied"
+        if (result.passed()) {
+            return new CriterionOutcome.Passed(result.description());
+        } else {
+            String reason = result.failureReason();
+            // Check if this is a "skipped" failure (starts with "Skipped:")
+            if (reason != null && reason.startsWith("Skipped:")) {
+                return new CriterionOutcome.NotEvaluated(result.description());
+            }
+            return new CriterionOutcome.Failed(
+                    result.description(),
+                    reason != null ? reason : "Postcondition not satisfied"
             );
-            case PostconditionResult.Skipped s -> new CriterionOutcome.NotEvaluated(s.description());
-        };
+        }
     }
 
     /**

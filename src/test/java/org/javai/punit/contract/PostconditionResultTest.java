@@ -11,120 +11,107 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PostconditionResultTest {
 
     @Nested
-    @DisplayName("Passed")
+    @DisplayName("passed()")
     class PassedTests {
 
         @Test
         @DisplayName("creates passed result with description")
         void createsPassedResult() {
-            PostconditionResult result = new PostconditionResult.Passed("Valid JSON");
+            PostconditionResult result = PostconditionResult.passed("Valid JSON");
 
             assertThat(result.description()).isEqualTo("Valid JSON");
             assertThat(result.passed()).isTrue();
             assertThat(result.failed()).isFalse();
-            assertThat(result.skipped()).isFalse();
-            assertThat(result.wasEvaluated()).isTrue();
+            assertThat(result.failureReason()).isNull();
         }
 
         @Test
-        @DisplayName("throws when description is null")
-        void throwsWhenDescriptionIsNull() {
-            assertThatThrownBy(() -> new PostconditionResult.Passed(null))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessageContaining("description must not be null");
+        @DisplayName("creates passed result with value")
+        void createsPassedResultWithValue() {
+            PostconditionResult result = PostconditionResult.passed("Parse number", 42);
+
+            assertThat(result.description()).isEqualTo("Parse number");
+            assertThat(result.passed()).isTrue();
+            assertThat(result.failed()).isFalse();
+            assertThat(result.outcome().getOrThrow()).isEqualTo(42);
         }
     }
 
     @Nested
-    @DisplayName("Failed")
+    @DisplayName("failed()")
     class FailedTests {
 
         @Test
         @DisplayName("creates failed result with description and reason")
         void createsFailedResultWithReason() {
-            PostconditionResult result = new PostconditionResult.Failed("Has operations", "Array was empty");
+            PostconditionResult result = PostconditionResult.failed("Has operations", "Array was empty");
 
             assertThat(result.description()).isEqualTo("Has operations");
             assertThat(result.passed()).isFalse();
             assertThat(result.failed()).isTrue();
-            assertThat(result.skipped()).isFalse();
-            assertThat(result.wasEvaluated()).isTrue();
-            assertThat(((PostconditionResult.Failed) result).reason()).isEqualTo("Array was empty");
+            assertThat(result.failureReason()).isEqualTo("Array was empty");
         }
 
         @Test
-        @DisplayName("creates failed result with no reason")
-        void createsFailedResultWithoutReason() {
-            PostconditionResult result = new PostconditionResult.Failed("Has operations");
+        @DisplayName("creates failed result with default reason")
+        void createsFailedResultWithDefaultReason() {
+            PostconditionResult result = PostconditionResult.failed("Has operations");
 
             assertThat(result.description()).isEqualTo("Has operations");
             assertThat(result.failed()).isTrue();
-            assertThat(((PostconditionResult.Failed) result).reason()).isNull();
-        }
-
-        @Test
-        @DisplayName("throws when description is null")
-        void throwsWhenDescriptionIsNull() {
-            assertThatThrownBy(() -> new PostconditionResult.Failed(null))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessageContaining("description must not be null");
-        }
-    }
-
-    @Nested
-    @DisplayName("Skipped")
-    class SkippedTests {
-
-        @Test
-        @DisplayName("creates skipped result with description and reason")
-        void createsSkippedResult() {
-            PostconditionResult result = new PostconditionResult.Skipped(
-                    "Has operations", "Derivation 'Valid JSON' failed");
-
-            assertThat(result.description()).isEqualTo("Has operations");
-            assertThat(result.passed()).isFalse();
-            assertThat(result.failed()).isFalse();
-            assertThat(result.skipped()).isTrue();
-            assertThat(result.wasEvaluated()).isFalse();
-            assertThat(((PostconditionResult.Skipped) result).reason())
-                    .isEqualTo("Derivation 'Valid JSON' failed");
-        }
-
-        @Test
-        @DisplayName("throws when description is null")
-        void throwsWhenDescriptionIsNull() {
-            assertThatThrownBy(() -> new PostconditionResult.Skipped(null, "reason"))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessageContaining("description must not be null");
+            assertThat(result.failureReason()).isEqualTo("Postcondition not satisfied");
         }
 
         @Test
         @DisplayName("throws when reason is null")
         void throwsWhenReasonIsNull() {
-            assertThatThrownBy(() -> new PostconditionResult.Skipped("description", null))
+            assertThatThrownBy(() -> PostconditionResult.failed("desc", null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("reason must not be null");
         }
     }
 
     @Nested
-    @DisplayName("pattern matching")
-    class PatternMatchingTests {
+    @DisplayName("constructor")
+    class ConstructorTests {
 
         @Test
-        @DisplayName("can pattern match on all result types")
-        void canPatternMatchOnAllTypes() {
-            assertThat(describe(new PostconditionResult.Passed("A"))).isEqualTo("PASSED: A");
-            assertThat(describe(new PostconditionResult.Failed("B", "reason"))).isEqualTo("FAILED: B");
-            assertThat(describe(new PostconditionResult.Skipped("C", "reason"))).isEqualTo("SKIPPED: C");
+        @DisplayName("throws when description is null")
+        void throwsWhenDescriptionIsNull() {
+            assertThatThrownBy(() -> new PostconditionResult(null, Outcomes.okVoid()))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("description must not be null");
         }
 
-        private String describe(PostconditionResult result) {
-            return switch (result) {
-                case PostconditionResult.Passed p -> "PASSED: " + p.description();
-                case PostconditionResult.Failed f -> "FAILED: " + f.description();
-                case PostconditionResult.Skipped s -> "SKIPPED: " + s.description();
-            };
+        @Test
+        @DisplayName("throws when outcome is null")
+        void throwsWhenOutcomeIsNull() {
+            assertThatThrownBy(() -> new PostconditionResult("desc", null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("outcome must not be null");
+        }
+    }
+
+    @Nested
+    @DisplayName("outcome access")
+    class OutcomeAccessTests {
+
+        @Test
+        @DisplayName("can access underlying outcome for passed result")
+        void canAccessOutcomeForPassed() {
+            PostconditionResult result = PostconditionResult.passed("test", "value");
+
+            assertThat(result.outcome().isOk()).isTrue();
+            assertThat(result.outcome().getOrThrow()).isEqualTo("value");
+        }
+
+        @Test
+        @DisplayName("can access underlying outcome for failed result")
+        void canAccessOutcomeForFailed() {
+            PostconditionResult result = PostconditionResult.failed("test", "error message");
+
+            assertThat(result.outcome().isOk()).isFalse();
+            assertThat(Outcomes.failureMessage(result.outcome())).isEqualTo("error message");
         }
     }
 }

@@ -287,8 +287,11 @@ class ServiceContractTest {
             assertThat(results).hasSize(3);
             assertThat(results.get(0).failed()).isTrue();
             assertThat(results.get(0).description()).isEqualTo("Valid number");
-            assertThat(results.get(1).skipped()).isTrue();
-            assertThat(results.get(2).skipped()).isTrue();
+            // Skipped postconditions are represented as failures with "Skipped:" prefix
+            assertThat(results.get(1).failed()).isTrue();
+            assertThat(results.get(1).failureReason()).startsWith("Skipped:");
+            assertThat(results.get(2).failed()).isTrue();
+            assertThat(results.get(2).failureReason()).startsWith("Skipped:");
         }
 
         @Test
@@ -312,11 +315,12 @@ class ServiceContractTest {
             List<PostconditionResult> results = contract.evaluate("hello");
 
             assertThat(results).hasSize(4);
-            // First derivation: Failed + Skipped
+            // First derivation: Failed + Skipped (skipped = failed with "Skipped:" prefix)
             assertThat(results.get(0).failed()).isTrue();
             assertThat(results.get(0).description()).isEqualTo("Valid number");
-            assertThat(results.get(1).skipped()).isTrue();
+            assertThat(results.get(1).failed()).isTrue();
             assertThat(results.get(1).description()).isEqualTo("Positive");
+            assertThat(results.get(1).failureReason()).startsWith("Skipped:");
             // Second derivation: Passed + Passed
             assertThat(results.get(2).passed()).isTrue();
             assertThat(results.get(2).description()).isEqualTo("Uppercase");

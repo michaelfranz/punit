@@ -54,44 +54,44 @@ class PostconditionTest {
     class EvaluateTests {
 
         @Test
-        @DisplayName("returns Passed when predicate returns true")
+        @DisplayName("returns passed when predicate returns true")
         void returnsPassed() {
             Postcondition<String> postcondition = new Postcondition<>(
                     "Is not empty", s -> !s.isEmpty());
 
             PostconditionResult result = postcondition.evaluate("hello");
 
-            assertThat(result).isInstanceOf(PostconditionResult.Passed.class);
-            assertThat(result.description()).isEqualTo("Is not empty");
             assertThat(result.passed()).isTrue();
+            assertThat(result.description()).isEqualTo("Is not empty");
+            assertThat(result.failureReason()).isNull();
         }
 
         @Test
-        @DisplayName("returns Failed when predicate returns false")
+        @DisplayName("returns failed when predicate returns false")
         void returnsFailed() {
             Postcondition<String> postcondition = new Postcondition<>(
                     "Is not empty", s -> !s.isEmpty());
 
             PostconditionResult result = postcondition.evaluate("");
 
-            assertThat(result).isInstanceOf(PostconditionResult.Failed.class);
-            assertThat(result.description()).isEqualTo("Is not empty");
             assertThat(result.failed()).isTrue();
-            assertThat(((PostconditionResult.Failed) result).reason()).isNull();
+            assertThat(result.description()).isEqualTo("Is not empty");
+            assertThat(result.failureReason()).isEqualTo("Postcondition not satisfied");
         }
 
         @Test
-        @DisplayName("returns Failed with message when predicate throws exception")
+        @DisplayName("returns failed with message when predicate throws exception")
         void returnsFailedWhenPredicateThrows() {
             Postcondition<String> postcondition = new Postcondition<>(
                     "Has length", s -> s.length() > 0);
 
             PostconditionResult result = postcondition.evaluate(null);
 
-            assertThat(result).isInstanceOf(PostconditionResult.Failed.class);
-            assertThat(result.description()).isEqualTo("Has length");
             assertThat(result.failed()).isTrue();
-            assertThat(((PostconditionResult.Failed) result).reason()).isNotNull();
+            assertThat(result.description()).isEqualTo("Has length");
+            assertThat(result.failureReason()).isNotNull();
+            // Modern Java NPE provides descriptive message about the null access
+            assertThat(result.failureReason()).containsIgnoringCase("null");
         }
 
         @Test
@@ -117,18 +117,16 @@ class PostconditionTest {
     class SkipTests {
 
         @Test
-        @DisplayName("creates Skipped result with description and reason")
+        @DisplayName("creates failed result with skip reason")
         void createsSkippedResult() {
             Postcondition<String> postcondition = new Postcondition<>(
                     "Has operations", s -> true);
 
             PostconditionResult result = postcondition.skip("Derivation 'Valid JSON' failed");
 
-            assertThat(result).isInstanceOf(PostconditionResult.Skipped.class);
+            assertThat(result.failed()).isTrue();
             assertThat(result.description()).isEqualTo("Has operations");
-            assertThat(result.skipped()).isTrue();
-            assertThat(((PostconditionResult.Skipped) result).reason())
-                    .isEqualTo("Derivation 'Valid JSON' failed");
+            assertThat(result.failureReason()).isEqualTo("Skipped: Derivation 'Valid JSON' failed");
         }
     }
 

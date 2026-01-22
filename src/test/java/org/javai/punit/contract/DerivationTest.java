@@ -90,11 +90,11 @@ class DerivationTest {
             List<PostconditionResult> results = derivation.evaluate("42");
 
             assertThat(results).hasSize(3);
-            assertThat(results.get(0)).isInstanceOf(PostconditionResult.Passed.class);
+            assertThat(results.get(0).passed()).isTrue();
             assertThat(results.get(0).description()).isEqualTo("Valid number");
-            assertThat(results.get(1)).isInstanceOf(PostconditionResult.Passed.class);
+            assertThat(results.get(1).passed()).isTrue();
             assertThat(results.get(1).description()).isEqualTo("Positive");
-            assertThat(results.get(2)).isInstanceOf(PostconditionResult.Passed.class);
+            assertThat(results.get(2).passed()).isTrue();
             assertThat(results.get(2).description()).isEqualTo("Less than 100");
         }
 
@@ -117,13 +117,16 @@ class DerivationTest {
             List<PostconditionResult> results = derivation.evaluate("not-a-number");
 
             assertThat(results).hasSize(3);
-            assertThat(results.get(0)).isInstanceOf(PostconditionResult.Failed.class);
+            assertThat(results.get(0).failed()).isTrue();
             assertThat(results.get(0).description()).isEqualTo("Valid number");
-            assertThat(((PostconditionResult.Failed) results.get(0)).reason()).isEqualTo("Not a number");
-            assertThat(results.get(1)).isInstanceOf(PostconditionResult.Skipped.class);
+            assertThat(results.get(0).failureReason()).isEqualTo("Not a number");
+            // Skipped postconditions are represented as failures with "Skipped:" prefix
+            assertThat(results.get(1).failed()).isTrue();
             assertThat(results.get(1).description()).isEqualTo("Positive");
-            assertThat(results.get(2)).isInstanceOf(PostconditionResult.Skipped.class);
+            assertThat(results.get(1).failureReason()).startsWith("Skipped:");
+            assertThat(results.get(2).failed()).isTrue();
             assertThat(results.get(2).description()).isEqualTo("Less than 100");
+            assertThat(results.get(2).failureReason()).startsWith("Skipped:");
         }
 
         @Test
@@ -137,9 +140,10 @@ class DerivationTest {
             List<PostconditionResult> results = derivation.evaluate("not-a-number");
 
             assertThat(results).hasSize(2);
-            assertThat(results.get(0)).isInstanceOf(PostconditionResult.Failed.class);
+            assertThat(results.get(0).failed()).isTrue();
             assertThat(results.get(0).description()).isEqualTo("Valid number");
-            assertThat(results.get(1)).isInstanceOf(PostconditionResult.Skipped.class);
+            assertThat(results.get(1).failed()).isTrue();
+            assertThat(results.get(1).failureReason()).startsWith("Skipped:");
         }
 
         @Test
@@ -153,7 +157,7 @@ class DerivationTest {
             List<PostconditionResult> results = derivation.evaluate("hello");
 
             assertThat(results).hasSize(1);
-            assertThat(results.get(0)).isInstanceOf(PostconditionResult.Passed.class);
+            assertThat(results.get(0).passed()).isTrue();
             assertThat(results.get(0).description()).isEqualTo("Uppercase");
         }
     }

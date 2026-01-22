@@ -33,8 +33,26 @@ public final class Outcomes {
 
     private static final FailureCode CONTRACT_FAILURE_CODE = FailureCode.of("contract", "derivation");
 
+    /**
+     * Sentinel value representing a successful outcome with no meaningful value.
+     */
+    private static final Object VOID_SUCCESS = new Object();
+
     private Outcomes() {
         // Utility class
+    }
+
+    /**
+     * Creates a successful outcome with no associated value.
+     *
+     * <p>Use this for postconditions that don't produce a meaningful value,
+     * such as simple predicate checks.
+     *
+     * @return a successful outcome
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Outcome<T> okVoid() {
+        return (Outcome<T>) Outcome.ok(VOID_SUCCESS);
     }
 
     /**

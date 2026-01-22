@@ -1,13 +1,16 @@
 package org.javai.punit.experiment.engine.shared;
 
-import org.javai.punit.api.ResultCaptor;
+import org.javai.punit.api.OutcomeCaptor;
+import org.javai.punit.contract.PostconditionResult;
 import org.javai.punit.experiment.engine.ExperimentResultAggregator;
 import org.javai.punit.model.CriterionOutcome;
 import org.javai.punit.model.UseCaseCriteria;
 import org.javai.punit.model.UseCaseResult;
 
+import java.util.List;
+
 /**
- * Records results from a ResultCaptor into an ExperimentResultAggregator.
+ * Records outcomes from an OutcomeCaptor into an ExperimentResultAggregator.
  *
  * <p>Handles success/failure determination and failure categorization.
  */
@@ -18,32 +21,53 @@ public final class ResultRecorder {
     }
 
     /**
-     * Records the result from the captor into the aggregator.
+     * Records the outcome from the captor into the aggregator.
      *
      * <p>Success is determined in priority order:
      * <ol>
-     *   <li>If criteria are recorded, use {@code criteria.allPassed()}</li>
+     *   <li>If a contract outcome is recorded, use {@code allPostconditionsPassed()}</li>
+     *   <li>If legacy criteria are recorded, use {@code criteria.allPassed()}</li>
      *   <li>Otherwise, fall back to legacy heuristics</li>
      * </ol>
      */
-    public static void recordResult(ResultCaptor captor, ExperimentResultAggregator aggregator) {
+    public static void recordResult(OutcomeCaptor captor, ExperimentResultAggregator aggregator) {
         if (captor != null && captor.hasResult()) {
             UseCaseResult result = captor.getResult();
 
-            // Determine success: prefer criteria if available
+            // Determine success: prefer contract postconditions, then legacy criteria
             boolean success;
-            if (captor.hasCriteria()) {
-                success = captor.getCriteria().allPassed();
-                aggregator.recordCriteria(captor.getCriteria());
-            } else {
-                success = determineSuccess(result);
-            }
+            if (captor.hasContractOutcome()) {
+                // New path: use contract postconditions directly
+                success = captor.allPostconditionsPassed();
+                List<PostconditionResult> postconditions = captor.getPostconditionResults();
+                aggregator.recordPostconditions(postconditions);
 
-            if (success) {
-                aggregator.recordSuccess(result);
+                if (success) {
+                    aggregator.recordSuccess(result);
+                } else {
+                    String failureCategory = determineFailureCategoryFromPostconditions(postconditions);
+                    aggregator.recordFailure(result, failureCategory);
+                }
+            } else if (captor.hasCriteria()) {
+                // Legacy path: use criteria
+                success = captor.getCriteria().allPassed();
+                recordCriteriaLegacy(aggregator, captor.getCriteria());
+
+                if (success) {
+                    aggregator.recordSuccess(result);
+                } else {
+                    String failureCategory = determineFailureCategory(result, captor.getCriteria());
+                    aggregator.recordFailure(result, failureCategory);
+                }
             } else {
-                String failureCategory = determineFailureCategory(result, captor.getCriteria());
-                aggregator.recordFailure(result, failureCategory);
+                // No criteria: use heuristics
+                success = determineSuccess(result);
+                if (success) {
+                    aggregator.recordSuccess(result);
+                } else {
+                    String failureCategory = determineFailureCategory(result, null);
+                    aggregator.recordFailure(result, failureCategory);
+                }
             }
         } else if (captor != null && captor.hasException()) {
             aggregator.recordException(captor.getException());
@@ -77,6 +101,28 @@ public final class ResultRecorder {
 
         // Default to success if no failure indicators
         return true;
+    }
+
+    /**
+     * Records criteria using the deprecated method (suppresses warning).
+     */
+    @SuppressWarnings("deprecation")
+    private static void recordCriteriaLegacy(ExperimentResultAggregator aggregator, UseCaseCriteria criteria) {
+        aggregator.recordCriteria(criteria);
+    }
+
+    /**
+     * Determines the failure category from postcondition results.
+     */
+    private static String determineFailureCategoryFromPostconditions(List<PostconditionResult> postconditions) {
+        if (postconditions != null) {
+            for (PostconditionResult result : postconditions) {
+                if (result.failed()) {
+                    return result.description();
+                }
+            }
+        }
+        return "unknown";
     }
 
     /**

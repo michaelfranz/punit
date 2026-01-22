@@ -58,13 +58,13 @@ public record Derivation<R, D>(
      *
      * <p>If the derivation function succeeds:
      * <ul>
-     *   <li>Adds a Passed result for the derivation description</li>
+     *   <li>Adds a passed result for the derivation description (with derived value)</li>
      *   <li>Evaluates all nested postconditions</li>
      * </ul>
      *
      * <p>If the derivation function fails:
      * <ul>
-     *   <li>Adds a Failed result for the derivation description</li>
+     *   <li>Adds a failed result for the derivation description</li>
      *   <li>Skips all nested postconditions</li>
      * </ul>
      *
@@ -78,7 +78,7 @@ public record Derivation<R, D>(
         try {
             derivationOutcome = function.apply(result);
         } catch (Exception e) {
-            results.add(new PostconditionResult.Failed(description, e.getMessage()));
+            results.add(PostconditionResult.failed(description, e.getMessage()));
             for (Postcondition<D> postcondition : postconditions) {
                 results.add(postcondition.skip("Derivation '" + description + "' failed"));
             }
@@ -86,13 +86,13 @@ public record Derivation<R, D>(
         }
 
         if (derivationOutcome.isOk()) {
-            results.add(new PostconditionResult.Passed(description));
             D derivedValue = derivationOutcome.getOrThrow();
+            results.add(PostconditionResult.passed(description, derivedValue));
             for (Postcondition<D> postcondition : postconditions) {
                 results.add(postcondition.evaluate(derivedValue));
             }
         } else {
-            results.add(new PostconditionResult.Failed(description, Outcomes.failureMessage(derivationOutcome)));
+            results.add(PostconditionResult.failed(description, Outcomes.failureMessage(derivationOutcome)));
             for (Postcondition<D> postcondition : postconditions) {
                 results.add(postcondition.skip("Derivation '" + description + "' failed"));
             }

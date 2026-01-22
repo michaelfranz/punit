@@ -1,136 +1,119 @@
 package org.javai.punit.contract;
 
+import org.javai.outcome.Outcome;
+
 import java.util.Objects;
 
 /**
  * The result of evaluating a postcondition.
  *
- * <p>A postcondition can be in one of three states after evaluation:
+ * <p>A postcondition result wraps an {@link Outcome} which provides:
  * <ul>
- *   <li>{@link Passed} — The condition was satisfied</li>
- *   <li>{@link Failed} — The condition was not satisfied</li>
- *   <li>{@link Skipped} — The condition was not evaluated (e.g., due to a failed derivation)</li>
+ *   <li>Success/failure semantics</li>
+ *   <li>A failure reason when applicable</li>
+ *   <li>An optional value for derivation results</li>
  * </ul>
  *
- * <h2>Skipped Postconditions</h2>
- * <p>When a derivation fails, all postconditions that depend on the derived value are
- * skipped. Skipped postconditions are not counted in pass/fail statistics, preventing
- * artificial inflation of failure counts.
+ * <h2>Factory Methods</h2>
+ * <pre>{@code
+ * // Simple pass/fail
+ * PostconditionResult.passed("Response not empty");
+ * PostconditionResult.failed("Valid JSON", "Parse error at line 5");
  *
+ * // With derivation value
+ * PostconditionResult.passed("Parse JSON", jsonNode);
+ * }</pre>
+ *
+ * @param description the human-readable description of the postcondition
+ * @param outcome the evaluation outcome (success or failure with reason)
  * @see Postcondition
  * @see ServiceContract
  */
-public sealed interface PostconditionResult {
+public record PostconditionResult(String description, Outcome<?> outcome) {
 
     /**
-     * Returns the description of the postcondition.
+     * Creates a postcondition result.
      *
-     * @return the postcondition description
+     * @throws NullPointerException if description or outcome is null
      */
-    String description();
+    public PostconditionResult {
+        Objects.requireNonNull(description, "description must not be null");
+        Objects.requireNonNull(outcome, "outcome must not be null");
+    }
 
     /**
      * Returns true if this postcondition passed.
      *
-     * @return true if passed, false otherwise
+     * @return true if the outcome is successful
      */
-    default boolean passed() {
-        return this instanceof Passed;
+    public boolean passed() {
+        return outcome.isOk();
     }
 
     /**
      * Returns true if this postcondition failed.
      *
-     * @return true if failed, false otherwise
+     * @return true if the outcome is a failure
      */
-    default boolean failed() {
-        return this instanceof Failed;
+    public boolean failed() {
+        return !outcome.isOk();
     }
 
     /**
-     * Returns true if this postcondition was skipped.
+     * Returns the failure reason, or null if passed.
      *
-     * @return true if skipped, false otherwise
+     * @return the failure reason, or null
      */
-    default boolean skipped() {
-        return this instanceof Skipped;
+    public String failureReason() {
+        return failed() ? Outcomes.failureMessage(outcome) : null;
     }
 
-    /**
-     * Returns true if this postcondition was evaluated (not skipped).
-     *
-     * @return true if evaluated, false if skipped
-     */
-    default boolean wasEvaluated() {
-        return !skipped();
-    }
+    // ========== Factory Methods ==========
 
     /**
-     * A postcondition that passed.
+     * Creates a passed result with no associated value.
      *
      * @param description the postcondition description
+     * @return a passed result
      */
-    record Passed(String description) implements PostconditionResult {
-
-        /**
-         * Creates a passed result.
-         *
-         * @param description the postcondition description (must not be null)
-         */
-        public Passed {
-            Objects.requireNonNull(description, "description must not be null");
-        }
+    public static PostconditionResult passed(String description) {
+        return new PostconditionResult(description, Outcomes.okVoid());
     }
 
     /**
-     * A postcondition that failed.
+     * Creates a passed result with an associated value.
+     *
+     * <p>This is typically used for derivations where the derived value
+     * may be useful for debugging or inspection.
      *
      * @param description the postcondition description
-     * @param reason the failure reason (optional, may be null)
+     * @param value the derived or computed value
+     * @param <T> the value type
+     * @return a passed result with the value
      */
-    record Failed(String description, String reason) implements PostconditionResult {
-
-        /**
-         * Creates a failed result.
-         *
-         * @param description the postcondition description (must not be null)
-         * @param reason the failure reason (may be null)
-         */
-        public Failed {
-            Objects.requireNonNull(description, "description must not be null");
-        }
-
-        /**
-         * Creates a failed result with no specific reason.
-         *
-         * @param description the postcondition description
-         */
-        public Failed(String description) {
-            this(description, null);
-        }
+    public static <T> PostconditionResult passed(String description, T value) {
+        return new PostconditionResult(description, Outcomes.ok(value));
     }
 
     /**
-     * A postcondition that was skipped (not evaluated).
-     *
-     * <p>Postconditions are skipped when their prerequisite derivation fails.
-     * For example, if JSON parsing fails, postconditions that check JSON structure
-     * are skipped rather than failed.
+     * Creates a failed result with a reason.
      *
      * @param description the postcondition description
-     * @param reason the reason for skipping
+     * @param reason the failure reason
+     * @return a failed result
      */
-    record Skipped(String description, String reason) implements PostconditionResult {
+    public static PostconditionResult failed(String description, String reason) {
+        Objects.requireNonNull(reason, "reason must not be null");
+        return new PostconditionResult(description, Outcomes.fail(reason));
+    }
 
-        /**
-         * Creates a skipped result.
-         *
-         * @param description the postcondition description (must not be null)
-         * @param reason the reason for skipping (must not be null)
-         */
-        public Skipped {
-            Objects.requireNonNull(description, "description must not be null");
-            Objects.requireNonNull(reason, "reason must not be null");
-        }
+    /**
+     * Creates a failed result with a default reason.
+     *
+     * @param description the postcondition description
+     * @return a failed result
+     */
+    public static PostconditionResult failed(String description) {
+        return failed(description, "Postcondition not satisfied");
     }
 }

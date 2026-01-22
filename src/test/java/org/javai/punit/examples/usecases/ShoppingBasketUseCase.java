@@ -11,7 +11,6 @@ import org.javai.punit.api.FactorProvider;
 import org.javai.punit.api.FactorSetter;
 import org.javai.punit.api.StandardCovariate;
 import org.javai.punit.api.UseCase;
-import org.javai.punit.api.UseCaseContract;
 import org.javai.punit.examples.infrastructure.llm.ChatLlm;
 import org.javai.punit.examples.infrastructure.llm.ChatResponse;
 import org.javai.punit.examples.infrastructure.llm.MockChatLlm;
@@ -74,7 +73,7 @@ import java.util.Set;
                 @Covariate(key = "temperature", category = CovariateCategory.CONFIGURATION)
         }
 )
-public class ShoppingBasketUseCase implements UseCaseContract {
+public class ShoppingBasketUseCase {
 
     private static final Set<String> VALID_ACTIONS = Set.of("add", "remove", "clear");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

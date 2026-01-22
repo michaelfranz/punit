@@ -29,8 +29,12 @@ import org.junit.jupiter.api.Test;
  * <p>The {@code recordResult()} method now checks if criteria are recorded and uses
  * {@code criteria.allPassed()} to determine success. Legacy heuristics are only used
  * as a fallback when no criteria are present.
+ *
+ * <p>Note: These tests use the legacy {@link UseCaseCriteria} API. New code should
+ * use the contract-based {@code PostconditionResult} system instead.
  */
 @DisplayName("Criteria-Based Success Determination")
+@SuppressWarnings("deprecation")
 class CriteriaBasedSuccessDeterminationTest {
 
     private ExperimentResultAggregator aggregator;

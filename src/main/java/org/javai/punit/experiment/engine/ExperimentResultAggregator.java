@@ -6,7 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.javai.punit.spec.criteria.CriteriaOutcomeAggregator;
+import org.javai.punit.contract.PostconditionResult;
+import org.javai.punit.spec.criteria.PostconditionAggregator;
 import org.javai.punit.experiment.model.ResultProjection;
 import org.javai.punit.model.UseCaseCriteria;
 import org.javai.punit.model.UseCaseResult;
@@ -36,7 +37,7 @@ public class ExperimentResultAggregator {
     private final Map<String, Integer> failureDistribution = new LinkedHashMap<>();
     private final List<UseCaseResult> results = new ArrayList<>();
     private final List<ResultProjection> resultProjections = new ArrayList<>();
-    private final CriteriaOutcomeAggregator criteriaAggregator = new CriteriaOutcomeAggregator();
+    private final PostconditionAggregator postconditionAggregator = new PostconditionAggregator();
     private String terminationReason = null;
     private String terminationDetails = null;
     
@@ -131,16 +132,32 @@ public class ExperimentResultAggregator {
     }
     
     /**
+     * Records postcondition outcomes for a sample.
+     *
+     * <p>The postcondition results are aggregated for statistical reporting.
+     *
+     * @param results the postcondition results to record
+     */
+    public void recordPostconditions(List<PostconditionResult> results) {
+        if (results != null) {
+            postconditionAggregator.record(results);
+        }
+    }
+
+    /**
      * Records success criteria outcomes for a sample.
      *
      * <p>The criteria's {@code evaluate()} method is called to obtain outcomes,
      * which are then aggregated for statistical reporting.
      *
      * @param criteria the success criteria to record
+     * @deprecated Use {@link #recordPostconditions(List)} instead
      */
+    @Deprecated(forRemoval = true)
+    @SuppressWarnings("deprecation")
     public void recordCriteria(UseCaseCriteria criteria) {
         if (criteria != null) {
-            criteriaAggregator.record(criteria);
+            postconditionAggregator.record(criteria);
         }
     }
     
@@ -315,23 +332,57 @@ public class ExperimentResultAggregator {
     }
     
     /**
+     * Returns the postcondition aggregator.
+     *
+     * @return the postcondition aggregator
+     */
+    public PostconditionAggregator getPostconditionAggregator() {
+        return postconditionAggregator;
+    }
+
+    /**
+     * Returns true if any postconditions have been recorded.
+     *
+     * @return true if postcondition stats are available
+     */
+    public boolean hasPostconditionStats() {
+        return postconditionAggregator.getSamplesRecorded() > 0;
+    }
+
+    /**
+     * Returns a summary of postcondition pass rates.
+     *
+     * <p>This is a convenience method that returns a map of postcondition
+     * descriptions to their observed pass rates. Useful for spec generation.
+     *
+     * @return map of postcondition descriptions to pass rates
+     */
+    public Map<String, Double> getPostconditionPassRates() {
+        return postconditionAggregator.getPassRateSummary();
+    }
+
+    /**
      * Returns the criteria outcome aggregator.
      *
      * @return the criteria aggregator
+     * @deprecated Use {@link #getPostconditionAggregator()} instead
      */
-    public CriteriaOutcomeAggregator getCriteriaAggregator() {
-        return criteriaAggregator;
+    @Deprecated(forRemoval = true)
+    public PostconditionAggregator getCriteriaAggregator() {
+        return postconditionAggregator;
     }
-    
+
     /**
      * Returns true if any criteria have been recorded.
      *
      * @return true if criteria stats are available
+     * @deprecated Use {@link #hasPostconditionStats()} instead
      */
+    @Deprecated(forRemoval = true)
     public boolean hasCriteriaStats() {
-        return criteriaAggregator.getSamplesRecorded() > 0;
+        return postconditionAggregator.getSamplesRecorded() > 0;
     }
-    
+
     /**
      * Returns a summary of criterion pass rates.
      *
@@ -339,9 +390,11 @@ public class ExperimentResultAggregator {
      * descriptions to their observed pass rates. Useful for spec generation.
      *
      * @return map of criterion descriptions to pass rates
+     * @deprecated Use {@link #getPostconditionPassRates()} instead
      */
+    @Deprecated(forRemoval = true)
     public Map<String, Double> getCriteriaPassRates() {
-        return criteriaAggregator.getPassRateSummary();
+        return postconditionAggregator.getPassRateSummary();
     }
 }
 

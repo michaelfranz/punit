@@ -51,16 +51,20 @@ public record Postcondition<T>(String description, Predicate<T> predicate) {
      * Evaluates this postcondition against a value.
      *
      * @param value the value to evaluate against
-     * @return the result of evaluation (Passed or Failed)
+     * @return the result of evaluation (passed or failed)
      */
     public PostconditionResult evaluate(T value) {
         try {
             boolean result = predicate.test(value);
             return result
-                    ? new PostconditionResult.Passed(description)
-                    : new PostconditionResult.Failed(description);
+                    ? PostconditionResult.passed(description)
+                    : PostconditionResult.failed(description);
         } catch (Exception e) {
-            return new PostconditionResult.Failed(description, e.getMessage());
+            String message = e.getMessage();
+            String reason = (message != null && !message.isBlank())
+                    ? message
+                    : e.getClass().getSimpleName();
+            return PostconditionResult.failed(description, reason);
         }
     }
 
@@ -68,12 +72,13 @@ public record Postcondition<T>(String description, Predicate<T> predicate) {
      * Creates a skipped result for this postcondition.
      *
      * <p>Used when a prerequisite derivation fails and this postcondition
-     * cannot be meaningfully evaluated.
+     * cannot be meaningfully evaluated. Skipped is represented as a failure
+     * with the skip reason.
      *
      * @param reason the reason for skipping
-     * @return a skipped result
+     * @return a failed result with the skip reason
      */
     public PostconditionResult skip(String reason) {
-        return new PostconditionResult.Skipped(description, reason);
+        return PostconditionResult.failed(description, "Skipped: " + reason);
     }
 }
