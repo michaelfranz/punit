@@ -25,49 +25,26 @@ import java.util.function.Predicate;
  *     // ...
  * }</pre>
  *
+ * @param description the human-readable description
+ * @param predicate the condition to evaluate
  * @param <I> the type of input this precondition evaluates
  * @see ServiceContract
  * @see UseCasePreconditionException
  */
-public final class Precondition<I> {
-
-    private final String description;
-    private final Predicate<I> predicate;
+public record Precondition<I>(String description, Predicate<I> predicate) {
 
     /**
      * Creates a new precondition.
      *
-     * @param description the human-readable description
-     * @param predicate the condition to evaluate
      * @throws NullPointerException if description or predicate is null
      * @throws IllegalArgumentException if description is blank
      */
-    public Precondition(String description, Predicate<I> predicate) {
+    public Precondition {
         Objects.requireNonNull(description, "description must not be null");
         Objects.requireNonNull(predicate, "predicate must not be null");
         if (description.isBlank()) {
             throw new IllegalArgumentException("description must not be blank");
         }
-        this.description = description;
-        this.predicate = predicate;
-    }
-
-    /**
-     * Returns the description of this precondition.
-     *
-     * @return the description
-     */
-    public String description() {
-        return description;
-    }
-
-    /**
-     * Returns the predicate for this precondition.
-     *
-     * @return the predicate
-     */
-    public Predicate<I> predicate() {
-        return predicate;
     }
 
     /**
@@ -87,10 +64,5 @@ public final class Precondition<I> {
             throw new UseCasePreconditionException(
                     description + " (evaluation failed: " + e.getMessage() + ")", input);
         }
-    }
-
-    @Override
-    public String toString() {
-        return "Precondition[" + description + "]";
     }
 }

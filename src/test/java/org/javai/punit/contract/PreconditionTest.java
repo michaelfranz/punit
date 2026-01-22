@@ -91,18 +91,4 @@ class PreconditionTest {
                     .hasMessageContaining("evaluation failed");
         }
     }
-
-    @Nested
-    @DisplayName("toString()")
-    class ToStringTests {
-
-        @Test
-        @DisplayName("returns descriptive string")
-        void returnsDescriptiveString() {
-            Precondition<String> precondition = new Precondition<>(
-                    "Not empty", s -> !s.isEmpty());
-
-            assertThat(precondition.toString()).isEqualTo("Precondition[Not empty]");
-        }
-    }
 }

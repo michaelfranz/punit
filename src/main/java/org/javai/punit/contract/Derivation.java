@@ -1,7 +1,6 @@
 package org.javai.punit.contract;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -29,43 +28,32 @@ import java.util.function.Function;
  *   <li>Nested postconditions are always evaluated</li>
  * </ul>
  *
+ * @param description the description (null for infallible derivations)
+ * @param function the derivation function
+ * @param postconditions the postconditions to evaluate on the derived value
  * @param <R> the raw result type
  * @param <D> the derived type
  * @see ServiceContract
  */
-public final class Derivation<R, D> {
-
-    private final String description;
-    private final Function<R, Outcome<D>> function;
-    private final List<Postcondition<D>> postconditions;
+public record Derivation<R, D>(
+        String description,
+        Function<R, Outcome<D>> function,
+        List<Postcondition<D>> postconditions
+) {
 
     /**
      * Creates a new derivation.
      *
-     * @param description the description (null for infallible derivations)
-     * @param function the derivation function
-     * @param postconditions the postconditions to evaluate on the derived value
      * @throws NullPointerException if function or postconditions is null
      * @throws IllegalArgumentException if description is blank (when non-null)
      */
-    Derivation(String description, Function<R, Outcome<D>> function, List<Postcondition<D>> postconditions) {
+    public Derivation {
         if (description != null && description.isBlank()) {
             throw new IllegalArgumentException("description must not be blank");
         }
         Objects.requireNonNull(function, "function must not be null");
         Objects.requireNonNull(postconditions, "postconditions must not be null");
-        this.description = description;
-        this.function = function;
-        this.postconditions = Collections.unmodifiableList(new ArrayList<>(postconditions));
-    }
-
-    /**
-     * Returns the description of this derivation, or null if infallible.
-     *
-     * @return the description, or null
-     */
-    public String description() {
-        return description;
+        postconditions = List.copyOf(postconditions);
     }
 
     /**
@@ -75,24 +63,6 @@ public final class Derivation<R, D> {
      */
     public boolean isFallible() {
         return description != null;
-    }
-
-    /**
-     * Returns the derivation function.
-     *
-     * @return the function
-     */
-    public Function<R, Outcome<D>> function() {
-        return function;
-    }
-
-    /**
-     * Returns the postconditions for this derivation.
-     *
-     * @return unmodifiable list of postconditions
-     */
-    public List<Postcondition<D>> postconditions() {
-        return postconditions;
     }
 
     /**
@@ -150,11 +120,5 @@ public final class Derivation<R, D> {
         }
 
         return results;
-    }
-
-    @Override
-    public String toString() {
-        String name = description != null ? description : "(infallible)";
-        return "Derivation[" + name + ", postconditions=" + postconditions.size() + "]";
     }
 }

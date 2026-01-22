@@ -25,49 +25,26 @@ import java.util.function.Predicate;
  *     .ensure("All operations valid", json -> allOpsValid(json))
  * }</pre>
  *
+ * @param description the human-readable description
+ * @param predicate the condition to evaluate
  * @param <T> the type of value this postcondition evaluates
  * @see ServiceContract
  * @see PostconditionResult
  */
-public final class Postcondition<T> {
-
-    private final String description;
-    private final Predicate<T> predicate;
+public record Postcondition<T>(String description, Predicate<T> predicate) {
 
     /**
      * Creates a new postcondition.
      *
-     * @param description the human-readable description
-     * @param predicate the condition to evaluate
      * @throws NullPointerException if description or predicate is null
      * @throws IllegalArgumentException if description is blank
      */
-    public Postcondition(String description, Predicate<T> predicate) {
+    public Postcondition {
         Objects.requireNonNull(description, "description must not be null");
         Objects.requireNonNull(predicate, "predicate must not be null");
         if (description.isBlank()) {
             throw new IllegalArgumentException("description must not be blank");
         }
-        this.description = description;
-        this.predicate = predicate;
-    }
-
-    /**
-     * Returns the description of this postcondition.
-     *
-     * @return the description
-     */
-    public String description() {
-        return description;
-    }
-
-    /**
-     * Returns the predicate for this postcondition.
-     *
-     * @return the predicate
-     */
-    public Predicate<T> predicate() {
-        return predicate;
     }
 
     /**
@@ -98,10 +75,5 @@ public final class Postcondition<T> {
      */
     public PostconditionResult skip(String reason) {
         return new PostconditionResult.Skipped(description, reason);
-    }
-
-    @Override
-    public String toString() {
-        return "Postcondition[" + description + "]";
     }
 }

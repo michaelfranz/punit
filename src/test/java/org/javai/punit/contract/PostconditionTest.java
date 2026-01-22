@@ -132,17 +132,4 @@ class PostconditionTest {
         }
     }
 
-    @Nested
-    @DisplayName("toString()")
-    class ToStringTests {
-
-        @Test
-        @DisplayName("returns descriptive string")
-        void returnsDescriptiveString() {
-            Postcondition<String> postcondition = new Postcondition<>(
-                    "Has operations", s -> true);
-
-            assertThat(postcondition.toString()).isEqualTo("Postcondition[Has operations]");
-        }
-    }
 }

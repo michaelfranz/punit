@@ -1,7 +1,6 @@
 package org.javai.punit.contract;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -50,8 +49,8 @@ public final class ServiceContract<I, R> {
     private final List<Derivation<R, ?>> derivations;
 
     private ServiceContract(List<Precondition<I>> preconditions, List<Derivation<R, ?>> derivations) {
-        this.preconditions = Collections.unmodifiableList(new ArrayList<>(preconditions));
-        this.derivations = Collections.unmodifiableList(new ArrayList<>(derivations));
+        this.preconditions = List.copyOf(preconditions);
+        this.derivations = List.copyOf(derivations);
     }
 
     /**

@@ -182,31 +182,4 @@ class DerivationTest {
             assertThat(results).isEmpty();
         }
     }
-
-    @Nested
-    @DisplayName("toString()")
-    class ToStringTests {
-
-        @Test
-        @DisplayName("returns descriptive string for fallible derivation")
-        void returnsDescriptiveStringForFallible() {
-            Derivation<String, Integer> derivation = new Derivation<>(
-                    "Valid number",
-                    s -> Outcome.success(Integer.parseInt(s)),
-                    List.of(new Postcondition<>("Positive", n -> n > 0)));
-
-            assertThat(derivation.toString()).isEqualTo("Derivation[Valid number, postconditions=1]");
-        }
-
-        @Test
-        @DisplayName("returns descriptive string for infallible derivation")
-        void returnsDescriptiveStringForInfallible() {
-            Derivation<String, String> derivation = new Derivation<>(
-                    null,
-                    s -> Outcome.success(s.toUpperCase()),
-                    List.of());
-
-            assertThat(derivation.toString()).isEqualTo("Derivation[(infallible), postconditions=0]");
-        }
-    }
 }
