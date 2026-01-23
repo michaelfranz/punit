@@ -5,8 +5,6 @@ import org.javai.punit.contract.Outcomes;
 import org.javai.punit.contract.ServiceContract;
 import org.javai.punit.contract.UseCaseOutcome;
 import org.javai.punit.experiment.engine.ExperimentResultAggregator;
-import org.javai.punit.model.UseCaseCriteria;
-import org.javai.punit.model.UseCaseResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -149,93 +147,6 @@ class ResultRecorderTest {
     }
 
     @Nested
-    @DisplayName("with legacy criteria")
-    @SuppressWarnings("deprecation")
-    class LegacyCriteriaTests {
-
-        @Test
-        @DisplayName("records success when all criteria pass")
-        void recordsSuccessWhenAllCriteriaPass() {
-            UseCaseResult result = UseCaseResult.builder()
-                    .value("data", "test")
-                    .build();
-
-            UseCaseCriteria criteria = UseCaseCriteria.ordered()
-                    .criterion("Check A", () -> true)
-                    .criterion("Check B", () -> true)
-                    .build();
-
-            OutcomeCaptor captor = new OutcomeCaptor();
-            captor.record(result);
-            captor.recordCriteria(criteria);
-
-            ResultRecorder.recordResult(captor, aggregator);
-
-            assertThat(aggregator.getSuccesses()).isEqualTo(1);
-            assertThat(aggregator.getFailures()).isZero();
-        }
-
-        @Test
-        @DisplayName("records failure when any criterion fails")
-        void recordsFailureWhenAnyCriterionFails() {
-            UseCaseResult result = UseCaseResult.builder()
-                    .value("data", "test")
-                    .build();
-
-            UseCaseCriteria criteria = UseCaseCriteria.ordered()
-                    .criterion("Check A", () -> true)
-                    .criterion("Check B", () -> false)
-                    .build();
-
-            OutcomeCaptor captor = new OutcomeCaptor();
-            captor.record(result);
-            captor.recordCriteria(criteria);
-
-            ResultRecorder.recordResult(captor, aggregator);
-
-            assertThat(aggregator.getSuccesses()).isZero();
-            assertThat(aggregator.getFailures()).isEqualTo(1);
-            assertThat(aggregator.getFailureDistribution()).containsKey("Check B");
-        }
-    }
-
-    @Nested
-    @DisplayName("with legacy heuristics")
-    @SuppressWarnings("deprecation")
-    class LegacyHeuristicsTests {
-
-        @Test
-        @DisplayName("uses success key from result when no criteria")
-        void usesSuccessKeyFromResult() {
-            UseCaseResult result = UseCaseResult.builder()
-                    .value("success", false)
-                    .build();
-
-            OutcomeCaptor captor = new OutcomeCaptor();
-            captor.record(result);
-
-            ResultRecorder.recordResult(captor, aggregator);
-
-            assertThat(aggregator.getFailures()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("defaults to success when no indicators present")
-        void defaultsToSuccessWhenNoIndicators() {
-            UseCaseResult result = UseCaseResult.builder()
-                    .value("someData", "value")
-                    .build();
-
-            OutcomeCaptor captor = new OutcomeCaptor();
-            captor.record(result);
-
-            ResultRecorder.recordResult(captor, aggregator);
-
-            assertThat(aggregator.getSuccesses()).isEqualTo(1);
-        }
-    }
-
-    @Nested
     @DisplayName("exception handling")
     class ExceptionHandlingTests {
 
@@ -252,24 +163,24 @@ class ResultRecorderTest {
         }
 
         @Test
-        @DisplayName("handles null captor gracefully")
-        void handlesNullCaptorGracefully() {
+        @DisplayName("does not record anything when captor is null")
+        void doesNotRecordAnythingWhenCaptorIsNull() {
             ResultRecorder.recordResult(null, aggregator);
 
-            // Should record a default success
-            assertThat(aggregator.getSuccesses()).isEqualTo(1);
+            // Should not record anything
+            assertThat(aggregator.getSamplesExecuted()).isZero();
         }
 
         @Test
-        @DisplayName("handles captor with no result")
-        void handlesCaptorWithNoResult() {
+        @DisplayName("does not record anything when captor has no result")
+        void doesNotRecordAnythingWhenCaptorHasNoResult() {
             OutcomeCaptor captor = new OutcomeCaptor();
             // Don't record anything
 
             ResultRecorder.recordResult(captor, aggregator);
 
-            // Should record a default success
-            assertThat(aggregator.getSuccesses()).isEqualTo(1);
+            // Should not record anything
+            assertThat(aggregator.getSamplesExecuted()).isZero();
         }
     }
 }

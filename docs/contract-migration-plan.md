@@ -8,33 +8,17 @@ This document outlines the plan to consolidate the duplicate type systems in PUn
 
 The goal is to eliminate redundancy by adopting the new typed contract system as the canonical approach.
 
-## Current State
+## Current State ✅ MIGRATION COMPLETE
 
-### Old Types (model package) - TO BE REMOVED
-
-```
-CriterionOutcome (sealed interface)
-├── Passed(description)
-├── Failed(description, reason)
-├── Errored(description, cause)
-└── NotEvaluated(description)
-
-UseCaseCriteria (interface)
-├── entries(): List<Entry<String, Supplier<Boolean>>>
-├── evaluate(): List<CriterionOutcome>
-└── allPassed(): boolean
-
-UseCaseOutcome (record)
-├── result: UseCaseResult
-└── criteria: UseCaseCriteria
-
-UseCaseContract (interface) - DEAD, DELETE
-```
-
-### New Types (contract package) - CANONICAL
+### Canonical Types (contract package)
 
 ```
-PostconditionResult (record) - SIMPLIFIED
+ServiceContract<I, R> (class)
+├── preconditions: List<Precondition<I>>
+├── postconditions: List<Postcondition<R>>
+└── derivations: List<Derivation<I, R, ?>>
+
+PostconditionResult (record)
 ├── description: String
 └── outcome: Outcome<?>              ← leverages existing Outcome type
 
@@ -45,15 +29,19 @@ PostconditionEvaluator<R> (interface)
 UseCaseOutcome<R> (record)
 ├── result: R                        ← typed!
 ├── executionTime: Duration
+├── timestamp: Instant
 ├── metadata: Map<String, Object>
 └── postconditionEvaluator: PostconditionEvaluator<R>
-
-UseCaseResult (record) - MOVE FROM MODEL
-├── values: Map<String, Object>
-├── metadata: Map<String, Object>
-├── timestamp: Instant
-└── executionTime: Duration
 ```
+
+### Deleted Types (model package) - REMOVED
+
+All legacy types have been deleted:
+- `CriterionOutcome` - replaced by `PostconditionResult`
+- `UseCaseCriteria` - replaced by `PostconditionEvaluator<R>`
+- `UseCaseOutcome` (model) - replaced by `UseCaseOutcome<R>` (contract)
+- `UseCaseResult` - replaced by typed result objects
+- `UseCaseContract` - replaced by `ServiceContract<I, R>`
 
 ## Design Decisions
 
@@ -83,18 +71,19 @@ record PostconditionResult(String description, Outcome<?> outcome) {
 
 The "Skipped" case becomes a failure with reason "Derivation 'X' failed" - no special handling needed.
 
-### 2. UseCaseResult Location
+### 2. UseCaseResult Deletion
 
-**Decision**: Move `UseCaseResult` from `model` package to `contract` package.
+**Decision**: Delete `UseCaseResult` entirely.
 
-`UseCaseResult` (Map-based result container) is useful for:
-- Storing arbitrary named values when a typed result isn't appropriate
-- Metadata storage
-- Execution timing
+The original plan was to move `UseCaseResult` from `model` to `contract` package.
+After analysis, `UseCaseResult` was found to be unnecessary:
 
-It coexists with `UseCaseOutcome<R>` for different use cases:
-- `UseCaseOutcome<R>` - when you have a typed result
-- `UseCaseResult` - when you need a bag of named values
+- The new contract pattern uses **typed results** (e.g., `TranslationResult`, `PaymentResult`)
+- Typed results provide compile-time safety and better documentation
+- Metadata is stored in `UseCaseOutcome.metadata()` Map
+- No use case required a generic "bag of values" container
+
+**Result**: `UseCaseResult` was deleted. All use cases now define typed result records.
 
 ### 3. UseCaseCriteria Replacement
 
@@ -294,92 +283,83 @@ Files modified:
 - `src/test/java/org/javai/punit/examples/usecases/PaymentGatewayUseCase.java`
 - `src/main/java/org/javai/punit/contract/UseCaseOutcome.java`
 
-### Phase 10: Move UseCaseResult to Contract Package ⏭️ DEFERRED
+### Phase 10: Delete UseCaseResult ✅ COMPLETE
 
-**Goal**: Relocate `UseCaseResult` from model to contract package.
+**Goal**: Remove the deprecated `UseCaseResult` type.
 
-**Assessment**: After review, `UseCaseResult` is NOT part of the user-facing contract API.
-It's used entirely by internal infrastructure:
-- `OutcomeCaptor` bridge layer
-- `ResultRecorder` and experiment aggregation
-- Optimize infrastructure
-- Spec model classes
+**Assessment**: After migrating all infrastructure to use `contract.UseCaseOutcome<R>`,
+the `UseCaseResult` type (map-based result container) was no longer needed.
 
-The new contract pattern uses typed results (`TranslationResult`, `PaymentResult`, etc.),
-not `UseCaseResult`. Moving it to the contract package would be misleading.
+Tasks:
+- [x] Updated `FailureObservation` to return `UseCaseOutcome<?>` instead of `UseCaseResult`
+- [x] Updated `SuccessCriteria` to accept `Map<String, Object>` instead of `UseCaseResult`
+- [x] Updated `ResultProjection` Javadoc to reference `UseCaseOutcome`
+- [x] Updated `UseCaseContext` Javadoc example
+- [x] Updated `ResultProjectionBuilderTest` to use `UseCaseOutcome`
+- [x] Updated `SuccessCriteriaTest` to use `Map` directly
+- [x] Deleted `UseCaseResult.java`
+- [x] Deleted `UseCaseResultTest.java`
+- [x] Deleted unused `UseCaseRegistry.java` and `UseCaseDefinition.java`
 
-**Decision**: Keep `UseCaseResult` in the model package. It serves as internal infrastructure
-for backward compatibility and experiment aggregation. A future refactoring could:
-1. Rename to something like `ResultBag` to clarify its purpose
-2. Make it internal/package-private
-3. Replace with a simpler interface if the current implementation is over-engineered
+Files deleted:
+- `src/main/java/org/javai/punit/model/UseCaseResult.java`
+- `src/test/java/org/javai/punit/model/UseCaseResultTest.java`
+- `src/main/java/org/javai/punit/experiment/engine/UseCaseRegistry.java`
+- `src/main/java/org/javai/punit/experiment/engine/UseCaseDefinition.java`
 
-For now, skip this phase and proceed with Phase 11 (delete obsolete types).
+Files modified:
+- `src/main/java/org/javai/punit/model/FailureObservation.java`
+- `src/main/java/org/javai/punit/spec/model/SuccessCriteria.java`
+- `src/main/java/org/javai/punit/experiment/model/ResultProjection.java`
+- `src/main/java/org/javai/punit/api/UseCaseContext.java`
+- `src/test/java/org/javai/punit/spec/model/SuccessCriteriaTest.java`
+- `src/test/java/org/javai/punit/experiment/engine/ResultProjectionBuilderTest.java`
 
-### Phase 11: Delete Old Types ⏭️ DEFERRED
+### Phase 11: Delete All Legacy Types ✅ COMPLETE
 
-**Goal**: Remove the redundant old types from model package.
+**Goal**: Remove all redundant old types from model package.
 
-**Assessment**: After thorough analysis, the old types cannot be safely deleted yet.
-They are deeply embedded in the optimize infrastructure:
+**Completed Deletions:**
 
-**Dependencies on old types:**
+| Type | Status |
+|------|--------|
+| `model.UseCaseOutcome` | ✅ Deleted |
+| `model.UseCaseCriteria` | ✅ Deleted |
+| `model.CriterionOutcome` | ✅ Deleted |
+| `model.UseCaseResult` | ✅ Deleted |
+| `ResultCaptor` | ✅ Deleted (replaced by `OutcomeCaptor`) |
+| `PostconditionResultAdapter` | ✅ Deleted |
+| `ContractCriteriaAdapter` | ✅ Deleted |
+| `UseCaseRegistry` | ✅ Deleted (unused) |
+| `UseCaseDefinition` | ✅ Deleted (unused) |
 
-| Type | Used By | Can Delete? |
-|------|---------|-------------|
-| `model.UseCaseOutcome` | `OptimizeState`, `OptimizeStrategy`, `OptimizationOutcomeAggregator`, `DefaultOptimizationOutcomeAggregator`, `UseCaseExecutor` | No |
-| `UseCaseCriteria` | `OutcomeCaptor`, `ResultRecorder`, `OptimizeStrategy`, `ExperimentResultAggregator`, `PostconditionAggregator` | No |
-| `CriterionOutcome` | `ResultRecorder`, `PostconditionResultAdapter`, `ContractCriteriaAdapter` | No |
-| `PostconditionResultAdapter` | `ContractCriteriaAdapter` | No |
-| `ContractCriteriaAdapter` | `OutcomeCaptor` (bridge) | No |
+**Infrastructure Migration:**
 
-**The Bridge Pattern:**
+All infrastructure now uses `contract.UseCaseOutcome<R>` directly:
 
-The Phase 8 assessment was correct: the `OutcomeCaptor` bridge allows both old and new
-patterns to coexist. The adapters (`PostconditionResultAdapter`, `ContractCriteriaAdapter`)
-are essential for this bridge:
+1. **Experiment infrastructure:**
+   - `OutcomeCaptor` stores `UseCaseOutcome<?>` directly
+   - `ResultRecorder` uses `outcome.allPostconditionsSatisfied()` for success determination
+   - `ExperimentResultAggregator` accepts `UseCaseOutcome<?>` directly
 
-1. User code uses `contract.UseCaseOutcome<R>` (new pattern)
-2. `OutcomeCaptor.record()` calls `ContractCriteriaAdapter.from(outcome)`
-3. Adapter converts postconditions to `UseCaseCriteria` interface
-4. Optimize/experiment infrastructure works unchanged with legacy types
+2. **Optimize infrastructure:**
+   - `OptimizeState` uses `List<UseCaseOutcome<?>>`
+   - `DefaultOptimizationOutcomeAggregator` uses `outcome.allPostconditionsSatisfied()`
+   - All strategies work with contract outcomes
 
-**Path to Full Migration:**
+3. **EXPLORE mode:**
+   - `ResultProjectionBuilder` builds projections from `UseCaseOutcome<?>`
+   - `DiffableContentProvider` receives `UseCaseOutcome<?>`
 
-To eventually delete the old types, the following major refactoring would be needed:
-
-1. **Migrate optimize infrastructure to contract types:**
-   - Create `OptimizationPostconditionAggregator` that works with `contract.UseCaseOutcome<?>`
-   - Update `OptimizeState` to use `List<contract.UseCaseOutcome<?>>` instead of `List<model.UseCaseOutcome>`
-   - Update `OptimizeStrategy` to work directly with contract outcomes
-   - Update all scorers and mutators
-
-2. **Migrate experiment infrastructure:**
-   - Update `ExperimentResultAggregator` to drop legacy criteria support
-   - Update `ResultRecorder` to remove legacy criteria path
-
-3. **Migrate OutcomeCaptor:**
-   - Remove `UseCaseCriteria` field and related methods
-   - Remove backward compatibility with legacy outcomes
-
-4. **Delete adapters and old types:**
-   - Delete `PostconditionResultAdapter`, `ContractCriteriaAdapter`
-   - Delete `CriterionOutcome`, `UseCaseCriteria`, `model.UseCaseOutcome`
-
-**Decision**: Defer this phase. The bridge pattern works well and provides backward
-compatibility. The old types can be deprecated and eventually removed when:
-- The optimize infrastructure is refactored to use contract types directly
-- All external consumers have migrated to the new contract pattern
-
-For now, mark the old types and legacy methods as `@Deprecated(forRemoval = true)`.
-
-Tasks (completed for this iteration):
-- [x] Analyzed dependencies to understand scope
-- [x] Documented the bridge pattern and migration path
-- [x] Updated `OptimizeStrategy` with helper method for clarity
-- [ ] (Future) Add deprecation annotations to old types
-- [ ] (Future) Refactor optimize infrastructure to use contract types
-- [ ] (Future) Delete old types when no longer needed
+Tasks:
+- [x] Migrated all invocation contexts from `ResultCaptor` to `OutcomeCaptor`
+- [x] Migrated all strategies (MeasureStrategy, ExploreStrategy, OptimizeStrategy)
+- [x] Updated parameter resolvers
+- [x] Updated `DiffableContentProvider` interface
+- [x] Deleted all legacy types and adapters
+- [x] Deleted `ResultCaptor` (replaced by `OutcomeCaptor`)
+- [x] Updated all tests
+- [x] Verified build and all tests pass
 
 ### Phase 12: Documentation and Cleanup ✅ COMPLETE
 
@@ -394,26 +374,27 @@ Tasks:
 
 ## Risk Mitigation
 
-### Backward Compatibility
+### Migration Complete
 
-The bridge pattern provides full backward compatibility:
-- New use cases return `contract.UseCaseOutcome<R>` with typed results
-- `OutcomeCaptor` bridges to legacy types via `ContractCriteriaAdapter`
-- Optimize infrastructure works unchanged with both patterns
-- Legacy use cases (returning `model.UseCaseOutcome`) continue to work
+The migration was completed without breaking changes:
+- All use cases now return `contract.UseCaseOutcome<R>` with typed results
+- All infrastructure uses the contract types directly
+- No bridge pattern or adapters needed
+- Full backward compatibility maintained during incremental migration
 
 ### Testing Strategy
 
 - ✅ Full test suite passes after each phase
 - ✅ Each phase was independently committable
 - ✅ New tests written for migrated functionality
+- ✅ All tests updated to use new types
 
-## Success Criteria (Revised)
+## Success Criteria ✅ ALL COMPLETE
 
 1. ✅ All tests pass
 2. ✅ Example use cases demonstrate the new contract pattern
-3. ✅ Bridge pattern allows gradual migration without breaking changes
-4. ⏳ Old types will be removed in future iteration when optimize infrastructure is refactored
+3. ✅ All legacy types removed - no bridge pattern needed
+4. ✅ Single canonical type system: `contract.UseCaseOutcome<R>`
 
 ## Resolved Questions
 
@@ -431,19 +412,38 @@ The bridge pattern provides full backward compatibility:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 1 | ✅ Complete | Simplify PostconditionResult to use Outcome<?> |
+| 1 | ✅ Complete | Simplify PostconditionResult to use Outcome |
 | 2 | ✅ Complete | Migrate CriteriaOutcomeAggregator → PostconditionAggregator |
 | 3 | ✅ Complete | Migrate ExperimentResultAggregator |
 | 4 | ✅ Complete | Migrate ResultCaptor → OutcomeCaptor |
 | 5 | ✅ Complete | Migrate ResultRecorder |
 | 6 | ✅ Complete | Delete unused criteria infrastructure |
 | 7 | ✅ Complete | Delete UseCaseContract interface |
-| 8 | ✅ Complete | Optimize works via bridge (no code changes needed) |
+| 8 | ✅ Complete | Optimize infrastructure uses contract types directly |
 | 9 | ✅ Complete | Migrate example use cases |
-| 10 | ⏭️ Deferred | UseCaseResult stays in model (internal infrastructure) |
-| 11 | ⏭️ Deferred | Old types deletion (requires optimize refactoring) |
+| 10 | ✅ Complete | Delete UseCaseResult and related types |
+| 11 | ✅ Complete | Delete all legacy types (model package cleanup) |
 | 12 | ✅ Complete | Documentation and cleanup |
+
+## Final State
+
+The migration is complete. PUnit now uses a single, unified type system:
+
+**Canonical Types (`org.javai.punit.contract`):**
+- `ServiceContract<I, R>` - Defines preconditions and postconditions
+- `UseCaseOutcome<R>` - Typed result with postcondition evaluation
+- `PostconditionResult` - Result of evaluating a single postcondition
+- `PostconditionEvaluator<R>` - Interface for postcondition evaluation
+
+**Deleted Types:**
+- `model.UseCaseOutcome` - Replaced by `contract.UseCaseOutcome<R>`
+- `model.UseCaseResult` - Replaced by typed result objects
+- `model.UseCaseCriteria` - Replaced by `PostconditionEvaluator<R>`
+- `model.CriterionOutcome` - Replaced by `PostconditionResult`
+- `api.ResultCaptor` - Replaced by `OutcomeCaptor`
+- `contract.PostconditionResultAdapter` - No longer needed
+- `contract.ContractCriteriaAdapter` - No longer needed
 
 ## Open Questions
 
-None currently.
+None - migration complete.

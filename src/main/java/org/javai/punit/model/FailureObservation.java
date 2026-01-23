@@ -3,17 +3,19 @@ package org.javai.punit.model;
 import java.util.List;
 import java.util.Optional;
 
+import org.javai.punit.contract.UseCaseOutcome;
+
 /**
  * Observation of a single failure in an experiment, for refinement analysis.
  */
 public interface FailureObservation {
 
 	/**
-	 * Returns the UseCaseResult from the failed sample.
+	 * Returns the outcome from the failed sample.
 	 *
-	 * @return the result
+	 * @return the outcome
 	 */
-	UseCaseResult result();
+	UseCaseOutcome<?> outcome();
 
 	/**
 	 * Returns which success criteria were not met.

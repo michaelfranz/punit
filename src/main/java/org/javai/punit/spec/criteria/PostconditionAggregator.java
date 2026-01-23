@@ -7,8 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.javai.punit.contract.PostconditionResult;
-import org.javai.punit.contract.PostconditionResultAdapter;
-import org.javai.punit.model.UseCaseCriteria;
 
 /**
  * Aggregates postcondition outcomes across multiple experiment samples.
@@ -72,42 +70,6 @@ public class PostconditionAggregator {
         if (allPassed) {
             allPassedCount++;
         }
-    }
-
-    /**
-     * Records outcomes from legacy UseCaseCriteria.
-     *
-     * <p>This bridge method supports existing callers during migration.
-     * It converts CriterionOutcome to PostconditionResult internally.
-     *
-     * @param criteria the legacy success criteria to record
-     * @deprecated Use {@link #record(List)} with PostconditionResult instead
-     */
-    @Deprecated(forRemoval = true)
-    public void record(UseCaseCriteria criteria) {
-        Objects.requireNonNull(criteria, "criteria must not be null");
-        // Convert via adapter during migration period
-        List<PostconditionResult> results = criteria.evaluate().stream()
-            .map(this::fromCriterionOutcome)
-            .toList();
-        record(results);
-    }
-
-    /**
-     * Converts a CriterionOutcome to PostconditionResult.
-     * This is a temporary bridge method during migration.
-     */
-    private PostconditionResult fromCriterionOutcome(org.javai.punit.model.CriterionOutcome outcome) {
-        return switch (outcome) {
-            case org.javai.punit.model.CriterionOutcome.Passed p ->
-                PostconditionResult.passed(p.description());
-            case org.javai.punit.model.CriterionOutcome.Failed f ->
-                PostconditionResult.failed(f.description(), f.reason());
-            case org.javai.punit.model.CriterionOutcome.Errored e ->
-                PostconditionResult.failed(e.description(), e.reason());
-            case org.javai.punit.model.CriterionOutcome.NotEvaluated n ->
-                PostconditionResult.failed(n.description(), "Skipped: Not evaluated");
-        };
     }
 
     /**

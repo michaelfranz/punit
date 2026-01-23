@@ -15,7 +15,7 @@ import java.util.stream.StreamSupport;
 import org.javai.punit.api.ExperimentMode;
 import org.javai.punit.api.FactorAnnotations;
 import org.javai.punit.api.OptimizeExperiment;
-import org.javai.punit.api.ResultCaptor;
+import org.javai.punit.api.OutcomeCaptor;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.contract.PostconditionResult;
 import org.javai.punit.contract.UseCaseOutcome;
@@ -159,7 +159,7 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
 
         // Get invocation-specific data from the invocation context store
         ExtensionContext.Store invocationStore = extensionContext.getStore(NAMESPACE);
-        ResultCaptor captor = invocationStore.get("captor", ResultCaptor.class);
+        OutcomeCaptor captor = invocationStore.get("captor", OutcomeCaptor.class);
         Integer iterationNumber = invocationStore.get("iterationNumber", Integer.class);
         Integer sampleInIteration = invocationStore.get("sampleInIteration", Integer.class);
 
@@ -470,7 +470,7 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
                     state.useCaseId(),
                     state.currentControlFactorValue(),
                     state.controlFactorName(),
-                    new ResultCaptor()
+                    new OutcomeCaptor()
             );
 
             action.accept(context);

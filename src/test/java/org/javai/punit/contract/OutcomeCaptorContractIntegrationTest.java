@@ -1,7 +1,6 @@
 package org.javai.punit.contract;
 
-import org.javai.punit.api.ResultCaptor;
-import org.javai.punit.model.CriterionOutcome;
+import org.javai.punit.api.OutcomeCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -14,20 +13,19 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DisplayName("ResultCaptor contract integration")
-@SuppressWarnings("deprecation")
-class ResultCaptorContractIntegrationTest {
+@DisplayName("OutcomeCaptor contract integration")
+class OutcomeCaptorContractIntegrationTest {
 
-    private ResultCaptor captor;
+    private OutcomeCaptor captor;
 
     @BeforeEach
     void setUp() {
-        captor = new ResultCaptor();
+        captor = new OutcomeCaptor();
     }
 
     @Nested
-    @DisplayName("recordContract()")
-    class RecordContractTests {
+    @DisplayName("record()")
+    class RecordTests {
 
         @Test
         @DisplayName("records contract outcome with passing postconditions")
@@ -46,11 +44,11 @@ class ResultCaptorContractIntegrationTest {
                     contract
             );
 
-            captor.recordContract(outcome);
+            captor.record(outcome);
 
             assertThat(captor.hasResult()).isTrue();
-            assertThat(captor.hasCriteria()).isTrue();
-            assertThat(captor.getCriteria().allPassed()).isTrue();
+            assertThat(captor.getContractOutcome()).isNotNull();
+            assertThat(captor.getContractOutcome().allPostconditionsSatisfied()).isTrue();
         }
 
         @Test
@@ -70,21 +68,20 @@ class ResultCaptorContractIntegrationTest {
                     contract
             );
 
-            captor.recordContract(outcome);
+            captor.record(outcome);
 
             assertThat(captor.hasResult()).isTrue();
-            assertThat(captor.hasCriteria()).isTrue();
-            assertThat(captor.getCriteria().allPassed()).isFalse();
+            assertThat(captor.getContractOutcome().allPostconditionsSatisfied()).isFalse();
 
-            List<CriterionOutcome> outcomes = captor.getCriteria().evaluate();
-            assertThat(outcomes).hasSize(2);
-            assertThat(outcomes.get(0).passed()).isTrue();
-            assertThat(outcomes.get(1).passed()).isFalse();
+            List<PostconditionResult> results = captor.getContractOutcome().evaluatePostconditions();
+            assertThat(results).hasSize(2);
+            assertThat(results.get(0).passed()).isTrue();
+            assertThat(results.get(1).passed()).isFalse();
         }
 
         @Test
-        @DisplayName("preserves execution time in result")
-        void preservesExecutionTimeInResult() {
+        @DisplayName("preserves execution time in outcome")
+        void preservesExecutionTimeInOutcome() {
             ServiceContract<Void, String> contract = ServiceContract
                     .<Void, String>define()
                     .build();
@@ -98,14 +95,14 @@ class ResultCaptorContractIntegrationTest {
                     contract
             );
 
-            captor.recordContract(outcome);
+            captor.record(outcome);
 
-            assertThat(captor.getResult().executionTime()).isEqualTo(executionTime);
+            assertThat(captor.getContractOutcome().executionTime()).isEqualTo(executionTime);
         }
 
         @Test
-        @DisplayName("preserves metadata in result")
-        void preservesMetadataInResult() {
+        @DisplayName("preserves metadata in outcome")
+        void preservesMetadataInOutcome() {
             ServiceContract<Void, String> contract = ServiceContract
                     .<Void, String>define()
                     .build();
@@ -118,15 +115,15 @@ class ResultCaptorContractIntegrationTest {
                     contract
             );
 
-            captor.recordContract(outcome);
+            captor.record(outcome);
 
-            assertThat(captor.getResult().metadata()).containsEntry("tokensUsed", 150);
-            assertThat(captor.getResult().metadata()).containsEntry("model", "gpt-4");
+            assertThat(captor.getContractOutcome().metadata()).containsEntry("tokensUsed", 150);
+            assertThat(captor.getContractOutcome().metadata()).containsEntry("model", "gpt-4");
         }
 
         @Test
-        @DisplayName("stores result value in values map")
-        void storesResultValueInValuesMap() {
+        @DisplayName("provides direct access to typed result")
+        void providesDirectAccessToTypedResult() {
             ServiceContract<Void, String> contract = ServiceContract
                     .<Void, String>define()
                     .build();
@@ -139,11 +136,11 @@ class ResultCaptorContractIntegrationTest {
                     contract
             );
 
-            captor.recordContract(outcome);
+            captor.record(outcome);
 
-            assertThat(captor.getResult().getValue("result", String.class))
-                    .isPresent()
-                    .hasValue("the actual result");
+            @SuppressWarnings("unchecked")
+            UseCaseOutcome<String> captured = (UseCaseOutcome<String>) captor.getContractOutcome();
+            assertThat(captured.result()).isEqualTo("the actual result");
         }
 
         @Test
@@ -162,16 +159,18 @@ class ResultCaptorContractIntegrationTest {
                     contract
             );
 
-            captor.recordContract(outcome);
+            captor.record(outcome);
 
             assertThat(captor.hasResult()).isTrue();
-            assertThat(captor.getResult().hasValue("result")).isFalse();
-            assertThat(captor.getCriteria().allPassed()).isTrue();
+            @SuppressWarnings("unchecked")
+            UseCaseOutcome<String> captured = (UseCaseOutcome<String>) captor.getContractOutcome();
+            assertThat(captured.result()).isNull();
+            assertThat(captured.allPostconditionsSatisfied()).isTrue();
         }
 
         @Test
-        @DisplayName("only records first contract outcome")
-        void onlyRecordsFirstContractOutcome() {
+        @DisplayName("only records first outcome")
+        void onlyRecordsFirstOutcome() {
             ServiceContract<Void, String> contract1 = ServiceContract
                     .<Void, String>define()
                     .ensure("Always pass", s -> true)
@@ -198,13 +197,14 @@ class ResultCaptorContractIntegrationTest {
                     contract2
             );
 
-            captor.recordContract(outcome1);
-            captor.recordContract(outcome2);
+            captor.record(outcome1);
+            captor.record(outcome2);
 
-            // Should still have first outcome's criteria (which passes)
-            assertThat(captor.getCriteria().allPassed()).isTrue();
-            assertThat(captor.getResult().getValue("result", String.class))
-                    .hasValue("first");
+            // Should still have first outcome (which passes)
+            assertThat(captor.getContractOutcome().allPostconditionsSatisfied()).isTrue();
+            @SuppressWarnings("unchecked")
+            UseCaseOutcome<String> captured = (UseCaseOutcome<String>) captor.getContractOutcome();
+            assertThat(captured.result()).isEqualTo("first");
         }
 
         @Test
@@ -222,7 +222,7 @@ class ResultCaptorContractIntegrationTest {
                     contract
             );
 
-            UseCaseOutcome<String> returned = captor.recordContract(outcome);
+            UseCaseOutcome<String> returned = captor.record(outcome);
 
             assertThat(returned).isSameAs(outcome);
         }
@@ -257,13 +257,13 @@ class ResultCaptorContractIntegrationTest {
                     contract
             );
 
-            captor.recordContract(outcome);
+            captor.record(outcome);
 
-            assertThat(captor.getCriteria().allPassed()).isTrue();
+            assertThat(captor.getContractOutcome().allPostconditionsSatisfied()).isTrue();
 
-            List<CriterionOutcome> outcomes = captor.getCriteria().evaluate();
-            assertThat(outcomes).hasSize(4); // Not empty + Parse number + Positive + Less than 100
-            assertThat(outcomes).allMatch(CriterionOutcome::passed);
+            List<PostconditionResult> results = captor.getContractOutcome().evaluatePostconditions();
+            assertThat(results).hasSize(4); // Not empty + Parse number + Positive + Less than 100
+            assertThat(results).allMatch(PostconditionResult::passed);
         }
 
         @Test
@@ -289,16 +289,17 @@ class ResultCaptorContractIntegrationTest {
                     contract
             );
 
-            captor.recordContract(outcome);
+            captor.record(outcome);
 
-            assertThat(captor.getCriteria().allPassed()).isFalse();
+            assertThat(captor.getContractOutcome().allPostconditionsSatisfied()).isFalse();
 
-            List<CriterionOutcome> outcomes = captor.getCriteria().evaluate();
-            assertThat(outcomes).hasSize(2);
-            assertThat(outcomes.get(0)).isInstanceOf(CriterionOutcome.Failed.class);
-            assertThat(outcomes.get(0).description()).isEqualTo("Parse number");
-            assertThat(outcomes.get(1)).isInstanceOf(CriterionOutcome.NotEvaluated.class);
-            assertThat(outcomes.get(1).description()).isEqualTo("Positive");
+            List<PostconditionResult> results = captor.getContractOutcome().evaluatePostconditions();
+            assertThat(results).hasSize(2);
+            // First is the derivation failure
+            assertThat(results.get(0).failed()).isTrue();
+            assertThat(results.get(0).description()).isEqualTo("Parse number");
+            // Second is skipped because derivation failed
+            assertThat(results.get(1).description()).isEqualTo("Positive");
         }
     }
 }
