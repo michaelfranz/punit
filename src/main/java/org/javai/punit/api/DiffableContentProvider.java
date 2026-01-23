@@ -1,7 +1,6 @@
 package org.javai.punit.api;
 
 import java.util.List;
-
 import org.javai.punit.contract.UseCaseOutcome;
 
 /**

@@ -117,14 +117,14 @@ class DerivationTest {
             assertThat(results).hasSize(3);
             assertThat(results.get(0).failed()).isTrue();
             assertThat(results.get(0).description()).isEqualTo("Valid number");
-            assertThat(results.get(0).failureReason()).isEqualTo("Not a number");
+            assertThat(results.get(0).failureReason()).hasValue("Not a number");
             // Skipped postconditions are represented as failures with "Skipped:" prefix
             assertThat(results.get(1).failed()).isTrue();
             assertThat(results.get(1).description()).isEqualTo("Positive");
-            assertThat(results.get(1).failureReason()).startsWith("Skipped:");
+            assertThat(results.get(1).failureReason()).hasValueSatisfying(r -> assertThat(r).startsWith("Skipped:"));
             assertThat(results.get(2).failed()).isTrue();
             assertThat(results.get(2).description()).isEqualTo("Less than 100");
-            assertThat(results.get(2).failureReason()).startsWith("Skipped:");
+            assertThat(results.get(2).failureReason()).hasValueSatisfying(r -> assertThat(r).startsWith("Skipped:"));
         }
 
         @Test
@@ -141,7 +141,7 @@ class DerivationTest {
             assertThat(results.get(0).failed()).isTrue();
             assertThat(results.get(0).description()).isEqualTo("Valid number");
             assertThat(results.get(1).failed()).isTrue();
-            assertThat(results.get(1).failureReason()).startsWith("Skipped:");
+            assertThat(results.get(1).failureReason()).hasValueSatisfying(r -> assertThat(r).startsWith("Skipped:"));
         }
 
         @Test

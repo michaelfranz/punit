@@ -8,8 +8,8 @@ import java.util.Map;
 import java.util.Objects;
 import org.javai.punit.contract.PostconditionResult;
 import org.javai.punit.contract.UseCaseOutcome;
-import org.javai.punit.spec.criteria.PostconditionAggregator;
 import org.javai.punit.experiment.model.ResultProjection;
+import org.javai.punit.spec.criteria.PostconditionAggregator;
 
 /**
  * Aggregates results from experiment sample executions.

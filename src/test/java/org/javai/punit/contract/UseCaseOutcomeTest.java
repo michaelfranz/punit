@@ -15,8 +15,6 @@ class UseCaseOutcomeTest {
 
     private static final ServiceContract<TestInput, String> CONTRACT = ServiceContract
             .<TestInput, String>define()
-            .require("Value not null", in -> in.value() != null)
-            .require("Number positive", in -> in.number() > 0)
             .ensure("Not empty", s -> s.isEmpty() ? Outcomes.fail("was empty") : Outcomes.okVoid())
             .ensure("Reasonable length", s -> s.length() < 1000 ? Outcomes.okVoid() : Outcomes.fail("too long"))
             .deriving("Uppercase", s -> Outcomes.ok(s.toUpperCase()))
@@ -357,55 +355,6 @@ class UseCaseOutcomeTest {
                     .build();
 
             assertThat(outcome.getMetadataBoolean("cached")).isEmpty();
-        }
-    }
-
-    @Nested
-    @DisplayName("preconditions")
-    class PreconditionTests {
-
-        @Test
-        @DisplayName("checks preconditions at input()")
-        void checksPreconditionsAtInput() {
-            assertThatThrownBy(() -> UseCaseOutcome
-                    .withContract(CONTRACT)
-                    .input(new TestInput(null, 42)))
-                    .isInstanceOf(PreconditionException.class)
-                    .satisfies(e -> {
-                        PreconditionException ex = (PreconditionException) e;
-                        assertThat(ex.getPreconditionDescription()).isEqualTo("Value not null");
-                    });
-        }
-
-        @Test
-        @DisplayName("checks all preconditions in order")
-        void checksAllPreconditionsInOrder() {
-            // Both fail, but first one throws
-            assertThatThrownBy(() -> UseCaseOutcome
-                    .withContract(CONTRACT)
-                    .input(new TestInput(null, -1)))
-                    .isInstanceOf(PreconditionException.class)
-                    .satisfies(e -> {
-                        PreconditionException ex = (PreconditionException) e;
-                        assertThat(ex.getPreconditionDescription()).isEqualTo("Value not null");
-                    });
-        }
-
-        @Test
-        @DisplayName("does not execute service if precondition fails")
-        void doesNotExecuteServiceIfPreconditionFails() {
-            boolean[] executed = {false};
-
-            assertThatThrownBy(() -> UseCaseOutcome
-                    .withContract(CONTRACT)
-                    .input(new TestInput(null, 42))
-                    .execute(in -> {
-                        executed[0] = true;
-                        return "result";
-                    }))
-                    .isInstanceOf(PreconditionException.class);
-
-            assertThat(executed[0]).isFalse();
         }
     }
 

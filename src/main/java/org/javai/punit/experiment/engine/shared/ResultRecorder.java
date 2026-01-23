@@ -1,11 +1,10 @@
 package org.javai.punit.experiment.engine.shared;
 
+import java.util.List;
 import org.javai.punit.api.OutcomeCaptor;
 import org.javai.punit.contract.PostconditionResult;
 import org.javai.punit.contract.UseCaseOutcome;
 import org.javai.punit.experiment.engine.ExperimentResultAggregator;
-
-import java.util.List;
 
 /**
  * Records outcomes from an OutcomeCaptor into an ExperimentResultAggregator.

@@ -6,7 +6,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-
 import org.javai.punit.api.DiffableContentProvider;
 import org.javai.punit.contract.UseCaseOutcome;
 import org.javai.punit.experiment.model.ResultProjection;

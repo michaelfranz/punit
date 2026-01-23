@@ -1,9 +1,8 @@
 package org.javai.punit.api;
 
+import java.util.List;
 import org.javai.punit.contract.PostconditionResult;
 import org.javai.punit.contract.UseCaseOutcome;
-
-import java.util.List;
 
 /**
  * Captures use case execution outcomes during experiments.

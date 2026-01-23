@@ -4,34 +4,25 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import org.javai.outcome.Outcome;
 
 /**
- * A service contract defines the preconditions and postconditions for a service.
+ * A service contract defines the postconditions for a service.
  *
  * <p>A contract consists of:
  * <ul>
- *   <li>Preconditions — what the service requires from its caller (checked eagerly)</li>
  *   <li>Postconditions — conditions on the raw result (no transformation needed)</li>
  *   <li>Derivations — transformations of the result with associated postconditions</li>
  * </ul>
  *
- * <h2>Design by Contract</h2>
- * <p>The contract belongs to the <b>service</b> being invoked, but since Java lacks
- * Eiffel's built-in contract support, the use case formalizes it. The contract is
- * typically declared as a {@code static final} field—a pure specification with no free
- * variables.
+ * <p>The contract specifies what the external service promises to deliver. It does not
+ * include preconditions because the UseCase must be a faithful, transparent wrapper
+ * that exposes the service's actual behavior—including any missing input validation.
  *
  * <h2>Usage</h2>
  * <pre>{@code
- * private record ServiceInput(String prompt, String instruction, double temperature) {}
- *
  * private static final ServiceContract<ServiceInput, String> CONTRACT = ServiceContract
  *     .<ServiceInput, String>define()
- *
- *     .require("Prompt not null", in -> in.prompt() != null)
- *     .require("Instruction not blank", in -> !in.instruction().isBlank())
  *
  *     .ensure("Response not empty", response ->
  *         response.isEmpty() ? Outcomes.fail("was empty") : Outcomes.okVoid())
@@ -44,34 +35,21 @@ import org.javai.outcome.Outcome;
  *     .build();
  * }</pre>
  *
- * @param <I> the input type (preconditions evaluate against this)
- * @param <R> the result type (derivations transform this)
- * @see Precondition
+ * @param <I> the input type
+ * @param <R> the result type (postconditions and derivations evaluate against this)
  * @see Derivation
  * @see Postcondition
  */
 public final class ServiceContract<I, R> implements PostconditionEvaluator<R> {
 
-    private final List<Precondition<I>> preconditions;
     private final List<Postcondition<R>> postconditions;
     private final List<Derivation<R, ?>> derivations;
 
     private ServiceContract(
-            List<Precondition<I>> preconditions,
             List<Postcondition<R>> postconditions,
             List<Derivation<R, ?>> derivations) {
-        this.preconditions = List.copyOf(preconditions);
         this.postconditions = List.copyOf(postconditions);
         this.derivations = List.copyOf(derivations);
-    }
-
-    /**
-     * Returns the preconditions for this contract.
-     *
-     * @return unmodifiable list of preconditions
-     */
-    public List<Precondition<I>> preconditions() {
-        return preconditions;
     }
 
     /**
@@ -93,18 +71,6 @@ public final class ServiceContract<I, R> implements PostconditionEvaluator<R> {
      */
     public List<Derivation<R, ?>> derivations() {
         return derivations;
-    }
-
-    /**
-     * Checks all preconditions against an input value.
-     *
-     * @param input the input to check
-     * @throws PreconditionException if any precondition fails
-     */
-    public void checkPreconditions(I input) {
-        for (Precondition<I> precondition : preconditions) {
-            precondition.check(input);
-        }
     }
 
     /**
@@ -155,7 +121,7 @@ public final class ServiceContract<I, R> implements PostconditionEvaluator<R> {
      * <p>Use explicit type parameters for clarity:
      * <pre>{@code
      * ServiceContract.<MyInput, MyResult>define()
-     *     .require(...)
+     *     .ensure(...)
      *     .deriving(...)
      *     .build();
      * }</pre>
@@ -170,8 +136,7 @@ public final class ServiceContract<I, R> implements PostconditionEvaluator<R> {
 
     @Override
     public String toString() {
-        return "ServiceContract[preconditions=" + preconditions.size() +
-                ", derivations=" + derivations.size() +
+        return "ServiceContract[derivations=" + derivations.size() +
                 ", postconditions=" + postconditionCount() + "]";
     }
 
@@ -183,25 +148,10 @@ public final class ServiceContract<I, R> implements PostconditionEvaluator<R> {
      */
     public static final class ContractBuilder<I, R> {
 
-        private final List<Precondition<I>> preconditions = new ArrayList<>();
         private final List<Postcondition<R>> postconditions = new ArrayList<>();
         private final List<Derivation<R, ?>> derivations = new ArrayList<>();
 
         private ContractBuilder() {
-        }
-
-        /**
-         * Adds a precondition to the contract.
-         *
-         * <p>Preconditions are checked eagerly when input is provided.
-         *
-         * @param description the human-readable description
-         * @param predicate the condition to evaluate
-         * @return this builder
-         */
-        public ContractBuilder<I, R> require(String description, Predicate<I> predicate) {
-            preconditions.add(new Precondition<>(description, predicate));
-            return this;
         }
 
         /**
@@ -252,7 +202,7 @@ public final class ServiceContract<I, R> implements PostconditionEvaluator<R> {
          * @return the immutable service contract
          */
         public ServiceContract<I, R> build() {
-            return new ServiceContract<>(preconditions, postconditions, derivations);
+            return new ServiceContract<>(postconditions, derivations);
         }
 
         void addDerivation(Derivation<R, ?> derivation) {
@@ -312,7 +262,7 @@ public final class ServiceContract<I, R> implements PostconditionEvaluator<R> {
          * @param <D2> the new derived type
          * @return a deriving builder for the new derivation
          */
-        public <D2> DerivingBuilder<I, R, D2> deriving(String description, Function<R, Outcome<D2>> function) {
+        public <D2> DerivingBuilder<I, R, D2> derive(String description, Function<R, Outcome<D2>> function) {
             finalizeCurrent();
             return parent.deriving(description, function);
         }

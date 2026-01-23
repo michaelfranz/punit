@@ -152,13 +152,13 @@ public class PostconditionAggregator {
             if (result.passed()) {
                 passed++;
             } else {
-                String reason = result.failureReason();
-                if (reason != null && reason.startsWith("Skipped:")) {
+                String reason = result.failureReason().orElse("");
+                if (reason.startsWith("Skipped:")) {
                     skipped++;
                 } else {
                     failed++;
                     // Keep first few failure messages for diagnostics
-                    if (failureMessages.size() < 5 && reason != null) {
+                    if (failureMessages.size() < 5 && !reason.isEmpty()) {
                         failureMessages.add(reason);
                     }
                 }

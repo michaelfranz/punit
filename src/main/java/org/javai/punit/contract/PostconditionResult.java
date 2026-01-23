@@ -1,8 +1,8 @@
 package org.javai.punit.contract;
 
-import org.javai.outcome.Outcome;
-
 import java.util.Objects;
+import java.util.Optional;
+import org.javai.outcome.Outcome;
 
 /**
  * The result of evaluating a postcondition.
@@ -56,16 +56,32 @@ public record PostconditionResult(String description, Outcome<?> outcome) {
      * @return true if the outcome is a failure
      */
     public boolean failed() {
-        return !outcome.isOk();
+        return outcome.isFail();
     }
 
     /**
-     * Returns the failure reason, or null if passed.
+     * Returns the failure reason, if present.
      *
-     * @return the failure reason, or null
+     * @return the failure reason, or empty if passed
      */
-    public String failureReason() {
-        return failed() ? Outcomes.failureMessage(outcome) : null;
+    public Optional<String> failureReason() {
+        return switch (outcome) {
+            case Outcome.Fail<?> fail -> Optional.of(fail.failure().message());
+            case Outcome.Ok<?> ignored -> Optional.empty();
+        };
+    }
+
+    /**
+     * Returns a human-readable failure message combining description and reason.
+     *
+     * <p>Format: "{description}: {reason}" if reason present, otherwise just "{description}".
+     *
+     * @return the failure message, or just the description if passed
+     */
+    public String failureMessage() {
+        return failureReason()
+                .map(reason -> description + ": " + reason)
+                .orElse(description);
     }
 
     // ========== Factory Methods ==========
@@ -77,7 +93,7 @@ public record PostconditionResult(String description, Outcome<?> outcome) {
      * @return a passed result
      */
     public static PostconditionResult passed(String description) {
-        return new PostconditionResult(description, Outcomes.okVoid());
+        return new PostconditionResult(description, Outcome.ok());
     }
 
     /**
@@ -92,7 +108,7 @@ public record PostconditionResult(String description, Outcome<?> outcome) {
      * @return a passed result with the value
      */
     public static <T> PostconditionResult passed(String description, T value) {
-        return new PostconditionResult(description, Outcomes.ok(value));
+        return new PostconditionResult(description, Outcome.ok(value));
     }
 
     /**
@@ -104,7 +120,7 @@ public record PostconditionResult(String description, Outcome<?> outcome) {
      */
     public static PostconditionResult failed(String description, String reason) {
         Objects.requireNonNull(reason, "reason must not be null");
-        return new PostconditionResult(description, Outcomes.fail(reason));
+        return new PostconditionResult(description, Outcome.fail(description, reason));
     }
 
     /**

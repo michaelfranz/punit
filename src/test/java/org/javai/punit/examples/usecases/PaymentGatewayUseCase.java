@@ -50,8 +50,6 @@ public class PaymentGatewayUseCase {
      */
     private static final ServiceContract<PaymentInput, PaymentResult> CONTRACT =
             ServiceContract.<PaymentInput, PaymentResult>define()
-                    .require("Card token value", pi -> pi.cardToken != null && !pi.cardToken.isBlank())
-                    .require("Positive value", pi -> pi.amountCents() >= 0)
                     .ensure("Transaction succeeded", pr -> pr.success() ? Outcomes.okVoid() : Outcomes.fail("transaction failed: " + pr.errorCode()))
                     .build();
 

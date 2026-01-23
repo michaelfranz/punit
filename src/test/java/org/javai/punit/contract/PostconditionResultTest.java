@@ -1,11 +1,10 @@
 package org.javai.punit.contract;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("PostconditionResult")
 class PostconditionResultTest {
@@ -22,7 +21,7 @@ class PostconditionResultTest {
             assertThat(result.description()).isEqualTo("Valid JSON");
             assertThat(result.passed()).isTrue();
             assertThat(result.failed()).isFalse();
-            assertThat(result.failureReason()).isNull();
+            assertThat(result.failureReason()).isEmpty();
         }
 
         @Test
@@ -49,7 +48,7 @@ class PostconditionResultTest {
             assertThat(result.description()).isEqualTo("Has operations");
             assertThat(result.passed()).isFalse();
             assertThat(result.failed()).isTrue();
-            assertThat(result.failureReason()).isEqualTo("Array was empty");
+            assertThat(result.failureReason()).hasValue("Array was empty");
         }
 
         @Test
@@ -59,7 +58,7 @@ class PostconditionResultTest {
 
             assertThat(result.description()).isEqualTo("Has operations");
             assertThat(result.failed()).isTrue();
-            assertThat(result.failureReason()).isEqualTo("Postcondition not satisfied");
+            assertThat(result.failureReason()).hasValue("Postcondition not satisfied");
         }
 
         @Test

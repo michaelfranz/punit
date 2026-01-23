@@ -1,7 +1,6 @@
 package org.javai.punit.contract;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -24,22 +23,6 @@ class ServiceContractTest {
                     .<TestInput, String>define()
                     .build();
 
-            assertThat(contract.preconditions()).isEmpty();
-            assertThat(contract.postconditions()).isEmpty();
-            assertThat(contract.derivations()).isEmpty();
-            assertThat(contract.postconditionCount()).isZero();
-        }
-
-        @Test
-        @DisplayName("builds contract with preconditions only")
-        void buildsContractWithPreconditionsOnly() {
-            ServiceContract<TestInput, String> contract = ServiceContract
-                    .<TestInput, String>define()
-                    .require("Value not null", in -> in.value() != null)
-                    .require("Number positive", in -> in.number() > 0)
-                    .build();
-
-            assertThat(contract.preconditions()).hasSize(2);
             assertThat(contract.postconditions()).isEmpty();
             assertThat(contract.derivations()).isEmpty();
             assertThat(contract.postconditionCount()).isZero();
@@ -54,7 +37,6 @@ class ServiceContractTest {
                     .ensure("Reasonable length", s -> s.length() < 1000 ? Outcomes.okVoid() : Outcomes.fail("too long"))
                     .build();
 
-            assertThat(contract.preconditions()).isEmpty();
             assertThat(contract.postconditions()).hasSize(2);
             assertThat(contract.derivations()).isEmpty();
             assertThat(contract.postconditionCount()).isEqualTo(2);
@@ -80,7 +62,6 @@ class ServiceContractTest {
         void buildsContractWithDerivation() {
             ServiceContract<TestInput, String> contract = ServiceContract
                     .<TestInput, String>define()
-                    .require("Value not null", in -> in.value() != null)
                     .deriving("Valid number", s -> {
                         try {
                             return Outcomes.ok(Integer.parseInt(s));
@@ -92,7 +73,6 @@ class ServiceContractTest {
                         .ensure("Less than 100", n -> n < 100 ? Outcomes.okVoid() : Outcomes.fail("too large"))
                     .build();
 
-            assertThat(contract.preconditions()).hasSize(1);
             assertThat(contract.derivations()).hasSize(1);
             assertThat(contract.postconditionCount()).isEqualTo(3); // derivation + 2 ensures
         }
@@ -110,21 +90,12 @@ class ServiceContractTest {
                         }
                     })
                         .ensure("Positive", n -> n > 0 ? Outcomes.okVoid() : Outcomes.fail("not positive"))
-                    .deriving("Uppercase", s -> Outcomes.ok(s.toUpperCase()))
+                    .derive("Uppercase", s -> Outcomes.ok(s.toUpperCase()))
                         .ensure("Not empty", s -> s.isEmpty() ? Outcomes.fail("empty") : Outcomes.okVoid())
                     .build();
 
             assertThat(contract.derivations()).hasSize(2);
             assertThat(contract.postconditionCount()).isEqualTo(4); // 2 derivations + 2 ensures
-        }
-
-        @Test
-        @DisplayName("throws when require description is null")
-        void throwsWhenRequireDescriptionIsNull() {
-            assertThatThrownBy(() -> ServiceContract
-                    .<TestInput, String>define()
-                    .require(null, in -> true))
-                    .isInstanceOf(NullPointerException.class);
         }
 
         @Test
@@ -143,59 +114,6 @@ class ServiceContractTest {
                     .<TestInput, String>define()
                     .deriving("Test", null))
                     .isInstanceOf(NullPointerException.class);
-        }
-    }
-
-    @Nested
-    @DisplayName("checkPreconditions()")
-    class CheckPreconditionsTests {
-
-        @Test
-        @DisplayName("passes when all preconditions satisfied")
-        void passesWhenAllSatisfied() {
-            ServiceContract<TestInput, String> contract = ServiceContract
-                    .<TestInput, String>define()
-                    .require("Value not null", in -> in.value() != null)
-                    .require("Number positive", in -> in.number() > 0)
-                    .build();
-
-            assertThatCode(() -> contract.checkPreconditions(new TestInput("hello", 42)))
-                    .doesNotThrowAnyException();
-        }
-
-        @Test
-        @DisplayName("throws on first failed precondition")
-        void throwsOnFirstFailed() {
-            ServiceContract<TestInput, String> contract = ServiceContract
-                    .<TestInput, String>define()
-                    .require("Value not null", in -> in.value() != null)
-                    .require("Number positive", in -> in.number() > 0)
-                    .build();
-
-            assertThatThrownBy(() -> contract.checkPreconditions(new TestInput(null, 42)))
-                    .isInstanceOf(PreconditionException.class)
-                    .satisfies(e -> {
-                        PreconditionException ex = (PreconditionException) e;
-                        assertThat(ex.getPreconditionDescription()).isEqualTo("Value not null");
-                    });
-        }
-
-        @Test
-        @DisplayName("checks preconditions in order")
-        void checksPreconditionsInOrder() {
-            ServiceContract<TestInput, String> contract = ServiceContract
-                    .<TestInput, String>define()
-                    .require("Value not null", in -> in.value() != null)
-                    .require("Number positive", in -> in.number() > 0)
-                    .build();
-
-            // Both fail, but first one throws
-            assertThatThrownBy(() -> contract.checkPreconditions(new TestInput(null, -1)))
-                    .isInstanceOf(PreconditionException.class)
-                    .satisfies(e -> {
-                        PreconditionException ex = (PreconditionException) e;
-                        assertThat(ex.getPreconditionDescription()).isEqualTo("Value not null");
-                    });
         }
     }
 
@@ -287,9 +205,9 @@ class ServiceContractTest {
             assertThat(results.get(0).description()).isEqualTo("Valid number");
             // Skipped postconditions are represented as failures with "Skipped:" prefix
             assertThat(results.get(1).failed()).isTrue();
-            assertThat(results.get(1).failureReason()).startsWith("Skipped:");
+            assertThat(results.get(1).failureReason()).hasValueSatisfying(r -> assertThat(r).startsWith("Skipped:"));
             assertThat(results.get(2).failed()).isTrue();
-            assertThat(results.get(2).failureReason()).startsWith("Skipped:");
+            assertThat(results.get(2).failureReason()).hasValueSatisfying(r -> assertThat(r).startsWith("Skipped:"));
         }
 
         @Test
@@ -305,7 +223,7 @@ class ServiceContractTest {
                         }
                     })
                         .ensure("Positive", n -> n > 0 ? Outcomes.okVoid() : Outcomes.fail("not positive"))
-                    .deriving("Uppercase", Outcomes.lift(String::toUpperCase))
+                    .derive("Uppercase", Outcomes.lift(String::toUpperCase))
                         .ensure("Not empty", s -> s.isEmpty() ? Outcomes.fail("empty") : Outcomes.okVoid())
                     .build();
 
@@ -318,7 +236,7 @@ class ServiceContractTest {
             assertThat(results.get(0).description()).isEqualTo("Valid number");
             assertThat(results.get(1).failed()).isTrue();
             assertThat(results.get(1).description()).isEqualTo("Positive");
-            assertThat(results.get(1).failureReason()).startsWith("Skipped:");
+            assertThat(results.get(1).failureReason()).hasValueSatisfying(r -> assertThat(r).startsWith("Skipped:"));
             // Second derivation: Passed + Passed
             assertThat(results.get(2).passed()).isTrue();
             assertThat(results.get(2).description()).isEqualTo("Uppercase");
@@ -376,13 +294,12 @@ class ServiceContractTest {
         void returnsDescriptiveString() {
             ServiceContract<TestInput, String> contract = ServiceContract
                     .<TestInput, String>define()
-                    .require("Value not null", in -> in.value() != null)
                     .deriving("Valid number", s -> Outcomes.ok(42))
                         .ensure("Positive", n -> n > 0 ? Outcomes.okVoid() : Outcomes.fail("not positive"))
                     .build();
 
             assertThat(contract.toString())
-                    .isEqualTo("ServiceContract[preconditions=1, derivations=1, postconditions=2]");
+                    .isEqualTo("ServiceContract[derivations=1, postconditions=2]");
         }
     }
 }

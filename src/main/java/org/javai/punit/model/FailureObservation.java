@@ -2,7 +2,6 @@ package org.javai.punit.model;
 
 import java.util.List;
 import java.util.Optional;
-
 import org.javai.punit.contract.UseCaseOutcome;
 
 /**

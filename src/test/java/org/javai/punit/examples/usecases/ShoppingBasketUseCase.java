@@ -96,13 +96,10 @@ public class ShoppingBasketUseCase {
      */
     private static final ServiceContract<ServiceInput, ChatResponse> CONTRACT =
             ServiceContract.<ServiceInput, ChatResponse>define()
-                    .require("System prompt valid", si -> si.systemPrompt() != null && !si.systemPrompt().isBlank())
-                    .require("Instruction valid", si -> si.instruction() != null && !si.instruction().isBlank())
-                    .require("Temperature valid", si -> si.temperature() >= 0.0 && si.temperature() <= 1.0)
                     .deriving("Response content", cr -> Outcome.ok(cr.content()))
                     .ensure("Viable response content", c ->
-                            c != null && !c.isBlank() ? Outcomes.okVoid() : Outcomes.fail("content was null or blank"))
-                    .deriving("Valid Json", ShoppingBasketUseCase::parseJSON)
+                            c != null && !c.isBlank() ? Outcome.ok() : Outcomes.fail("content was null or blank"))
+                    .derive("Valid Json", ShoppingBasketUseCase::parseJSON)
                     .ensure("Has operations array", ShoppingBasketUseCase::hasOperationsArray)
                     .ensure("All operations valid", ShoppingBasketUseCase::allOperationsValid)
                     .build();
@@ -265,7 +262,7 @@ public class ShoppingBasketUseCase {
         if (!operations.isArray()) {
             return Outcomes.fail("'operations' is not an array");
         }
-        return Outcomes.okVoid();
+        return Outcome.ok();
     }
 
     private static Outcome<Void> allOperationsValid(JsonNode root) {
@@ -293,7 +290,7 @@ public class ShoppingBasketUseCase {
             }
         }
         if (problems.isEmpty()) {
-            return Outcomes.okVoid();
+            return Outcome.ok();
         }
         return Outcomes.fail(String.join(", ", problems));
     }

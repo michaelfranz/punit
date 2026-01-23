@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -58,7 +59,8 @@ public record UseCaseOutcome<R>(
         Objects.requireNonNull(executionTime, "executionTime must not be null");
         Objects.requireNonNull(timestamp, "timestamp must not be null");
         Objects.requireNonNull(postconditionEvaluator, "postconditionEvaluator must not be null");
-        metadata = Collections.unmodifiableMap(new HashMap<>(metadata));
+		//noinspection Java9CollectionFactory allows null metadata value
+		metadata = Collections.unmodifiableMap(new HashMap<>(metadata));
     }
 
     /**
@@ -96,38 +98,41 @@ public record UseCaseOutcome<R>(
     /**
      * Asserts that all postconditions pass.
      *
-     * <p>Each postcondition is evaluated and checked. On failure, an {@link AssertionError}
-     * is thrown with a message describing the failed postcondition.
+     * <p>All postconditions are evaluated and any failures are accumulated.
+     * If any postconditions fail, an {@link AssertionError} is thrown with
+     * messages describing all failed postconditions.
      *
      * @throws AssertionError if any postcondition fails
      */
     public void assertAll() {
-        for (PostconditionResult result : evaluatePostconditions()) {
-            if (result.failed()) {
-                String reason = result.failureReason();
-                String message = reason != null
-                        ? result.description() + ": " + reason
-                        : result.description();
-                throw new AssertionError("Postcondition failed: " + message);
-            }
+        List<String> failures = evaluatePostconditions().stream()
+                .filter(PostconditionResult::failed)
+                .map(PostconditionResult::failureMessage)
+                .toList();
+
+        if (!failures.isEmpty()) {
+            throw new AssertionError("Postconditions failed:\n  - " + String.join("\n  - ", failures));
         }
     }
 
     /**
      * Asserts that all postconditions pass, throwing a custom message on failure.
      *
+     * <p>All postconditions are evaluated and any failures are accumulated.
+     * If any postconditions fail, an {@link AssertionError} is thrown with
+     * the context message and descriptions of all failed postconditions.
+     *
      * @param contextMessage additional context for the error message
      * @throws AssertionError if any postcondition fails
      */
     public void assertAll(String contextMessage) {
-        for (PostconditionResult result : evaluatePostconditions()) {
-            if (result.failed()) {
-                String reason = result.failureReason();
-                String message = reason != null
-                        ? result.description() + ": " + reason
-                        : result.description();
-                throw new AssertionError(contextMessage + " - Postcondition failed: " + message);
-            }
+        List<String> failures = evaluatePostconditions().stream()
+                .filter(PostconditionResult::failed)
+                .map(PostconditionResult::failureMessage)
+                .toList();
+
+        if (!failures.isEmpty()) {
+            throw new AssertionError(contextMessage + " - Postconditions failed:\n  - " + String.join("\n  - ", failures));
         }
     }
 
@@ -142,14 +147,14 @@ public record UseCaseOutcome<R>(
      * @param keys the keys to try in order
      * @return the value if found, empty otherwise
      */
-    public java.util.Optional<Long> getMetadataLong(String... keys) {
+    public Optional<Long> getMetadataLong(String... keys) {
         for (String key : keys) {
             Object value = metadata.get(key);
             if (value instanceof Number n) {
-                return java.util.Optional.of(n.longValue());
+                return Optional.of(n.longValue());
             }
         }
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 
     /**
@@ -158,12 +163,12 @@ public record UseCaseOutcome<R>(
      * @param key the metadata key
      * @return the value if present and is a String, empty otherwise
      */
-    public java.util.Optional<String> getMetadataString(String key) {
+    public Optional<String> getMetadataString(String key) {
         Object value = metadata.get(key);
         if (value instanceof String s) {
-            return java.util.Optional.of(s);
+            return Optional.of(s);
         }
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 
     /**
@@ -172,12 +177,12 @@ public record UseCaseOutcome<R>(
      * @param key the metadata key
      * @return the value if present and is a Boolean, empty otherwise
      */
-    public java.util.Optional<Boolean> getMetadataBoolean(String key) {
+    public Optional<Boolean> getMetadataBoolean(String key) {
         Object value = metadata.get(key);
         if (value instanceof Boolean b) {
-            return java.util.Optional.of(b);
+            return Optional.of(b);
         }
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 
     /**
@@ -208,17 +213,12 @@ public record UseCaseOutcome<R>(
         }
 
         /**
-         * Provides the input to the service and checks preconditions.
-         *
-         * <p>Preconditions are evaluated eagerly. If any precondition fails,
-         * a {@link PreconditionException} is thrown immediately.
+         * Provides the input to the service.
          *
          * @param input the input value
          * @return a builder for executing the service
-         * @throws PreconditionException if any precondition fails
          */
         public ExecuteBuilder<I, R> input(I input) {
-            contract.checkPreconditions(input);
             return new ExecuteBuilder<>(contract, input);
         }
     }

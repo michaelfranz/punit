@@ -1,11 +1,10 @@
 package org.javai.punit.contract;
 
-import org.javai.outcome.Outcome;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import org.javai.outcome.Outcome;
 
 /**
  * A derivation transforms the raw result into a derived perspective for postcondition evaluation.

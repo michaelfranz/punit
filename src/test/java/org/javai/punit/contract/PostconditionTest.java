@@ -85,7 +85,7 @@ class PostconditionTest {
 
             assertThat(result.passed()).isTrue();
             assertThat(result.description()).isEqualTo("Is not empty");
-            assertThat(result.failureReason()).isNull();
+            assertThat(result.failureReason()).isEmpty();
         }
 
         @Test
@@ -98,7 +98,7 @@ class PostconditionTest {
 
             assertThat(result.failed()).isTrue();
             assertThat(result.description()).isEqualTo("Is not empty");
-            assertThat(result.failureReason()).isEqualTo("Postcondition not satisfied");
+            assertThat(result.failureReason()).hasValue("Postcondition not satisfied");
         }
 
         @Test
@@ -111,9 +111,9 @@ class PostconditionTest {
 
             assertThat(result.failed()).isTrue();
             assertThat(result.description()).isEqualTo("Has length");
-            assertThat(result.failureReason()).isNotNull();
+            assertThat(result.failureReason()).isPresent();
             // Modern Java NPE provides descriptive message about the null access
-            assertThat(result.failureReason()).containsIgnoringCase("null");
+            assertThat(result.failureReason()).hasValueSatisfying(r -> assertThat(r).containsIgnoringCase("null"));
         }
 
         @Test
@@ -148,7 +148,7 @@ class PostconditionTest {
 
             assertThat(result.passed()).isTrue();
             assertThat(result.description()).isEqualTo("Is not empty");
-            assertThat(result.failureReason()).isNull();
+            assertThat(result.failureReason()).isEmpty();
         }
 
         @Test
@@ -161,7 +161,7 @@ class PostconditionTest {
 
             assertThat(result.failed()).isTrue();
             assertThat(result.description()).isEqualTo("Is not empty");
-            assertThat(result.failureReason()).isEqualTo("Was empty");
+            assertThat(result.failureReason()).hasValue("Was empty");
         }
 
         @Test
@@ -180,11 +180,11 @@ class PostconditionTest {
 
             PostconditionResult resultNegative = postcondition.evaluate(-5);
             assertThat(resultNegative.failed()).isTrue();
-            assertThat(resultNegative.failureReason()).isEqualTo("Value -5 is negative");
+            assertThat(resultNegative.failureReason()).hasValue("Value -5 is negative");
 
             PostconditionResult resultTooLarge = postcondition.evaluate(150);
             assertThat(resultTooLarge.failed()).isTrue();
-            assertThat(resultTooLarge.failureReason()).isEqualTo("Value 150 exceeds maximum of 100");
+            assertThat(resultTooLarge.failureReason()).hasValue("Value 150 exceeds maximum of 100");
 
             PostconditionResult resultValid = postcondition.evaluate(50);
             assertThat(resultValid.passed()).isTrue();
@@ -200,8 +200,8 @@ class PostconditionTest {
 
             assertThat(result.failed()).isTrue();
             assertThat(result.description()).isEqualTo("Has length");
-            assertThat(result.failureReason()).isNotNull();
-            assertThat(result.failureReason()).containsIgnoringCase("null");
+            assertThat(result.failureReason()).isPresent();
+            assertThat(result.failureReason()).hasValueSatisfying(r -> assertThat(r).containsIgnoringCase("null"));
         }
     }
 
@@ -219,7 +219,7 @@ class PostconditionTest {
 
             assertThat(result.failed()).isTrue();
             assertThat(result.description()).isEqualTo("Has operations");
-            assertThat(result.failureReason()).isEqualTo("Skipped: Derivation 'Valid JSON' failed");
+            assertThat(result.failureReason()).hasValue("Skipped: Derivation 'Valid JSON' failed");
         }
     }
 

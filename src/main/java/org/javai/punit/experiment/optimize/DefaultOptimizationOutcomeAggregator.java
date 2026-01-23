@@ -1,8 +1,7 @@
 package org.javai.punit.experiment.optimize;
 
-import org.javai.punit.contract.UseCaseOutcome;
-
 import java.util.List;
+import org.javai.punit.contract.UseCaseOutcome;
 
 /**
  * Default implementation of OptimizationOutcomeAggregator.

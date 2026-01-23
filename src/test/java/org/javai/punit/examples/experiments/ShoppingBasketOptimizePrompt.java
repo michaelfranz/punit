@@ -2,8 +2,8 @@ package org.javai.punit.examples.experiments;
 
 import org.javai.punit.api.ControlFactor;
 import org.javai.punit.api.OptimizeExperiment;
-import org.javai.punit.api.Pacing;
 import org.javai.punit.api.OutcomeCaptor;
+import org.javai.punit.api.Pacing;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.usecases.ShoppingBasketUseCase;
 import org.javai.punit.experiment.optimize.OptimizationObjective;

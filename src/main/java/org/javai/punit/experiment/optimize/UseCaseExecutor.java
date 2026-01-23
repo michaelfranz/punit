@@ -1,9 +1,8 @@
 package org.javai.punit.experiment.optimize;
 
+import java.util.List;
 import org.javai.punit.contract.UseCaseOutcome;
 import org.javai.punit.experiment.model.FactorSuit;
-
-import java.util.List;
 
 /**
  * Executes a use case multiple times with a given factor suit.
