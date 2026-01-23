@@ -41,7 +41,6 @@ import java.lang.annotation.Target;
  *
  * @see Config
  * @see ExperimentGoal
- * @see Experiment
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
