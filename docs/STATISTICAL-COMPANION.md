@@ -727,9 +727,9 @@ Without `minDetectableEffect`, PUnit cannot compute a finite sample size and wil
 
 The three operational approaches apply to **both** paradigms. The key difference is the source of the threshold:
 
-| Paradigm        | Threshold Source                | Symbol Used            |
-|-----------------|---------------------------------|------------------------|
-| **Compliance**  | Given by contract/policy        | $p_{\text{SLA}}$       |
+| Paradigm       | Threshold Source                | Symbol Used            |
+|----------------|---------------------------------|------------------------|
+| **Compliance** | Given by contract/policy        | $p_{\text{SLA}}$       |
 | **Regression** | Derived from experimental basis | $\hat{p}_{\text{exp}}$ |
 
 Below, we present each approach with formulations for both paradigms.
@@ -1316,9 +1316,9 @@ When enabled, each test produces a structured explanation containing:
 
 The **Threshold Reference** section adapts based on the testing paradigm:
 
-| Paradigm        | Content Displayed                                                          |
-|-----------------|----------------------------------------------------------------------------|
-| **Compliance**  | Threshold origin (SLA/SLO/POLICY), contract reference, normative threshold |
+| Paradigm       | Content Displayed                                                          |
+|----------------|----------------------------------------------------------------------------|
+| **Compliance** | Threshold origin (SLA/SLO/POLICY), contract reference, normative threshold |
 | **Regression** | Spec file, empirical basis (samples, rate), threshold derivation method    |
 
 ### 10.3 Example Output: Regression Paradigm
@@ -1506,7 +1506,7 @@ PUnit addresses each of these failures with specific features.
 |-------------------------------------|-----------------------------------|------------------------------------------------|
 | **Principled sample sizes**         | Arbitrary numbers (10, 100, 1000) | Power analysis, confidence-first approach      |
 | **Controlled error rates**          | Unknown false positive rates      | Threshold derivation with specified α          |
-| **Empirically-grounded thresholds** | Hardcoded guesses                 | MEASURE experiments, regression testing       |
+| **Empirically-grounded thresholds** | Hardcoded guesses                 | MEASURE experiments, regression testing        |
 | **Assumption validity**             | Silent violations                 | Covariate tracking, expiration warnings        |
 | **Reproducibility**                 | Undocumented conditions           | Baseline provenance, machine-readable metadata |
 | **Transparency**                    | Black-box verdicts                | Transparent statistics mode                    |
