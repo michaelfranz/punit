@@ -6,8 +6,8 @@ import java.util.Map;
 import java.util.Optional;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ThresholdOrigin;
-import org.javai.punit.controls.budget.CostBudgetMonitor;
 import org.javai.punit.controls.budget.SharedBudgetMonitor;
+import org.javai.punit.ptest.strategy.TokenMode;
 import org.javai.punit.model.TerminationReason;
 import org.javai.punit.ptest.engine.ResultPublisher.PublishContext;
 import org.javai.punit.reporting.PUnitReporter;
@@ -49,7 +49,7 @@ class ResultPublisherTest {
                 0,
                 0,
                 0,
-                CostBudgetMonitor.TokenMode.NONE,
+                TokenMode.NONE,
                 null,
                 null,
                 null,
@@ -86,7 +86,7 @@ class ResultPublisherTest {
                 5000,
                 500,
                 250,
-                CostBudgetMonitor.TokenMode.DYNAMIC,
+                TokenMode.DYNAMIC,
                 classBudget,
                 suiteBudget,
                 null,
@@ -157,7 +157,7 @@ class ResultPublisherTest {
                     Optional.of(TerminationReason.IMPOSSIBILITY),
                     "Cannot achieve 90% pass rate",
                     1000, false, 1.0, 0, 0, 0,
-                    CostBudgetMonitor.TokenMode.NONE,
+                    TokenMode.NONE,
                     null, null, null, null, null, null, null,
                     BaselineData.empty(), List.of(), null
             );
@@ -261,7 +261,7 @@ class ResultPublisherTest {
             PublishContext ctx = new PublishContext(
                     "test", 100, 100, 90, 10, 0.9, 0.9, true,
                     Optional.empty(), null, 1000, false, 1.0, 0, 0, 0,
-                    CostBudgetMonitor.TokenMode.NONE, null, null, null, null,
+                    TokenMode.NONE, null, null, null, null,
                     ThresholdOrigin.UNSPECIFIED, null, null,
                     BaselineData.empty(), List.of(), null
             );

@@ -2,7 +2,7 @@ package org.javai.punit.ptest.strategy;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.javai.punit.controls.budget.CostBudgetMonitor;
+import org.javai.punit.controls.budget.CostMonitor;
 import org.javai.punit.controls.budget.DefaultTokenChargeRecorder;
 import org.javai.punit.controls.budget.SharedBudgetMonitor;
 import org.javai.punit.ptest.bernoulli.EarlyTerminationEvaluator;
@@ -26,7 +26,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  * @param config the probabilistic test configuration
  * @param aggregator the result aggregator for recording sample outcomes
  * @param evaluator the early termination evaluator
- * @param methodBudget the method-level budget monitor
+ * @param methodBudget the method-level cost monitor
  * @param classBudget the class-level budget monitor (may be null)
  * @param suiteBudget the suite-level budget monitor (may be null)
  * @param tokenRecorder the token recorder for dynamic token mode (may be null)
@@ -37,7 +37,7 @@ public record SampleExecutionContext(
         ProbabilisticTestConfig config,
         SampleResultAggregator aggregator,
         EarlyTerminationEvaluator evaluator,
-        CostBudgetMonitor methodBudget,
+        CostMonitor methodBudget,
         SharedBudgetMonitor classBudget,
         SharedBudgetMonitor suiteBudget,
         DefaultTokenChargeRecorder tokenRecorder,

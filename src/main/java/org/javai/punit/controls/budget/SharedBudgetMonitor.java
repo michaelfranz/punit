@@ -8,7 +8,7 @@ import org.javai.punit.model.TerminationReason;
 /**
  * Thread-safe budget monitor for shared budgets at class or suite level.
  * 
- * <p>Unlike {@link CostBudgetMonitor} which is per-method and not thread-safe,
+ * <p>Unlike {@link CostMonitor} which is per-method,
  * this class uses atomic operations to safely track consumption from multiple
  * concurrent test methods.
  * 

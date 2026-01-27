@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+import org.javai.punit.controls.budget.CostMonitor;
+import org.javai.punit.controls.budget.GlobalCostAccumulator;
 import org.javai.punit.controls.pacing.PacingConfiguration;
 import org.javai.punit.controls.pacing.PacingReporter;
 import org.javai.punit.controls.pacing.PacingResolver;
@@ -69,9 +71,19 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         ExtensionContext.Store store = context.getStore(NAMESPACE);
         ExperimentConfig config = strategy.parseConfig(testMethod);
 
+        // Create cost monitor for the experiment and connect to global accumulator
+        GlobalCostAccumulator globalAccumulator = GlobalCostAccumulator.getOrCreate(context);
+        CostMonitor costMonitor = CostMonitor.builder()
+                .timeBudgetMs(config.timeBudgetMs())
+                .tokenBudget(config.tokenBudget())
+                .build();
+        costMonitor.setGlobalAccumulator(globalAccumulator);
+
         // Store shared state
         store.put("strategy", strategy);
         store.put("config", config);
+        store.put("costMonitor", costMonitor);
+        store.put("globalAccumulator", globalAccumulator);
         store.put("testMethod", testMethod);
         store.put("startTimeMs", System.currentTimeMillis());
         store.put("useCaseId", config.useCaseId());
@@ -80,6 +92,10 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
         // Setup pacing (shared infrastructure)
         int totalSamples = strategy.computeTotalSamples(config, testMethod);
         setupPacing(testMethod, totalSamples, config, store);
+
+        // Register cleanup to record experiment completion
+        GlobalCostAccumulator.ExperimentMode mode = resolveExperimentMode(strategy);
+        store.put("experimentCompletionTracker", new ExperimentCompletionTracker(globalAccumulator, mode));
 
         return strategy.provideInvocationContexts(config, context, store);
     }
@@ -132,6 +148,42 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
             PacingReporter pacingReporter = new PacingReporter();
             pacingReporter.printPreFlightReport(testName, totalSamples, pacing, Instant.now());
             pacingReporter.printFeasibilityWarning(pacing, config.timeBudgetMs(), totalSamples);
+        }
+    }
+
+    /**
+     * Resolves the experiment mode from the strategy type.
+     */
+    private GlobalCostAccumulator.ExperimentMode resolveExperimentMode(ExperimentModeStrategy strategy) {
+        if (strategy instanceof MeasureStrategy) {
+            return GlobalCostAccumulator.ExperimentMode.MEASURE;
+        } else if (strategy instanceof ExploreStrategy) {
+            return GlobalCostAccumulator.ExperimentMode.EXPLORE;
+        } else if (strategy instanceof OptimizeStrategy) {
+            return GlobalCostAccumulator.ExperimentMode.OPTIMIZE;
+        }
+        return GlobalCostAccumulator.ExperimentMode.MEASURE; // Default fallback
+    }
+
+    /**
+     * Tracks experiment completion and records it to the global accumulator.
+     *
+     * <p>Implements CloseableResource so JUnit automatically calls close() when
+     * the extension context is closed (i.e., when the experiment completes).
+     */
+    private static class ExperimentCompletionTracker implements ExtensionContext.Store.CloseableResource {
+        private final GlobalCostAccumulator accumulator;
+        private final GlobalCostAccumulator.ExperimentMode mode;
+
+        ExperimentCompletionTracker(GlobalCostAccumulator accumulator,
+                                     GlobalCostAccumulator.ExperimentMode mode) {
+            this.accumulator = accumulator;
+            this.mode = mode;
+        }
+
+        @Override
+        public void close() {
+            accumulator.recordExperimentMethodCompleted(mode);
         }
     }
 

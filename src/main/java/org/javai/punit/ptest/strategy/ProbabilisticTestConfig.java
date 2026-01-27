@@ -3,7 +3,6 @@ package org.javai.punit.ptest.strategy;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ThresholdOrigin;
-import org.javai.punit.controls.budget.CostBudgetMonitor;
 import org.javai.punit.controls.pacing.PacingConfiguration;
 import org.javai.punit.statistics.transparent.TransparentStatsConfig;
 
@@ -44,7 +43,7 @@ public interface ProbabilisticTestConfig {
     /**
      * Token charging mode.
      */
-    CostBudgetMonitor.TokenMode tokenMode();
+    TokenMode tokenMode();
 
     /**
      * Behavior when budget is exhausted.

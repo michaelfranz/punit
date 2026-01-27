@@ -96,7 +96,8 @@ Budgets are checked in order: Suite → Class → Method. First exhausted budget
 | `SampleResultAggregator`     | Tracks pass/fail outcomes                         |
 | `EarlyTerminationEvaluator`  | Detects impossibility or success-guaranteed       |
 | `ThresholdDeriver`           | Derives thresholds from baseline using statistics |
-| `CostBudgetMonitor`          | Enforces time/token budgets                       |
+| `CostMonitor`                | Enforces time/token budgets at method level       |
+| `GlobalCostAccumulator`      | Tracks global cost across all tests/experiments   |
 
 ## Conventions
 

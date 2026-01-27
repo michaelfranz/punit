@@ -136,7 +136,7 @@ public final class OptimizeHistory {
     }
 
     /**
-     * Get the total duration of the optimization run.
+     * Get the total duration of the completed optimization run.
      *
      * @return the duration, or Duration.ZERO if not yet complete
      */
@@ -145,6 +145,22 @@ public final class OptimizeHistory {
             return Duration.ZERO;
         }
         return Duration.between(startTime, endTime);
+    }
+
+    /**
+     * Get the elapsed duration since the optimization started.
+     *
+     * <p>Unlike {@link #totalDuration()}, this method returns the time elapsed
+     * from {@code startTime} to now, making it suitable for use during the
+     * optimization loop (e.g., for time budget checks).
+     *
+     * @return the elapsed duration, or Duration.ZERO if startTime is not set
+     */
+    public Duration elapsedDuration() {
+        if (startTime == null) {
+            return Duration.ZERO;
+        }
+        return Duration.between(startTime, Instant.now());
     }
 
     /**

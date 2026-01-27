@@ -4,10 +4,11 @@
  * <p>This package provides infrastructure for enforcing time and token budgets at
  * multiple scopes:
  * <ul>
- *   <li><b>Method-level:</b> {@link CostBudgetMonitor} tracks budgets for individual test methods</li>
+ *   <li><b>Method-level:</b> {@link CostMonitor} tracks budgets for individual test methods</li>
  *   <li><b>Class-level:</b> {@link SharedBudgetMonitor} with {@link ProbabilisticTestBudgetExtension}
  *       enforces shared budgets across all tests in a class</li>
  *   <li><b>Suite-level:</b> {@link SuiteBudgetManager} manages JVM-wide budget limits</li>
+ *   <li><b>Global:</b> {@link GlobalCostAccumulator} provides JVM-wide cost tracking and reporting</li>
  * </ul>
  *
  * <p>The {@link BudgetOrchestrator} coordinates budget checking across all scopes with

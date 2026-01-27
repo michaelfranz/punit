@@ -270,4 +270,49 @@ class OptimizeHistoryTest {
         assertEquals(end, history.endTime());
         assertEquals(MAX_ITERATIONS, history.terminationReason().cause());
     }
+
+    @Test
+    void elapsedDurationShouldReturnTimeFromStartToNow() throws InterruptedException {
+        // Create a history with startTime but no endTime (simulates in-progress optimization)
+        OptimizeHistory history = OptimizeHistory.builder()
+                .useCaseId("test")
+                .controlFactorName("factor")
+                .objective(OptimizationObjective.MAXIMIZE)
+                .startTime(Instant.now())
+                .buildPartial();
+
+        Thread.sleep(50);
+
+        // elapsedDuration should return time since startTime, NOT zero
+        assertTrue(history.elapsedDuration().toMillis() >= 50,
+                "elapsedDuration should track time from startTime to now");
+    }
+
+    @Test
+    void elapsedDurationShouldReturnZeroWhenNoStartTime() {
+        // This is an edge case - startTime should always be set, but test defensive behavior
+        OptimizeHistory history = OptimizeHistory.builder()
+                .useCaseId("test")
+                .controlFactorName("factor")
+                .objective(OptimizationObjective.MAXIMIZE)
+                // No startTime
+                .buildPartial();
+
+        assertEquals(java.time.Duration.ZERO, history.elapsedDuration());
+    }
+
+    @Test
+    void totalDurationShouldReturnZeroWhenNoEndTime() {
+        // This verifies the original behavior is preserved
+        OptimizeHistory history = OptimizeHistory.builder()
+                .useCaseId("test")
+                .controlFactorName("factor")
+                .objective(OptimizationObjective.MAXIMIZE)
+                .startTime(Instant.now())
+                // No endTime
+                .buildPartial();
+
+        assertEquals(java.time.Duration.ZERO, history.totalDuration(),
+                "totalDuration should return ZERO when endTime is not set (for completed duration semantics)");
+    }
 }

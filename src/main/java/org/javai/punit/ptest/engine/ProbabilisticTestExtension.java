@@ -12,8 +12,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.UseCaseProvider;
-import org.javai.punit.controls.budget.CostBudgetMonitor;
+import org.javai.punit.controls.budget.CostMonitor;
 import org.javai.punit.controls.budget.DefaultTokenChargeRecorder;
+import org.javai.punit.controls.budget.GlobalCostAccumulator;
 import org.javai.punit.controls.budget.ProbabilisticTestBudgetExtension;
 import org.javai.punit.controls.budget.SharedBudgetMonitor;
 import org.javai.punit.controls.budget.SuiteBudgetManager;
@@ -27,6 +28,7 @@ import org.javai.punit.ptest.bernoulli.SampleResultAggregator;
 import org.javai.punit.ptest.strategy.InterceptResult;
 import org.javai.punit.ptest.strategy.ProbabilisticTestStrategy;
 import org.javai.punit.ptest.strategy.SampleExecutionContext;
+import org.javai.punit.ptest.strategy.TokenMode;
 import org.javai.punit.reporting.PUnitReporter;
 import org.javai.punit.spec.baseline.BaselineRepository;
 import org.javai.punit.spec.baseline.BaselineSelectionTypes.SelectionResult;
@@ -91,6 +93,7 @@ public class ProbabilisticTestExtension implements
 	private static final String SELECTION_RESULT_KEY = "selectionResult";
 	private static final String PENDING_SELECTION_KEY = "pendingSelection";
 	private static final String STRATEGY_CONFIG_KEY = "strategyConfig";
+	private static final String GLOBAL_ACCUMULATOR_KEY = "globalAccumulator";
 
 	// Strategy for test execution (currently only Bernoulli trials supported)
 	private final ProbabilisticTestStrategy strategy;
@@ -183,17 +186,19 @@ public class ProbabilisticTestExtension implements
 		BernoulliTrialsConfig strategyConfig = (BernoulliTrialsConfig) strategy.parseConfig(
 				annotation, testMethod, configResolver);
 
-		// Create method-level budget monitor
-		CostBudgetMonitor budgetMonitor = new CostBudgetMonitor(
-				strategyConfig.timeBudgetMs(),
-				strategyConfig.tokenBudget(),
-				strategyConfig.tokenCharge(),
-				strategyConfig.tokenMode(),
-				strategyConfig.onBudgetExhausted()
-		);
+		// Get or create global cost accumulator
+		GlobalCostAccumulator globalAccumulator = GlobalCostAccumulator.getOrCreate(context);
+
+		// Create method-level budget monitor with global accumulator
+		CostMonitor budgetMonitor = CostMonitor.builder()
+				.timeBudgetMs(strategyConfig.timeBudgetMs())
+				.tokenBudget(strategyConfig.tokenBudget())
+				.onBudgetExhausted(strategyConfig.onBudgetExhausted())
+				.build();
+		budgetMonitor.setGlobalAccumulator(globalAccumulator);
 
 		// Create token recorder if dynamic mode
-		DefaultTokenChargeRecorder tokenRecorder = strategyConfig.tokenMode() == CostBudgetMonitor.TokenMode.DYNAMIC
+		DefaultTokenChargeRecorder tokenRecorder = strategyConfig.tokenMode() == TokenMode.DYNAMIC
 				? new DefaultTokenChargeRecorder(strategyConfig.tokenBudget())
 				: null;
 
@@ -216,9 +221,13 @@ public class ProbabilisticTestExtension implements
 		store.put(TERMINATED_KEY, terminated);
 		store.put(PACING_KEY, strategyConfig.pacing());
 		store.put(SAMPLE_COUNTER_KEY, sampleCounter);
+		store.put(GLOBAL_ACCUMULATOR_KEY, globalAccumulator);
 		if (tokenRecorder != null) {
 			store.put(TOKEN_RECORDER_KEY, tokenRecorder);
 		}
+
+		// Register completion tracker to record test method completion when context closes
+		store.put("testCompletionTracker", new TestCompletionTracker(globalAccumulator));
 
 		// Prepare baseline selection data (selection is resolved lazily during first sample)
 		prepareBaselineSelection(annotation, strategyConfig.specId(), store, context);
@@ -285,7 +294,7 @@ public class ProbabilisticTestExtension implements
 		SampleResultAggregator aggregator = getAggregator(extensionContext);
 		TestConfiguration config = getConfiguration(extensionContext);
 		EarlyTerminationEvaluator evaluator = getEvaluator(extensionContext);
-		CostBudgetMonitor budgetMonitor = getBudgetMonitor(extensionContext);
+		CostMonitor budgetMonitor = getBudgetMonitor(extensionContext);
 		DefaultTokenChargeRecorder tokenRecorder = getTokenRecorder(extensionContext);
 		AtomicBoolean terminated = getTerminatedFlag(extensionContext);
 
@@ -349,7 +358,7 @@ public class ProbabilisticTestExtension implements
 	private void finalizeProbabilisticTest(ExtensionContext context,
 										   SampleResultAggregator aggregator,
 										   TestConfiguration config,
-										   CostBudgetMonitor methodBudget,
+										   CostMonitor methodBudget,
 										   SharedBudgetMonitor classBudget,
 										   SharedBudgetMonitor suiteBudget) {
 
@@ -379,7 +388,7 @@ public class ProbabilisticTestExtension implements
 	private void publishResults(ExtensionContext context,
 								SampleResultAggregator aggregator,
 								TestConfiguration config,
-								CostBudgetMonitor methodBudget,
+								CostMonitor methodBudget,
 								SharedBudgetMonitor classBudget,
 								SharedBudgetMonitor suiteBudget,
 								boolean passed) {
@@ -494,8 +503,8 @@ public class ProbabilisticTestExtension implements
 		return getFromStoreOrParent(context, STRATEGY_CONFIG_KEY, BernoulliTrialsConfig.class);
 	}
 
-	private CostBudgetMonitor getBudgetMonitor(ExtensionContext context) {
-		return getFromStoreOrParent(context, BUDGET_MONITOR_KEY, CostBudgetMonitor.class);
+	private CostMonitor getBudgetMonitor(ExtensionContext context) {
+		return getFromStoreOrParent(context, BUDGET_MONITOR_KEY, CostMonitor.class);
 	}
 
 	private DefaultTokenChargeRecorder getTokenRecorder(ExtensionContext context) {
@@ -784,4 +793,23 @@ public class ProbabilisticTestExtension implements
 	}
 
 	// ========== Inner Classes ==========
+
+	/**
+	 * Tracks test completion and records it to the global accumulator.
+	 *
+	 * <p>Implements CloseableResource so JUnit automatically calls close() when
+	 * the extension context is closed (i.e., when the test method completes).
+	 */
+	private static class TestCompletionTracker implements ExtensionContext.Store.CloseableResource {
+		private final GlobalCostAccumulator accumulator;
+
+		TestCompletionTracker(GlobalCostAccumulator accumulator) {
+			this.accumulator = accumulator;
+		}
+
+		@Override
+		public void close() {
+			accumulator.recordTestMethodCompleted();
+		}
+	}
 }

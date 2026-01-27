@@ -9,8 +9,8 @@ import org.javai.punit.model.TerminationReason;
  *
  * <p>This class handles:
  * <ul>
- *   <li>Pre-sample budget checks (time and token budgets at all scopes)</li>
- *   <li>Post-sample budget checks (for dynamic token mode)</li>
+ *   <li>Pre-sample budget checks (time budgets at all scopes)</li>
+ *   <li>Post-sample budget checks (token budgets after recording)</li>
  *   <li>Token recording and propagation across scopes</li>
  *   <li>Determining appropriate exhaustion behavior based on scope</li>
  *   <li>Building exhaustion messages for logging and error reporting</li>
@@ -53,7 +53,7 @@ public class BudgetOrchestrator {
      *   <li>Class-level time budget</li>
      *   <li>Class-level token budget</li>
      *   <li>Method-level time budget</li>
-     *   <li>Method-level token budget (pre-sample check)</li>
+     *   <li>Method-level token budget</li>
      * </ol>
      *
      * @param suiteBudget the suite-level budget monitor (may be null)
@@ -64,7 +64,7 @@ public class BudgetOrchestrator {
     public BudgetCheckResult checkBeforeSample(
             SharedBudgetMonitor suiteBudget,
             SharedBudgetMonitor classBudget,
-            CostBudgetMonitor methodBudget) {
+            CostMonitor methodBudget) {
 
         // 1. Suite-level budgets
         if (suiteBudget != null) {
@@ -88,17 +88,16 @@ public class BudgetOrchestrator {
         Optional<TerminationReason> reason = methodBudget.checkTimeBudget();
         if (reason.isPresent()) return BudgetCheckResult.exhausted(reason.get());
 
-        reason = methodBudget.checkTokenBudgetBeforeSample();
+        reason = methodBudget.checkTokenBudget();
         if (reason.isPresent()) return BudgetCheckResult.exhausted(reason.get());
 
         return BudgetCheckResult.ok();
     }
 
     /**
-     * Checks all budget scopes after a sample (for dynamic token mode).
+     * Checks all budget scopes after a sample.
      *
-     * <p>This is called after token consumption is recorded, primarily for
-     * dynamic token budgets where consumption isn't known until after execution.
+     * <p>This is called after token consumption is recorded.
      *
      * @param suiteBudget the suite-level budget monitor (may be null)
      * @param classBudget the class-level budget monitor (may be null)
@@ -108,7 +107,7 @@ public class BudgetOrchestrator {
     public BudgetCheckResult checkAfterSample(
             SharedBudgetMonitor suiteBudget,
             SharedBudgetMonitor classBudget,
-            CostBudgetMonitor methodBudget) {
+            CostMonitor methodBudget) {
 
         // Check in order: suite → class → method
         if (suiteBudget != null) {
@@ -121,7 +120,7 @@ public class BudgetOrchestrator {
             if (reason.isPresent()) return BudgetCheckResult.exhausted(reason.get());
         }
 
-        Optional<TerminationReason> reason = methodBudget.checkTokenBudgetAfterSample();
+        Optional<TerminationReason> reason = methodBudget.checkTokenBudget();
         if (reason.isPresent()) return BudgetCheckResult.exhausted(reason.get());
 
         return BudgetCheckResult.ok();
@@ -130,37 +129,38 @@ public class BudgetOrchestrator {
     /**
      * Records tokens and propagates consumption to all active scopes.
      *
-     * <p>Handles both static (pre-configured per-sample) and dynamic
-     * (recorded during execution) token charging modes.
+     * <p>Handles both dynamic (recorded via TokenChargeRecorder) and static
+     * (pre-configured per-sample) token charging.
      *
      * @param tokenRecorder the dynamic token recorder (may be null)
      * @param methodBudget the method-level budget monitor
-     * @param tokenMode the token charging mode
-     * @param tokenCharge the static token charge per sample (if applicable)
+     * @param staticTokenCharge the static token charge per sample (used if tokenRecorder is null)
      * @param classBudget the class-level budget monitor (may be null)
      * @param suiteBudget the suite-level budget monitor (may be null)
      * @return the number of tokens consumed in this sample
      */
     public long recordAndPropagateTokens(
             DefaultTokenChargeRecorder tokenRecorder,
-            CostBudgetMonitor methodBudget,
-            CostBudgetMonitor.TokenMode tokenMode,
-            int tokenCharge,
+            CostMonitor methodBudget,
+            int staticTokenCharge,
             SharedBudgetMonitor classBudget,
             SharedBudgetMonitor suiteBudget) {
 
         long sampleTokens = 0;
 
         if (tokenRecorder != null) {
+            // Dynamic mode: get tokens from recorder
             sampleTokens = tokenRecorder.finalizeSample();
-            methodBudget.recordDynamicTokens(sampleTokens);
-        } else if (tokenMode == CostBudgetMonitor.TokenMode.STATIC) {
-            sampleTokens = tokenCharge;
-            methodBudget.recordStaticTokenCharge();
+        } else if (staticTokenCharge > 0) {
+            // Static mode: use configured charge
+            sampleTokens = staticTokenCharge;
         }
 
-        // Propagate to class and suite scopes
+        // Record to method budget (which may propagate to global accumulator)
         if (sampleTokens > 0) {
+            methodBudget.recordTokens(sampleTokens);
+
+            // Propagate to class and suite scopes
             if (classBudget != null) {
                 classBudget.addTokens(sampleTokens);
             }
@@ -216,7 +216,7 @@ public class BudgetOrchestrator {
      */
     public String buildExhaustionMessage(
             TerminationReason reason,
-            CostBudgetMonitor methodBudget,
+            CostMonitor methodBudget,
             SharedBudgetMonitor classBudget,
             SharedBudgetMonitor suiteBudget) {
 

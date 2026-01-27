@@ -155,6 +155,46 @@ class OptimizeTerminationPolicyTest {
     }
 
     @Test
+    void timeBudgetPolicyShouldWorkDuringOptimizationLoopWithoutEndTime() {
+        // This test verifies the fix for the bug where totalDuration() returned ZERO
+        // during the optimization loop because endTime was never set.
+        // The policy should use elapsedDuration() instead.
+
+        OptimizeTerminationPolicy policy = new OptimizeTimeBudgetPolicy(Duration.ofMillis(50));
+
+        // Create history with startTime in the past but NO endTime (simulates mid-loop)
+        OptimizeHistory historyWithoutEndTime = OptimizeHistory.builder()
+                .useCaseId("test")
+                .controlFactorName("factor")
+                .objective(OptimizationObjective.MAXIMIZE)
+                .startTime(Instant.now().minusMillis(100))  // Started 100ms ago
+                // No endTime set - this is the key difference from completed history
+                .buildPartial();
+
+        // The policy should detect that elapsed time (100ms) exceeds budget (50ms)
+        Optional<OptimizeTerminationReason> reason = policy.shouldTerminate(historyWithoutEndTime);
+        assertTrue(reason.isPresent(), "Policy should terminate when elapsed time exceeds budget, even without endTime");
+        assertEquals(OPTIMIZATION_TIME_BUDGET_EXHAUSTED, reason.get().cause());
+    }
+
+    @Test
+    void timeBudgetPolicyShouldNotTerminateEarlyDuringLoop() {
+        OptimizeTerminationPolicy policy = new OptimizeTimeBudgetPolicy(Duration.ofSeconds(10));
+
+        // Create history with startTime just now, no endTime
+        OptimizeHistory historyWithoutEndTime = OptimizeHistory.builder()
+                .useCaseId("test")
+                .controlFactorName("factor")
+                .objective(OptimizationObjective.MAXIMIZE)
+                .startTime(Instant.now())  // Just started
+                .buildPartial();
+
+        // Should not terminate - we just started
+        assertTrue(policy.shouldTerminate(historyWithoutEndTime).isEmpty(),
+                "Policy should not terminate when within budget");
+    }
+
+    @Test
     void timeBudgetPolicyShouldRejectInvalidDuration() {
         assertThrows(IllegalArgumentException.class, () ->
                 new OptimizeTimeBudgetPolicy(null)

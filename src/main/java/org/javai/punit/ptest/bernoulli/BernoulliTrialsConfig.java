@@ -3,9 +3,9 @@ package org.javai.punit.ptest.bernoulli;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.api.ExceptionHandling;
 import org.javai.punit.api.ThresholdOrigin;
-import org.javai.punit.controls.budget.CostBudgetMonitor;
 import org.javai.punit.controls.pacing.PacingConfiguration;
 import org.javai.punit.ptest.strategy.ProbabilisticTestConfig;
+import org.javai.punit.ptest.strategy.TokenMode;
 import org.javai.punit.statistics.transparent.TransparentStatsConfig;
 
 /**
@@ -49,7 +49,7 @@ public record BernoulliTrialsConfig(
         long timeBudgetMs,
         int tokenCharge,
         int tokenBudget,
-        CostBudgetMonitor.TokenMode tokenMode,
+        TokenMode tokenMode,
         BudgetExhaustedBehavior onBudgetExhausted,
         ExceptionHandling onException,
         int maxExampleFailures,

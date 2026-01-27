@@ -13,7 +13,6 @@ import org.javai.punit.api.HashableFactorSource;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.TokenChargeRecorder;
 import org.javai.punit.controls.budget.BudgetOrchestrator;
-import org.javai.punit.controls.budget.CostBudgetMonitor;
 import org.javai.punit.controls.budget.DefaultTokenChargeRecorder;
 import org.javai.punit.controls.pacing.PacingConfiguration;
 import org.javai.punit.controls.pacing.PacingResolver;
@@ -28,6 +27,7 @@ import org.javai.punit.ptest.strategy.InterceptResult;
 import org.javai.punit.ptest.strategy.ProbabilisticTestConfig;
 import org.javai.punit.ptest.strategy.ProbabilisticTestStrategy;
 import org.javai.punit.ptest.strategy.SampleExecutionContext;
+import org.javai.punit.ptest.strategy.TokenMode;
 import org.javai.punit.spec.model.ExecutionSpecification;
 import org.javai.punit.statistics.transparent.TransparentStatsConfig;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -99,7 +99,7 @@ public class BernoulliTrialsStrategy implements ProbabilisticTestStrategy {
 
         // Detect token charging mode
         boolean hasTokenRecorderParam = hasTokenChargeRecorderParameter(testMethod);
-        CostBudgetMonitor.TokenMode tokenMode = determineTokenMode(resolved, hasTokenRecorderParam);
+        TokenMode tokenMode = determineTokenMode(resolved, hasTokenRecorderParam);
 
         // Resolve pacing configuration
         PacingConfiguration pacing = pacingResolver.resolve(testMethod, resolved.samples());
@@ -214,14 +214,16 @@ public class BernoulliTrialsStrategy implements ProbabilisticTestStrategy {
             return InterceptResult.abort(sampleResult.abortException());
         }
 
-        // Post-sample token recording
+        // Post-sample token recording (propagates to global accumulator via CostMonitor)
         budgetOrchestrator.recordAndPropagateTokens(
                 executionContext.tokenRecorder(),
                 executionContext.methodBudget(),
-                config.tokenMode(),
                 config.tokenCharge(),
                 executionContext.classBudget(),
                 executionContext.suiteBudget());
+
+        // Record sample execution to method budget (propagates to global accumulator)
+        executionContext.methodBudget().recordSampleExecuted();
 
         // Post-sample budget check
         BudgetOrchestrator.BudgetCheckResult postSampleCheck = budgetOrchestrator.checkAfterSample(
@@ -377,16 +379,16 @@ public class BernoulliTrialsStrategy implements ProbabilisticTestStrategy {
         return false;
     }
 
-    private CostBudgetMonitor.TokenMode determineTokenMode(
+    private TokenMode determineTokenMode(
             ConfigurationResolver.ResolvedConfiguration config,
             boolean hasTokenRecorderParam) {
 
         if (hasTokenRecorderParam) {
-            return CostBudgetMonitor.TokenMode.DYNAMIC;
+            return TokenMode.DYNAMIC;
         } else if (config.tokenCharge() > 0) {
-            return CostBudgetMonitor.TokenMode.STATIC;
+            return TokenMode.STATIC;
         } else {
-            return CostBudgetMonitor.TokenMode.NONE;
+            return TokenMode.NONE;
         }
     }
 }

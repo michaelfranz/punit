@@ -4,9 +4,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.javai.punit.controls.budget.CostBudgetMonitor;
 import org.javai.punit.controls.budget.SharedBudgetMonitor;
 import org.javai.punit.model.ExpirationStatus;
+import org.javai.punit.ptest.strategy.TokenMode;
 import org.javai.punit.model.TerminationReason;
 import org.javai.punit.reporting.PUnitReporter;
 import org.javai.punit.spec.expiration.ExpirationEvaluator;
@@ -62,7 +62,7 @@ class ResultPublisher {
             long timeBudgetMs,
             long tokenBudget,
             long methodTokensConsumed,
-            CostBudgetMonitor.TokenMode tokenMode,
+            TokenMode tokenMode,
             SharedBudgetMonitor classBudget,
             SharedBudgetMonitor suiteBudget,
             ExecutionSpecification spec,
@@ -133,7 +133,7 @@ class ResultPublisher {
         }
         entries.put("punit.method.tokensConsumed", String.valueOf(ctx.methodTokensConsumed()));
 
-        if (ctx.tokenMode() != CostBudgetMonitor.TokenMode.NONE) {
+        if (ctx.tokenMode() != TokenMode.NONE) {
             entries.put("punit.tokenMode", ctx.tokenMode().name());
         }
 

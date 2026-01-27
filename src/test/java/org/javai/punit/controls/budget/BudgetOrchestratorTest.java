@@ -22,23 +22,20 @@ class BudgetOrchestratorTest {
     }
 
     // Helper to create a method budget with no limits
-    private CostBudgetMonitor unlimitedMethodBudget() {
-        return new CostBudgetMonitor(0, 0, 0, CostBudgetMonitor.TokenMode.NONE, 
-                BudgetExhaustedBehavior.EVALUATE_PARTIAL);
+    private CostMonitor unlimitedMethodBudget() {
+        return CostMonitor.unlimited();
     }
 
     // Helper to create a method budget with time limit (already expired)
-    private CostBudgetMonitor expiredTimeBudget() throws InterruptedException {
-        CostBudgetMonitor monitor = new CostBudgetMonitor(1, 0, 0, 
-                CostBudgetMonitor.TokenMode.NONE, BudgetExhaustedBehavior.FAIL);
+    private CostMonitor expiredTimeBudget() throws InterruptedException {
+        CostMonitor monitor = CostMonitor.withTimeBudget(1);
         Thread.sleep(10); // Let it expire
         return monitor;
     }
 
     // Helper to create a method budget with token limit
-    private CostBudgetMonitor tokenLimitedMethodBudget(long budget, int staticCharge) {
-        return new CostBudgetMonitor(0, budget, staticCharge,
-                CostBudgetMonitor.TokenMode.STATIC, BudgetExhaustedBehavior.FAIL);
+    private CostMonitor tokenLimitedMethodBudget(long budget) {
+        return CostMonitor.withTokenBudget(budget);
     }
 
     // Helper to create a shared budget with no limits
@@ -47,7 +44,7 @@ class BudgetOrchestratorTest {
     }
 
     // Helper to create a shared budget that's expired
-    private SharedBudgetMonitor expiredTimeSharedBudget(SharedBudgetMonitor.Scope scope) 
+    private SharedBudgetMonitor expiredTimeSharedBudget(SharedBudgetMonitor.Scope scope)
             throws InterruptedException {
         SharedBudgetMonitor monitor = new SharedBudgetMonitor(scope, 1, 0, BudgetExhaustedBehavior.FAIL);
         Thread.sleep(10); // Let it expire
@@ -66,7 +63,7 @@ class BudgetOrchestratorTest {
         @Test
         @DisplayName("returns ok when all budgets are within limits")
         void returnsOkWhenAllBudgetsWithinLimits() {
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             BudgetCheckResult result = orchestrator.checkBeforeSample(null, null, methodBudget);
 
@@ -78,7 +75,7 @@ class BudgetOrchestratorTest {
         void suiteTimeBudgetTriggersFirst() throws InterruptedException {
             SharedBudgetMonitor suiteBudget = expiredTimeSharedBudget(SharedBudgetMonitor.Scope.SUITE);
             SharedBudgetMonitor classBudget = unlimitedSharedBudget(SharedBudgetMonitor.Scope.CLASS);
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             BudgetCheckResult result = orchestrator.checkBeforeSample(suiteBudget, classBudget, methodBudget);
 
@@ -91,7 +88,7 @@ class BudgetOrchestratorTest {
         void suiteTokenBudgetTriggers() {
             SharedBudgetMonitor suiteBudget = tokenLimitedSharedBudget(SharedBudgetMonitor.Scope.SUITE, 10);
             suiteBudget.addTokens(20); // Exceed budget
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             BudgetCheckResult result = orchestrator.checkBeforeSample(suiteBudget, null, methodBudget);
 
@@ -104,7 +101,7 @@ class BudgetOrchestratorTest {
         void classBudgetCheckedAfterSuite() throws InterruptedException {
             SharedBudgetMonitor suiteBudget = unlimitedSharedBudget(SharedBudgetMonitor.Scope.SUITE);
             SharedBudgetMonitor classBudget = expiredTimeSharedBudget(SharedBudgetMonitor.Scope.CLASS);
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             BudgetCheckResult result = orchestrator.checkBeforeSample(suiteBudget, classBudget, methodBudget);
 
@@ -115,7 +112,7 @@ class BudgetOrchestratorTest {
         @Test
         @DisplayName("method budget checked when suite and class pass")
         void methodBudgetCheckedLast() throws InterruptedException {
-            CostBudgetMonitor methodBudget = expiredTimeBudget();
+            CostMonitor methodBudget = expiredTimeBudget();
 
             BudgetCheckResult result = orchestrator.checkBeforeSample(null, null, methodBudget);
 
@@ -124,12 +121,10 @@ class BudgetOrchestratorTest {
         }
 
         @Test
-        @DisplayName("method token budget uses pre-sample check")
-        void methodTokenBudgetUsesPreSampleCheck() {
-            // Create a budget that will be exceeded on next sample
-            CostBudgetMonitor methodBudget = tokenLimitedMethodBudget(50, 30);
-            methodBudget.recordStaticTokenCharge(); // 30 consumed
-            methodBudget.recordStaticTokenCharge(); // 60 consumed - exceeds 50
+        @DisplayName("method token budget triggers when exceeded")
+        void methodTokenBudgetTriggersWhenExceeded() {
+            CostMonitor methodBudget = tokenLimitedMethodBudget(50);
+            methodBudget.recordTokens(60); // Exceed budget
 
             BudgetCheckResult result = orchestrator.checkBeforeSample(null, null, methodBudget);
 
@@ -145,7 +140,7 @@ class BudgetOrchestratorTest {
         @Test
         @DisplayName("returns ok when all budgets within limits")
         void returnsOkWhenAllBudgetsWithinLimits() {
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             BudgetCheckResult result = orchestrator.checkAfterSample(null, null, methodBudget);
 
@@ -157,7 +152,7 @@ class BudgetOrchestratorTest {
         void suiteTokenBudgetCheckedFirst() {
             SharedBudgetMonitor suiteBudget = tokenLimitedSharedBudget(SharedBudgetMonitor.Scope.SUITE, 10);
             suiteBudget.addTokens(20); // Exceed budget
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             BudgetCheckResult result = orchestrator.checkAfterSample(suiteBudget, null, methodBudget);
 
@@ -171,7 +166,7 @@ class BudgetOrchestratorTest {
             SharedBudgetMonitor suiteBudget = unlimitedSharedBudget(SharedBudgetMonitor.Scope.SUITE);
             SharedBudgetMonitor classBudget = tokenLimitedSharedBudget(SharedBudgetMonitor.Scope.CLASS, 5);
             classBudget.addTokens(10); // Exceed budget
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             BudgetCheckResult result = orchestrator.checkAfterSample(suiteBudget, classBudget, methodBudget);
 
@@ -189,12 +184,10 @@ class BudgetOrchestratorTest {
         void recordsDynamicTokensFromRecorder() {
             DefaultTokenChargeRecorder tokenRecorder = new DefaultTokenChargeRecorder(1000);
             tokenRecorder.recordTokens(100);
-            CostBudgetMonitor methodBudget = new CostBudgetMonitor(0, 1000, 0,
-                    CostBudgetMonitor.TokenMode.DYNAMIC, BudgetExhaustedBehavior.FAIL);
+            CostMonitor methodBudget = CostMonitor.builder().tokenBudget(1000).build();
 
             long tokens = orchestrator.recordAndPropagateTokens(
-                    tokenRecorder, methodBudget, CostBudgetMonitor.TokenMode.DYNAMIC,
-                    0, null, null);
+                    tokenRecorder, methodBudget, 0, null, null);
 
             assertThat(tokens).isEqualTo(100L);
             assertThat(methodBudget.getTokensConsumed()).isEqualTo(100L);
@@ -203,12 +196,10 @@ class BudgetOrchestratorTest {
         @Test
         @DisplayName("records static token charge when no recorder")
         void recordsStaticTokenChargeWhenNoRecorder() {
-            CostBudgetMonitor methodBudget = new CostBudgetMonitor(0, 1000, 50,
-                    CostBudgetMonitor.TokenMode.STATIC, BudgetExhaustedBehavior.FAIL);
+            CostMonitor methodBudget = CostMonitor.builder().tokenBudget(1000).build();
 
             long tokens = orchestrator.recordAndPropagateTokens(
-                    null, methodBudget, CostBudgetMonitor.TokenMode.STATIC,
-                    50, null, null);
+                    null, methodBudget, 50, null, null);
 
             assertThat(tokens).isEqualTo(50L);
             assertThat(methodBudget.getTokensConsumed()).isEqualTo(50L);
@@ -219,13 +210,11 @@ class BudgetOrchestratorTest {
         void propagatesToClassBudget() {
             DefaultTokenChargeRecorder tokenRecorder = new DefaultTokenChargeRecorder(1000);
             tokenRecorder.recordTokens(75);
-            CostBudgetMonitor methodBudget = new CostBudgetMonitor(0, 1000, 0,
-                    CostBudgetMonitor.TokenMode.DYNAMIC, BudgetExhaustedBehavior.FAIL);
+            CostMonitor methodBudget = CostMonitor.builder().tokenBudget(1000).build();
             SharedBudgetMonitor classBudget = unlimitedSharedBudget(SharedBudgetMonitor.Scope.CLASS);
 
             orchestrator.recordAndPropagateTokens(
-                    tokenRecorder, methodBudget, CostBudgetMonitor.TokenMode.DYNAMIC,
-                    0, classBudget, null);
+                    tokenRecorder, methodBudget, 0, classBudget, null);
 
             assertThat(classBudget.getTokensConsumed()).isEqualTo(75L);
         }
@@ -235,13 +224,11 @@ class BudgetOrchestratorTest {
         void propagatesToSuiteBudget() {
             DefaultTokenChargeRecorder tokenRecorder = new DefaultTokenChargeRecorder(1000);
             tokenRecorder.recordTokens(200);
-            CostBudgetMonitor methodBudget = new CostBudgetMonitor(0, 1000, 0,
-                    CostBudgetMonitor.TokenMode.DYNAMIC, BudgetExhaustedBehavior.FAIL);
+            CostMonitor methodBudget = CostMonitor.builder().tokenBudget(1000).build();
             SharedBudgetMonitor suiteBudget = unlimitedSharedBudget(SharedBudgetMonitor.Scope.SUITE);
 
             orchestrator.recordAndPropagateTokens(
-                    tokenRecorder, methodBudget, CostBudgetMonitor.TokenMode.DYNAMIC,
-                    0, null, suiteBudget);
+                    tokenRecorder, methodBudget, 0, null, suiteBudget);
 
             assertThat(suiteBudget.getTokensConsumed()).isEqualTo(200L);
         }
@@ -249,12 +236,11 @@ class BudgetOrchestratorTest {
         @Test
         @DisplayName("does not propagate zero tokens")
         void doesNotPropagateZeroTokens() {
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
             SharedBudgetMonitor classBudget = unlimitedSharedBudget(SharedBudgetMonitor.Scope.CLASS);
 
             long tokens = orchestrator.recordAndPropagateTokens(
-                    null, methodBudget, CostBudgetMonitor.TokenMode.NONE,
-                    0, classBudget, null);
+                    null, methodBudget, 0, classBudget, null);
 
             assertThat(tokens).isEqualTo(0L);
             assertThat(classBudget.getTokensConsumed()).isEqualTo(0L);
@@ -322,7 +308,7 @@ class BudgetOrchestratorTest {
             SharedBudgetMonitor suiteBudget = new SharedBudgetMonitor(
                     SharedBudgetMonitor.Scope.SUITE, 100, 0, BudgetExhaustedBehavior.FAIL);
             Thread.sleep(10); // Let some time pass
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             String message = orchestrator.buildExhaustionMessage(
                     TerminationReason.SUITE_TIME_BUDGET_EXHAUSTED,
@@ -337,7 +323,7 @@ class BudgetOrchestratorTest {
         void formatsSuiteTokenExhaustionMessage() {
             SharedBudgetMonitor suiteBudget = tokenLimitedSharedBudget(SharedBudgetMonitor.Scope.SUITE, 1000);
             suiteBudget.addTokens(1500);
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             String message = orchestrator.buildExhaustionMessage(
                     TerminationReason.SUITE_TOKEN_BUDGET_EXHAUSTED,
@@ -351,8 +337,7 @@ class BudgetOrchestratorTest {
         @Test
         @DisplayName("formats method time exhaustion message")
         void formatsMethodTimeExhaustionMessage() throws InterruptedException {
-            CostBudgetMonitor methodBudget = new CostBudgetMonitor(
-                    500, 0, 0, CostBudgetMonitor.TokenMode.NONE, BudgetExhaustedBehavior.FAIL);
+            CostMonitor methodBudget = CostMonitor.withTimeBudget(500);
             Thread.sleep(10); // Let some time pass
 
             String message = orchestrator.buildExhaustionMessage(
@@ -366,9 +351,8 @@ class BudgetOrchestratorTest {
         @Test
         @DisplayName("formats method token exhaustion message")
         void formatsMethodTokenExhaustionMessage() {
-            CostBudgetMonitor methodBudget = new CostBudgetMonitor(
-                    0, 400, 0, CostBudgetMonitor.TokenMode.DYNAMIC, BudgetExhaustedBehavior.FAIL);
-            methodBudget.recordDynamicTokens(500);
+            CostMonitor methodBudget = CostMonitor.withTokenBudget(400);
+            methodBudget.recordTokens(500);
 
             String message = orchestrator.buildExhaustionMessage(
                     TerminationReason.METHOD_TOKEN_BUDGET_EXHAUSTED,
@@ -382,7 +366,7 @@ class BudgetOrchestratorTest {
         @Test
         @DisplayName("returns description for unknown reason")
         void returnsDescriptionForUnknownReason() {
-            CostBudgetMonitor methodBudget = unlimitedMethodBudget();
+            CostMonitor methodBudget = unlimitedMethodBudget();
 
             String message = orchestrator.buildExhaustionMessage(
                     TerminationReason.COMPLETED,

@@ -44,7 +44,7 @@ public final class OptimizeTimeBudgetPolicy implements OptimizeTerminationPolicy
 
     @Override
     public Optional<OptimizeTerminationReason> shouldTerminate(OptimizeHistory history) {
-        Duration elapsed = history.totalDuration();
+        Duration elapsed = history.elapsedDuration();
         if (elapsed.compareTo(maxDuration) >= 0) {
             return Optional.of(OptimizeTerminationReason.timeBudgetExhausted(maxDuration.toMillis()));
         }
