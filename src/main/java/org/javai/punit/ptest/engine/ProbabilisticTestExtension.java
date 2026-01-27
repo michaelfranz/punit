@@ -800,7 +800,7 @@ public class ProbabilisticTestExtension implements
 	 * <p>Implements CloseableResource so JUnit automatically calls close() when
 	 * the extension context is closed (i.e., when the test method completes).
 	 */
-	private static class TestCompletionTracker implements ExtensionContext.Store.CloseableResource {
+	private static class TestCompletionTracker implements ExtensionContext.Store.CloseableResource, AutoCloseable {
 		private final GlobalCostAccumulator accumulator;
 
 		TestCompletionTracker(GlobalCostAccumulator accumulator) {

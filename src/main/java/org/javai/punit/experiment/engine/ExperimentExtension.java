@@ -171,7 +171,7 @@ public class ExperimentExtension implements TestTemplateInvocationContextProvide
      * <p>Implements CloseableResource so JUnit automatically calls close() when
      * the extension context is closed (i.e., when the experiment completes).
      */
-    private static class ExperimentCompletionTracker implements ExtensionContext.Store.CloseableResource {
+    private static class ExperimentCompletionTracker implements ExtensionContext.Store.CloseableResource, AutoCloseable {
         private final GlobalCostAccumulator accumulator;
         private final GlobalCostAccumulator.ExperimentMode mode;
 
