@@ -1566,7 +1566,7 @@ This shift—from hidden assumption to managed condition—is at the heart of PU
 Every PUnit test verdict can be traced to its foundations:
 
 ```
-Verdict: PASS (97/100 = 97% ≥ threshold 90.4%)
+Verdict: PASS (97/100 = 97% ≥ min pass rate 90.4%)
     ↓
 Threshold: 90.4% (derived from baseline at 95% confidence)
     ↓

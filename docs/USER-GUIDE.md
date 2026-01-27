@@ -304,7 +304,7 @@ This information appears in the verdict output, providing an audit trail:
 ```
 ═══════════════════════════════════════════════════════════════
 PUnit PASSED: testSlaCompliance
-  Observed: 99.97% (9997/10000) >= Threshold: 99.99%
+  Observed: 99.97% (9997/10000) >= min pass rate: 99.99%
   Threshold origin: SLA
   Contract ref: Payment Provider SLA v2.3, Section 4.1
 ═══════════════════════════════════════════════════════════════
@@ -784,7 +784,7 @@ An expired baseline can and will still be used by the probabilistic test, but th
 ```
 ═══════════════════════════════════════════════════════════════
 PUnit PASSED: testInstructionTranslation
-  Observed: 94.0% (94/100) >= Threshold: 91.9%
+  Observed: 94.0% (94/100) >= min pass rate: 91.9%
   Baseline: 93.5% @ N=1000 (spec: ShoppingBasketUseCase.yaml)
   Confidence: 95%
 
@@ -812,7 +812,7 @@ Covariates are environmental factors that may affect system behavior.
 ```
 ═══════════════════════════════════════════════════════════════
 PUnit PASSED: testInstructionTranslation
-  Observed: 91.0% (91/100) >= Threshold: 91.9%
+  Observed: 91.0% (91/100) >= min pass rate: 91.9%
   Baseline: 93.5% @ N=1000 (spec: ShoppingBasketUseCase.yaml)
   Confidence: 95%
 
@@ -864,7 +864,7 @@ Every probabilistic test produces a verdict with statistical context:
 ```
 ═══════════════════════════════════════════════════════════════
 PUnit PASSED: testInstructionTranslation
-  Observed: 94.0% (94/100) >= Threshold: 91.9%
+  Observed: 94.0% (94/100) >= min pass rate: 91.9%
   Baseline: 93.5% @ N=1000 (spec: ShoppingBasketUseCase.yaml)
   Confidence: 95%
 ═══════════════════════════════════════════════════════════════
@@ -1003,7 +1003,7 @@ Configure how exceptions during sample execution are handled:
 ```java
 @ProbabilisticTest(
     samples = 100,
-    exceptionHandling = ExceptionHandling.FAIL_SAMPLE
+    onException = ExceptionHandling.FAIL_SAMPLE
 )
 void exceptionsCountAsFailures() {
     // Exceptions count as sample failures, don't propagate
@@ -1013,8 +1013,7 @@ void exceptionsCountAsFailures() {
 | Strategy      | Behavior                                            |
 |---------------|-----------------------------------------------------|
 | `FAIL_SAMPLE` | Exception counts as failed sample; continue testing |
-| `PROPAGATE`   | Exception immediately fails the test                |
-| `IGNORE`      | Exception is ignored; sample not counted            |
+| `ABORT_TEST`  | Exception immediately fails the test                |
 
 *Source: `org.javai.punit.examples.tests.ShoppingBasketExceptionTest`*
 
