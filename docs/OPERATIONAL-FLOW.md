@@ -128,11 +128,11 @@ Regardless of which paradigm you use, you must decide **how to parameterize** yo
 
 **In practice, choose ONE approach and use it consistently across your organization.**
 
-| If Your Priority Is...              | Use...            | You're Saying...                          |
-|-------------------------------------|-------------------|-------------------------------------------|
-| Controlling costs (CI time, API)    | Sample-Size-First | "We can afford N samples. What do we get?"|
-| Minimizing risk (safety, compliance)| Confidence-First  | "We need X% confidence. What does it cost?"|
-| Learning the trade-offs             | Threshold-First   | "Show me exactly what's happening."       |
+| If Your Priority Is...               | Use...            | You're Saying...                            |
+|--------------------------------------|-------------------|---------------------------------------------|
+| Controlling costs (CI time, API)     | Sample-Size-First | "We can afford N samples. What do we get?"  |
+| Minimizing risk (safety, compliance) | Confidence-First  | "We need X% confidence. What does it cost?" |
+| Learning the trade-offs              | Threshold-First   | "Show me exactly what's happening."         |
 
 All three approaches work with both SLA-driven and spec-driven testing. The approach determines **how** you parameterize—not **where** the threshold comes from.
 
@@ -398,11 +398,11 @@ OPTIMIZE iteratively refines a **control factor** through mutation and evaluatio
 
 ## Summary
 
-| Step | Command | Output |
-|------|---------|--------|
-| Define use case | — | `@UseCase` class |
-| Run experiment | `./gradlew measure` | Spec file |
-| Commit spec | `git commit` | Version-controlled baseline |
-| Run tests | `./gradlew test` | Qualified pass/fail verdicts |
+| Step            | Command             | Output                       |
+|-----------------|---------------------|------------------------------|
+| Define use case | —                   | `@UseCase` class             |
+| Run experiment  | `./gradlew measure` | Spec file                    |
+| Commit spec     | `git commit`        | Version-controlled baseline  |
+| Run tests       | `./gradlew test`    | Qualified pass/fail verdicts |
 
 **The key insight:** PUnit doesn't eliminate uncertainty—it quantifies it. Every verdict comes with statistical context, enabling informed decisions about whether to act on test results.

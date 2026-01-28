@@ -62,11 +62,11 @@ Don't let the simplicity of this snippet fool you. Behind this clean API lies ri
 
 ### Experimentation
 
-| Experimental Mode   | Description                                                                            |
-|---------------------|----------------------------------------------------------------------------------------|
-| 🔬 **EXPLORE**      | Compare the impact of different factors (use case configurations) with minimal samples |
-| ⚙️ **OPTIMIZE**     | Auto-tune a factor iteratively to find the optimal value for production                |
-| 📊 **MEASURE**      | Generate a baseline pass rate with which to power probabilistic tests                  |
+| Experimental Mode | Description                                                                            |
+|-------------------|----------------------------------------------------------------------------------------|
+| 🔬 **EXPLORE**    | Compare the impact of different factors (use case configurations) with minimal samples |
+| ⚙️ **OPTIMIZE**   | Auto-tune a factor iteratively to find the optimal value for production                |
+| 📊 **MEASURE**    | Generate a baseline spec with which to power probabilistic tests                       |
 
 ### Testing
 
@@ -95,8 +95,9 @@ Don't let the simplicity of this snippet fool you. Behind this clean API lies ri
 **Gradle (Kotlin DSL):**
 ```kotlin
 repositories {
-    mavenLocal()  // If using locally published version
-    mavenCentral()
+   mavenLocal()  // Required for outcome library
+   mavenCentral()
+   maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {

@@ -41,7 +41,11 @@
       "WebFetch(domain:github.com)",
       "Bash(./gradlew dependencies:*)",
       "Bash(unzip:*)",
-      "Bash(./gradlew:*)"
+      "Bash(./gradlew:*)",
+      "Bash(git pull:*)",
+      "Bash(gh run:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(curl:*)"
     ]
   }
 }

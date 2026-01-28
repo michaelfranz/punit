@@ -10,10 +10,10 @@ Get up and running with PUnit in minutes. This guide covers installation and you
 
 PUnit is a **dual-purpose platform** for non-deterministic systems:
 
-| Capability | What It Does | When to Use |
-|------------|--------------|-------------|
+| Capability          | What It Does                                           | When to Use                            |
+|---------------------|--------------------------------------------------------|----------------------------------------|
 | **Experimentation** | Discover how your system behaves across configurations | Before you know what "good" looks like |
-| **Testing** | Verify behavior hasn't regressed | After you've established a baseline |
+| **Testing**         | Verify behavior hasn't regressed                       | After you've established a baseline    |
 
 The two are connected: experiments generate the empirical data that powers **spec-driven tests**—the most rigorous form of probabilistic testing.
 
@@ -35,6 +35,7 @@ PUnit is available via [JitPack](https://jitpack.io). Add it to your project:
 
 ```kotlin
 repositories {
+    mavenLocal()  // Required for outcome library
     mavenCentral()
     maven { url = uri("https://jitpack.io") }
 }
@@ -221,11 +222,11 @@ Experimentation and testing are two halves of the same workflow. Specs bridge th
 
 ## Next Steps
 
-| Document | Description |
-|----------|-------------|
-| [README](../README.md) | Project overview, philosophy, and quick reference |
-| [USER-GUIDE](USER-GUIDE.md) | Complete guide: experimentation, testing, and advanced features |
-| [STATISTICAL-COMPANION](STATISTICAL-COMPANION.md) | Mathematical foundations for the curious |
+| Document                                          | Description                                                     |
+|---------------------------------------------------|-----------------------------------------------------------------|
+| [README](../README.md)                            | Project overview, philosophy, and quick reference               |
+| [USER-GUIDE](USER-GUIDE.md)                       | Complete guide: experimentation, testing, and advanced features |
+| [STATISTICAL-COMPANION](STATISTICAL-COMPANION.md) | Mathematical foundations for the curious                        |
 
 ---
 
