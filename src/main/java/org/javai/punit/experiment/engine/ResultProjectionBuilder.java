@@ -4,10 +4,12 @@ import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.javai.punit.api.DiffableContentProvider;
+import org.javai.punit.contract.PostconditionResult;
 import org.javai.punit.contract.UseCaseOutcome;
 import org.javai.punit.experiment.model.ResultProjection;
 
@@ -88,13 +90,14 @@ public class ResultProjectionBuilder {
         Objects.requireNonNull(outcome, "outcome must not be null");
 
         String input = extractInput(outcome.metadata());
+        Map<String, String> postconditions = extractPostconditions(outcome);
         List<String> rawLines = getDiffableLinesFromOutcome(outcome);
         List<String> normalizedLines = normalizeLineCount(rawLines);
 
         return new ResultProjection(
             sampleIndex,
             input != null ? truncate(input) : null,
-            outcome.allPostconditionsSatisfied(),
+            postconditions,
             outcome.executionTime().toMillis(),
             normalizedLines
         );
@@ -118,7 +121,16 @@ public class ResultProjectionBuilder {
 
         List<String> normalizedLines = normalizeLineCount(lines);
 
-        return new ResultProjection(sampleIndex, input != null ? truncate(input) : null, false, executionTimeMs, normalizedLines);
+        // Error case: mark execution as failed
+        Map<String, String> postconditions = Map.of("Execution completed", ResultProjection.FAILED);
+
+        return new ResultProjection(
+            sampleIndex,
+            input != null ? truncate(input) : null,
+            postconditions,
+            executionTimeMs,
+            normalizedLines
+        );
     }
 
     /**
@@ -221,6 +233,27 @@ public class ResultProjectionBuilder {
         }
         int newline = text.indexOf('\n');
         return newline > 0 ? text.substring(0, newline) : text;
+    }
+
+    /**
+     * Extracts postcondition results as a map of description to status.
+     *
+     * <p>Status values are defined as constants in {@link ResultProjection}:
+     * {@code passed}, {@code failed}, or {@code skipped}.
+     *
+     * @param outcome the use case outcome
+     * @return ordered map of postcondition descriptions to their status
+     */
+    private Map<String, String> extractPostconditions(UseCaseOutcome<?> outcome) {
+        List<PostconditionResult> results = outcome.evaluatePostconditions();
+        Map<String, String> postconditions = new LinkedHashMap<>();
+
+        for (PostconditionResult result : results) {
+            String status = result.passed() ? ResultProjection.PASSED : ResultProjection.FAILED;
+            postconditions.put(result.description(), status);
+        }
+
+        return postconditions;
     }
 
     /**

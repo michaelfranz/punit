@@ -81,8 +81,23 @@ public class BaselineWriter {
      * Builds the YAML content (without the fingerprint line).
      */
     private String buildYamlContent(EmpiricalBaseline baseline) {
-        YamlBuilder builder = YamlBuilder.create()
-            .comment("Empirical Baseline for " + baseline.getUseCaseId())
+        YamlBuilder builder = YamlBuilder.create();
+
+        writeHeader(builder, baseline);
+        writeCovariates(builder, baseline);
+        writeExecution(builder, baseline);
+        writeRequirements(builder, baseline);
+        writeStatistics(builder, baseline);
+        writeCost(builder, baseline);
+        writeSuccessCriteria(builder, baseline);
+        writeResultProjections(builder, baseline);
+        writeExpiration(builder, baseline);
+
+        return builder.build();
+    }
+
+    private void writeHeader(YamlBuilder builder, EmpiricalBaseline baseline) {
+        builder.comment("Empirical Baseline for " + baseline.getUseCaseId())
             .comment("Generated automatically by punit experiment runner")
             .comment("DO NOT EDIT - create a specification based on this baseline instead")
             .blankLine()
@@ -93,38 +108,42 @@ public class BaselineWriter {
             .fieldIfPresent("experimentClass", baseline.getExperimentClass())
             .fieldIfPresent("experimentMethod", baseline.getExperimentMethod());
 
-        // Footprint
         if (baseline.hasFootprint()) {
             builder.field("footprint", baseline.getFootprint());
         }
+    }
 
-        // Covariates
-        if (baseline.hasCovariates()) {
-            builder.startObject("covariates");
-            CovariateProfile profile = baseline.getCovariateProfile();
-            for (String key : profile.orderedKeys()) {
-                CovariateValue value = profile.get(key);
-                builder.field(key, value.toCanonicalString());
-            }
-            builder.endObject();
+    private void writeCovariates(YamlBuilder builder, EmpiricalBaseline baseline) {
+        if (!baseline.hasCovariates()) {
+            return;
         }
+        builder.startObject("covariates");
+        CovariateProfile profile = baseline.getCovariateProfile();
+        for (String key : profile.orderedKeys()) {
+            CovariateValue value = profile.get(key);
+            builder.field(key, value.toCanonicalString());
+        }
+        builder.endObject();
+    }
 
-        // Execution
+    private void writeExecution(YamlBuilder builder, EmpiricalBaseline baseline) {
         builder.startObject("execution")
             .field("samplesPlanned", baseline.getExecution().samplesPlanned())
             .field("samplesExecuted", baseline.getExecution().samplesExecuted())
-            .field("terminationReason", baseline.getExecution().terminationReason().toString())
+            .field("terminationReason", baseline.getExecution().terminationReason())
             .fieldIfPresent("terminationDetails", baseline.getExecution().terminationDetails())
             .endObject();
+    }
 
-        // Requirements (derived from empirical data)
+    private void writeRequirements(YamlBuilder builder, EmpiricalBaseline baseline) {
         // minPassRate is set to the lower bound of the 95% confidence interval
         double derivedMinPassRate = baseline.getStatistics().confidenceIntervalLower();
         builder.startObject("requirements")
             .field("minPassRate", derivedMinPassRate, "%.4f")
             .endObject();
+    }
 
-        // Statistics
+    private void writeStatistics(YamlBuilder builder, EmpiricalBaseline baseline) {
         builder.startObject("statistics")
             .startObject("successRate")
                 .field("observed", baseline.getStatistics().observedSuccessRate(), "%.4f")
@@ -144,54 +163,72 @@ public class BaselineWriter {
             builder.endObject();
         }
         builder.endObject();
+    }
 
-        // Cost
+    private void writeCost(YamlBuilder builder, EmpiricalBaseline baseline) {
         builder.startObject("cost")
             .field("totalTimeMs", baseline.getCost().totalTimeMs())
             .field("avgTimePerSampleMs", baseline.getCost().avgTimePerSampleMs())
             .field("totalTokens", baseline.getCost().totalTokens())
             .field("avgTokensPerSample", baseline.getCost().avgTokensPerSample())
             .endObject();
+    }
 
-        // Success criteria
-        if (baseline.getUseCaseCriteria() != null) {
-            builder.startObject("successCriteria")
-                .field("definition", baseline.getUseCaseCriteria())
-                .endObject();
+    private void writeSuccessCriteria(YamlBuilder builder, EmpiricalBaseline baseline) {
+        if (baseline.getUseCaseCriteria() == null) {
+            return;
+        }
+        builder.startObject("successCriteria")
+            .field("definition", baseline.getUseCaseCriteria())
+            .endObject();
+    }
+
+    private void writeResultProjections(YamlBuilder builder, EmpiricalBaseline baseline) {
+        if (!baseline.hasResultProjections()) {
+            return;
+        }
+        builder.startObject("resultProjection");
+        for (ResultProjection projection : baseline.getResultProjections()) {
+            writeResultProjection(builder, projection);
+        }
+        builder.endObject();
+    }
+
+    private void writeResultProjection(YamlBuilder builder, ResultProjection projection) {
+        String sampleKey = "sample[" + projection.sampleIndex() + "]";
+        builder.startObject(sampleKey);
+
+        if (projection.input() != null) {
+            builder.field("input", projection.input());
         }
 
-        // Result projections (EXPLORE mode only)
-        if (baseline.hasResultProjections()) {
-            builder.startObject("resultProjection");
-            for (ResultProjection projection : baseline.getResultProjections()) {
-                String sampleKey = "sample[" + projection.sampleIndex() + "]";
-                builder.startObject(sampleKey);
-                if (projection.input() != null) {
-                    builder.field("input", projection.input());
-                }
-                builder.field("success", projection.success())
-                    .field("executionTimeMs", projection.executionTimeMs())
-                    .startList("diffableContent");
-                for (String line : projection.diffableLines()) {
-                    builder.listItem(line);
-                }
-                builder.endList().endObject();
+        if (!projection.postconditions().isEmpty()) {
+            builder.startObject("postconditions");
+            for (var entry : projection.postconditions().entrySet()) {
+                builder.field(entry.getKey(), entry.getValue());
             }
             builder.endObject();
         }
 
-        // Expiration policy
-        if (baseline.hasExpirationPolicy()) {
-            ExpirationPolicy policy = baseline.getExpirationPolicy();
-            builder.startObject("expiration")
-                .field("expiresInDays", policy.expiresInDays())
-                .field("baselineEndTime", ISO_FORMATTER.format(policy.baselineEndTime()));
-            policy.expirationTime().ifPresent(exp ->
-                builder.field("expirationDate", ISO_FORMATTER.format(exp)));
-            builder.endObject();
+        builder.field("executionTimeMs", projection.executionTimeMs())
+            .startList("diffableContent");
+        for (String line : projection.diffableLines()) {
+            builder.listItem(line);
         }
+        builder.endList().endObject();
+    }
 
-        return builder.build();
+    private void writeExpiration(YamlBuilder builder, EmpiricalBaseline baseline) {
+        if (!baseline.hasExpirationPolicy()) {
+            return;
+        }
+        ExpirationPolicy policy = baseline.getExpirationPolicy();
+        builder.startObject("expiration")
+            .field("expiresInDays", policy.expiresInDays())
+            .field("baselineEndTime", ISO_FORMATTER.format(policy.baselineEndTime()));
+        policy.expirationTime().ifPresent(exp ->
+            builder.field("expirationDate", ISO_FORMATTER.format(exp)));
+        builder.endObject();
     }
     
     /**
