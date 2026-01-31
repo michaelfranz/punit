@@ -220,6 +220,7 @@ public class ExploreStrategy implements ExperimentModeStrategy {
             Long startTimeMs = store.get("startTimeMs", Long.class);
             ResultProjection projection = projectionBuilder.buildError(
                     sampleInConfig - 1,
+                    null,  // Input not available when error occurs before outcome creation
                     System.currentTimeMillis() - startTimeMs,
                     e
             );

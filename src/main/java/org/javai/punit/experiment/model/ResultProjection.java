@@ -27,6 +27,8 @@ import org.javai.punit.experiment.engine.ResultProjectionBuilder;
  */
 public record ResultProjection(
     int sampleIndex,
+    String input,
+    boolean success,
     long executionTimeMs,
     List<String> diffableLines
 ) {

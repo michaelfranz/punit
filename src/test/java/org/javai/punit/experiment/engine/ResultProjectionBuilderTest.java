@@ -189,6 +189,7 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                "test input",
                 100,
                 new IllegalArgumentException("test message")
             );
@@ -204,6 +205,7 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                "test input",
                 100,
                 new IllegalArgumentException("test message")
             );
@@ -219,6 +221,7 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                null,
                 100,
                 new RuntimeException("error")
             );
@@ -235,6 +238,7 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                "test input",
                 100,
                 new RuntimeException("first line\nsecond line\nthird line")
             );
@@ -251,12 +255,29 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                null,
                 100,
                 new RuntimeException((String) null)
             );
 
             assertThat(projection.diffableLines().get(1))
                 .isEqualTo("message: null");
+        }
+
+        @Test
+        @DisplayName("captures input in error projection")
+        void capturesInputInErrorProjection() {
+            ResultProjectionBuilder builder = new ResultProjectionBuilder(5, 60);
+
+            ResultProjection projection = builder.buildError(
+                0,
+                "Add 2 apples",
+                100,
+                new RuntimeException("error")
+            );
+
+            assertThat(projection.input()).isEqualTo("Add 2 apples");
+            assertThat(projection.success()).isFalse();
         }
     }
 

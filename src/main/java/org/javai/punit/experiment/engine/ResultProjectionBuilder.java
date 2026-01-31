@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.javai.punit.api.DiffableContentProvider;
 import org.javai.punit.contract.UseCaseOutcome;
@@ -86,11 +87,14 @@ public class ResultProjectionBuilder {
     public ResultProjection build(int sampleIndex, UseCaseOutcome<?> outcome) {
         Objects.requireNonNull(outcome, "outcome must not be null");
 
+        String input = extractInput(outcome.metadata());
         List<String> rawLines = getDiffableLinesFromOutcome(outcome);
         List<String> normalizedLines = normalizeLineCount(rawLines);
 
         return new ResultProjection(
             sampleIndex,
+            input != null ? truncate(input) : null,
+            outcome.allPostconditionsSatisfied(),
             outcome.executionTime().toMillis(),
             normalizedLines
         );
@@ -100,20 +104,21 @@ public class ResultProjectionBuilder {
      * Builds a projection for an error case.
      *
      * @param sampleIndex the sample index (0-based)
+     * @param input the input that was being processed when the error occurred (may be null)
      * @param executionTimeMs execution time in milliseconds
      * @param error the error that occurred
      * @return the projection
      */
-    public ResultProjection buildError(int sampleIndex, long executionTimeMs, Throwable error) {
+    public ResultProjection buildError(int sampleIndex, String input, long executionTimeMs, Throwable error) {
         Objects.requireNonNull(error, "error must not be null");
-        
+
         List<String> lines = new ArrayList<>();
         lines.add(truncate("error: " + error.getClass().getSimpleName()));
         lines.add(truncate("message: " + firstLine(error.getMessage())));
 
         List<String> normalizedLines = normalizeLineCount(lines);
 
-        return new ResultProjection(sampleIndex, executionTimeMs, normalizedLines);
+        return new ResultProjection(sampleIndex, input != null ? truncate(input) : null, false, executionTimeMs, normalizedLines);
     }
 
     /**
@@ -216,6 +221,33 @@ public class ResultProjectionBuilder {
         }
         int newline = text.indexOf('\n');
         return newline > 0 ? text.substring(0, newline) : text;
+    }
+
+    /**
+     * Extracts the input representation from outcome metadata.
+     *
+     * <p>Looks for common input keys in order of preference:
+     * "input", "instruction", "query", "request", "prompt".
+     *
+     * @param metadata the outcome metadata
+     * @return the input string, or null if not found
+     */
+    private String extractInput(Map<String, Object> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return null;
+        }
+
+        // Common keys for input values, in order of preference
+        List<String> inputKeys = List.of("input", "instruction", "query", "request", "prompt");
+
+        for (String key : inputKeys) {
+            Object value = metadata.get(key);
+            if (value != null) {
+                return normalizeValue(value.toString());
+            }
+        }
+
+        return null;
     }
 }
 

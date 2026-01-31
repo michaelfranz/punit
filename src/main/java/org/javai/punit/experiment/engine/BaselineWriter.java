@@ -165,7 +165,11 @@ public class BaselineWriter {
             builder.startObject("resultProjection");
             for (ResultProjection projection : baseline.getResultProjections()) {
                 String sampleKey = "sample[" + projection.sampleIndex() + "]";
-                builder.startObject(sampleKey)
+                builder.startObject(sampleKey);
+                if (projection.input() != null) {
+                    builder.field("input", projection.input());
+                }
+                builder.field("success", projection.success())
                     .field("executionTimeMs", projection.executionTimeMs())
                     .startList("diffableContent");
                 for (String line : projection.diffableLines()) {
