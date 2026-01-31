@@ -406,3 +406,45 @@ OPTIMIZE iteratively refines a **control factor** through mutation and evaluatio
 | Run tests       | `./gradlew test`    | Qualified pass/fail verdicts |
 
 **The key insight:** PUnit doesn't eliminate uncertainty—it quantifies it. Every verdict comes with statistical context, enabling informed decisions about whether to act on test results.
+
+---
+
+## Production Readiness
+
+Taking a non-deterministic system from prototype to production involves two distinct phases:
+
+### Phase A: Prepartion
+
+The goal is to find the best configuration and understand raw system behavior.
+
+| Step | Activity                                 | Purpose                                          |
+|------|------------------------------------------|--------------------------------------------------|
+| 1    | **EXPLORE** factors (model, temperature) | Find the best configuration for your price-point |
+| 2    | **OPTIMIZE** the system prompt           | Maximize reliability with iterative refinement   |
+| 3    | **MEASURE** raw baseline                 | Quantify how well the optimized system performs  |
+
+At the end of Phase A, you have an optimized configuration and a baseline that reflects the system's true reliability—warts and all.
+
+### Phase B: Hardening
+
+The goal is to improve user-facing reliability and establish regression protection.
+
+| Step | Activity                      | Purpose                                                   |
+|------|-------------------------------|-----------------------------------------------------------|
+| 4    | Add **hardening mechanisms**  | Improve reliability without changing the underlying model |
+| 5    | **MEASURE** hardened baseline | Quantify the improvement (and its cost)                   |
+| 6    | Add **probabilistic tests**   | Protect against regression using both baselines           |
+
+**Why measure before and after hardening?**
+
+The pre-hardening baseline (Phase A) tells you how well the underlying system performs. The post-hardening baseline (Phase B) tells you what users actually experience. Keeping both baselines enables you to detect if the underlying model degrades—even when hardening masks it at the user level.
+
+**What does hardening mean for LLMs?**
+
+For LLM-based systems, hardening typically involves retrying failed invocations. A simple retry repeats the same request; a smarter approach includes the previous (invalid) response in the retry prompt, guiding the model toward a valid response. This improves user-facing reliability at the cost of additional tokens.
+
+### When to Re-Run Each Phase
+
+- **Re-run Phase A** when you change models, significantly modify prompts, or suspect the underlying system has changed.
+- **Re-run Phase B** when you modify hardening logic or want to re-baseline user-facing reliability.
+- **Run Phase B tests continuously** in CI to detect regressions.
