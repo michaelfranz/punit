@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.Optional;
 import org.javai.punit.api.UseCaseContext;
 import org.javai.punit.api.UseCaseProvider;
-import org.javai.punit.experiment.engine.BaselineWriter;
 import org.javai.punit.experiment.engine.EmpiricalBaselineGenerator;
 import org.javai.punit.experiment.engine.ExperimentConfig;
 import org.javai.punit.experiment.engine.ExperimentResultAggregator;
@@ -105,10 +104,10 @@ public class MeasureSpecGenerator {
                 covariateProfile
         );
 
-        // Write spec to file
+        // Write spec to file using measure-specific output format
         try {
             Path outputPath = resolveOutputPath(useCaseId, footprint, covariateProfile);
-            BaselineWriter writer = new BaselineWriter();
+            MeasureOutputWriter writer = new MeasureOutputWriter();
             writer.write(baseline, outputPath);
 
             context.publishReportEntry("punit.spec.outputPath", outputPath.toString());

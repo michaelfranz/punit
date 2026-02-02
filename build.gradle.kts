@@ -152,7 +152,13 @@ fun Test.configureAsExperimentTask() {
     val runFilter = project.findProperty("run") as String?
     if (runFilter != null) {
         filter {
-            includeTestsMatching("*$runFilter*")
+            if (runFilter.contains(".")) {
+                // Class.method specified - match precisely (no trailing wildcard)
+                includeTestsMatching("*$runFilter")
+            } else {
+                // Just class name - match all methods in the class
+                includeTestsMatching("*$runFilter*")
+            }
         }
     }
     

@@ -113,14 +113,13 @@ public class ShoppingBasketExplore {
             samplesPerConfig = 20,
             experimentId = "model-temperature-matrix-v1"
     )
-    @FactorSource(value = "modelTemperatureMatrix", factors = {"model", "temperature"})
+    @FactorSource(value = "temperatureConfigurations", factors = {"model", "temperature"})
     void compareModelsAcrossTemperatures(
             ShoppingBasketUseCase useCase,
-            @Factor("model") String model,
             @Factor("temperature") Double temperature,
             OutcomeCaptor captor
     ) {
-        useCase.setModel(model);
+        useCase.setModel("gpt-4o-mini");
         useCase.setTemperature(temperature);
         captor.record(useCase.translateInstruction(SIMPLE_INSTRUCTION));
     }
@@ -141,36 +140,26 @@ public class ShoppingBasketExplore {
                 .names("model")
                 .values("gpt-4o-mini")
                 .values("gpt-4o")
-//                .values("claude-haiku-4-5-20251001")
-//                .values("claude-sonnet-4-5-20250929")
+                .values("claude-haiku-4-5-20251001")
+                .values("claude-sonnet-4-5-20250929")
                 .stream();
     }
 
     /**
      * Model × temperature combinations to explore.
      *
-     * <p>Creates a matrix to understand how each model behaves at different
+     * <p>Creates a matrix to understand how a model behaves at different
      * temperature settings.
      */
-    public static Stream<FactorArguments> modelTemperatureMatrix() {
+    public static Stream<FactorArguments> temperatureConfigurations() {
         return FactorArguments.configurations()
-                .names("model", "temperature")
-                // GPT-4o-mini across temperatures
-                .values("gpt-4o-mini", 0.0)
-                .values("gpt-4o-mini", 0.5)
-                .values("gpt-4o-mini", 1.0)
-                // GPT-4o across temperatures
-                .values("gpt-4o", 0.0)
-                .values("gpt-4o", 0.5)
-                .values("gpt-4o", 1.0)
-                // Claude Haiku across temperatures
-//                .values("claude-haiku-4-5-20251001", 0.0)
-//                .values("claude-haiku-4-5-20251001", 0.5)
-//                .values("claude-haiku-4-5-20251001", 1.0)
-//                // Claude Sonnet across temperatures
-//                .values("claude-sonnet-4-5-20250929", 0.0)
-//                .values("claude-sonnet-4-5-20250929", 0.5)
-//                .values("claude-sonnet-4-5-20250929", 1.0)
+                .names("temperature")
+                .values(0.0)
+                .values(0.2)
+                .values(0.4)
+                .values(0.6)
+                .values(0.8)
+                .values(1.0)
                 .stream();
     }
 }

@@ -5,7 +5,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.javai.punit.api.UseCaseContext;
-import org.javai.punit.experiment.engine.BaselineWriter;
 import org.javai.punit.experiment.engine.EmpiricalBaselineGenerator;
 import org.javai.punit.experiment.engine.ExperimentConfig;
 import org.javai.punit.experiment.engine.ExperimentResultAggregator;
@@ -52,10 +51,10 @@ public class ExploreSpecGenerator {
                 expiresInDays
         );
 
-        // Write spec to config-specific file
+        // Write spec to config-specific file using explore-specific output format
         try {
             Path outputPath = resolveOutputPath(useCaseId, configName);
-            BaselineWriter writer = new BaselineWriter();
+            ExploreOutputWriter writer = new ExploreOutputWriter();
             writer.write(baseline, outputPath);
 
             context.publishReportEntry("punit.spec.outputPath", outputPath.toString());
