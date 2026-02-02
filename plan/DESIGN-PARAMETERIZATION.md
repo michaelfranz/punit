@@ -236,20 +236,20 @@ static Stream<TranslationInput> goldenInputs() {
 
 Records are the **recommended approach** for test inputs because they:
 
-| Benefit | Description |
-|---------|-------------|
+| Benefit              | Description                                          |
+|----------------------|------------------------------------------------------|
 | **Self-documenting** | Record components clearly define the input structure |
-| **Type-safe** | Compile-time checking, refactor-friendly |
-| **JSON-compatible** | Jackson deserializes JSON directly to records |
-| **CSV-compatible** | Headers map to component names automatically |
-| **Single parameter** | One parameter regardless of input complexity |
+| **Type-safe**        | Compile-time checking, refactor-friendly             |
+| **JSON-compatible**  | Jackson deserializes JSON directly to records        |
+| **CSV-compatible**   | Headers map to component names automatically         |
+| **Single parameter** | One parameter regardless of input complexity         |
 
 ### When to Use Each Pattern
 
-| Scenario | Recommended Pattern |
-|----------|---------------------|
-| Single string input, no expected | `Stream<String>` method source |
-| Multiple fields or expected value | Record with method source |
+| Scenario                          | Recommended Pattern                     |
+|-----------------------------------|-----------------------------------------|
+| Single string input, no expected  | `Stream<String>` method source          |
+| Multiple fields or expected value | Record with method source               |
 | Large dataset or shared test data | Record with file source (.json or .csv) |
 
 ## Sample Distribution Rule

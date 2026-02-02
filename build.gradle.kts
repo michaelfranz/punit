@@ -50,6 +50,10 @@ dependencies {
     // SnakeYAML - for YAML serialization in spec generation
     implementation("org.yaml:snakeyaml:2.5")
 
+    // Jackson - for JSON/CSV parsing in @InputSource
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.0")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.18.0")
+
     // Outcome - result types for contract postconditions
     // Note: outcome is a private repo. For CI builds, either:
     // 1. Make michaelfranz/outcome public for JitPack access, or
