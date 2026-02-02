@@ -15,7 +15,11 @@ import org.junit.jupiter.api.Test;
 class OptimizeHistoryTest {
 
     private OptimizationRecord createIteration(int iterationNumber, double score) {
-        FactorSuit factorSuit = FactorSuit.of("systemPrompt", "value" + iterationNumber);
+        return createIteration(iterationNumber, score, "value" + iterationNumber);
+    }
+
+    private OptimizationRecord createIteration(int iterationNumber, double score, String controlFactorValue) {
+        FactorSuit factorSuit = FactorSuit.of("systemPrompt", controlFactorValue);
         OptimizeStatistics stats = OptimizeStatistics.fromCounts(
                 100, (int) (score * 100), 10000, 100.0
         );
@@ -97,6 +101,47 @@ class OptimizeHistoryTest {
         assertTrue(best.isPresent());
         assertEquals(1, best.get().iterationNumber());
         assertEquals(0.50, best.get().score());
+    }
+
+    @Test
+    void shouldPreferShorterControlFactorWhenScoresAreEqual() {
+        OptimizeHistory.Builder builder = OptimizeHistory.builder()
+                .useCaseId("test")
+                .controlFactorName("systemPrompt")
+                .objective(OptimizationObjective.MAXIMIZE)
+                .startTime(Instant.now());
+
+        // All iterations have the same score (0.95), but different prompt lengths
+        builder.addIteration(createIteration(0, 0.95, "This is a very long system prompt with lots of unnecessary words."));
+        builder.addIteration(createIteration(1, 0.95, "Short prompt"));  // Best (shortest)
+        builder.addIteration(createIteration(2, 0.95, "Medium length prompt here"));
+
+        OptimizeHistory history = builder.buildPartial();
+
+        Optional<OptimizationRecord> best = history.bestIteration();
+        assertTrue(best.isPresent());
+        assertEquals(1, best.get().iterationNumber());  // Iteration 1 has shortest prompt
+        assertEquals("Short prompt", best.get().aggregate().controlFactorValue());
+    }
+
+    @Test
+    void shouldPreferHigherScoreOverShorterLength() {
+        OptimizeHistory.Builder builder = OptimizeHistory.builder()
+                .useCaseId("test")
+                .controlFactorName("systemPrompt")
+                .objective(OptimizationObjective.MAXIMIZE)
+                .startTime(Instant.now());
+
+        // Higher score wins even with longer prompt
+        builder.addIteration(createIteration(0, 0.90, "Short"));
+        builder.addIteration(createIteration(1, 0.95, "This is a much longer prompt"));  // Best (higher score)
+
+        OptimizeHistory history = builder.buildPartial();
+
+        Optional<OptimizationRecord> best = history.bestIteration();
+        assertTrue(best.isPresent());
+        assertEquals(1, best.get().iterationNumber());  // Higher score wins
+        assertEquals(0.95, best.get().score());
     }
 
     @Test

@@ -22,7 +22,7 @@ class ScorerTest {
         int failureCount = 100 - successCount;
         OptimizeStatistics stats = new OptimizeStatistics(
                 100, successCount, failureCount,
-                successRate, totalTokens, 100.0
+                successRate, totalTokens, 100.0, null
         );
         return new OptimizationIterationAggregate(
                 0, factorSuit, "controlFactor", stats, NOW, NOW.plusMillis(1000)

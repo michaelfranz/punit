@@ -1,7 +1,7 @@
 package org.javai.punit.examples.tests;
 
-import org.javai.punit.api.Factor;
-import org.javai.punit.api.FactorSource;
+import java.util.stream.Stream;
+import org.javai.punit.api.InputSource;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.usecases.ShoppingBasketUseCase;
@@ -74,10 +74,10 @@ public class ShoppingBasketTest {
             useCase = ShoppingBasketUseCase.class,
             samples = 100
     )
-    @FactorSource(value = "standardInstructions", factors = {"instruction"})
+    @InputSource("standardInstructions")
     void testInstructionTranslation(
             ShoppingBasketUseCase useCase,
-            @Factor("instruction") String instruction
+            String instruction
     ) {
         useCase.translateInstruction(instruction).assertAll();
     }
@@ -96,11 +96,35 @@ public class ShoppingBasketTest {
             useCase = ShoppingBasketUseCase.class,
             samples = 100
     )
-    @FactorSource(value = "singleInstruction", factors = {"instruction"})
+    @InputSource("singleInstruction")
     void testControlledInstruction(
             ShoppingBasketUseCase useCase,
-            @Factor("instruction") String instruction
+            String instruction
     ) {
         useCase.translateInstruction(instruction).assertAll();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // INPUT SOURCES - Test input data
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Standard instructions for varied testing.
+     */
+    static Stream<String> standardInstructions() {
+        return Stream.of(
+                "Add 2 apples",
+                "Remove the milk",
+                "Add 1 loaf of bread",
+                "Add 3 oranges and 2 bananas",
+                "Clear the basket"
+        );
+    }
+
+    /**
+     * Single instruction for controlled testing.
+     */
+    static Stream<String> singleInstruction() {
+        return Stream.of("Add 2 apples and remove the bread");
     }
 }

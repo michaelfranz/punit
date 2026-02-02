@@ -19,6 +19,7 @@ import org.javai.punit.experiment.model.EmpiricalSummary;
  * @param successRate proportion of successful outcomes (0.0 to 1.0)
  * @param totalTokens total tokens consumed across all outcomes
  * @param meanLatencyMs mean latency in milliseconds
+ * @param feedback detailed failure feedback for the mutator (nullable for backward compatibility)
  */
 public record OptimizeStatistics(
         int sampleCount,
@@ -26,7 +27,8 @@ public record OptimizeStatistics(
         int failureCount,
         double successRate,
         long totalTokens,
-        double meanLatencyMs
+        double meanLatencyMs,
+        IterationFeedback feedback
 ) implements EmpiricalSummary {
     /**
      * Creates OptimizeStatistics with validation.
@@ -72,10 +74,30 @@ public record OptimizeStatistics(
             long totalTokens,
             double meanLatencyMs
     ) {
+        return fromCounts(sampleCount, successCount, totalTokens, meanLatencyMs, null);
+    }
+
+    /**
+     * Creates OptimizeStatistics computing successRate from counts with feedback.
+     *
+     * @param sampleCount total number of samples
+     * @param successCount number of successful samples
+     * @param totalTokens total tokens consumed
+     * @param meanLatencyMs mean latency in milliseconds
+     * @param feedback detailed failure feedback for the mutator
+     * @return new OptimizeStatistics instance
+     */
+    public static OptimizeStatistics fromCounts(
+            int sampleCount,
+            int successCount,
+            long totalTokens,
+            double meanLatencyMs,
+            IterationFeedback feedback
+    ) {
         int failureCount = sampleCount - successCount;
         double successRate = sampleCount > 0 ? (double) successCount / sampleCount : 0.0;
         return new OptimizeStatistics(
-                sampleCount, successCount, failureCount, successRate, totalTokens, meanLatencyMs
+                sampleCount, successCount, failureCount, successRate, totalTokens, meanLatencyMs, feedback
         );
     }
 
@@ -85,7 +107,7 @@ public record OptimizeStatistics(
      * @return empty statistics
      */
     public static OptimizeStatistics empty() {
-        return new OptimizeStatistics(0, 0, 0, 0.0, 0L, 0.0);
+        return new OptimizeStatistics(0, 0, 0, 0.0, 0L, 0.0, null);
     }
 
     // ========== EmpiricalSummary Implementation ==========

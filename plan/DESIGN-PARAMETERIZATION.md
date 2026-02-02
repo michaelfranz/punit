@@ -448,16 +448,16 @@ static Stream<String> instructions() {
 
 ## Success Criteria
 
-- [ ] `@InputSource` annotation created with `value()` and `file()` attributes
-- [ ] Method source resolution works with `Stream<T>`, `Iterable<T>`, and arrays
-- [ ] JSON file source works with automatic type inference
-- [ ] CSV file source works with header-to-component mapping
-- [ ] Sample distribution across inputs works correctly
-- [ ] Integration with `@MeasureExperiment` complete
-- [ ] Integration with `@ExploreExperiment` complete
-- [ ] Integration with `@ProbabilisticTest` complete
-- [ ] `@Factor` on method parameters removed
-- [ ] Output includes input count and samples-per-input metrics
+- [x] `@InputSource` annotation created with `value()` and `file()` attributes
+- [x] Method source resolution works with `Stream<T>`, `Iterable<T>`, and arrays
+- [x] JSON file source works with automatic type inference
+- [x] CSV file source works with header-to-component mapping
+- [x] Sample distribution across inputs works correctly
+- [x] Integration with `@MeasureExperiment` complete
+- [x] Integration with `@ExploreExperiment` complete
+- [x] Integration with `@ProbabilisticTest` complete
+- [ ] `@Factor` on method parameters removed (deferred - existing code still works)
+- [ ] Output includes input count and samples-per-input metrics (future enhancement)
 
 ## Summary
 

@@ -11,6 +11,7 @@ import org.javai.punit.api.ExploreExperiment;
 import org.javai.punit.api.InputSource;
 import org.javai.punit.api.MeasureExperiment;
 import org.javai.punit.api.OutcomeCaptor;
+import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.UseCase;
 import org.javai.punit.contract.ServiceContract;
 import org.javai.punit.contract.UseCaseOutcome;
@@ -124,6 +125,31 @@ class InputSourceIntegrationTest {
         }
     }
 
+    @Nested
+    @DisplayName("ProbabilisticTest with @InputSource")
+    class ProbabilisticTestTests {
+
+        @Test
+        @DisplayName("cycles through inputs during samples")
+        void cyclesThroughInputs() {
+            ProbabilisticTestSubject.capturedInputs.clear();
+            EngineExecutionResults results = EngineTestKit
+                    .engine("junit-jupiter")
+                    .selectors(DiscoverySelectors.selectClass(ProbabilisticTestSubject.class))
+                    .execute();
+
+            // Test may terminate early when success is guaranteed, so don't check exact counts
+            // Just verify it completed without failures
+            results.testEvents().assertStatistics(stats -> stats.failed(0));
+
+            // Verify inputs were captured (at least 3 to see the cycle start)
+            assertThat(ProbabilisticTestSubject.capturedInputs).hasSizeGreaterThanOrEqualTo(3);
+            // First three should be the cycling inputs
+            assertThat(ProbabilisticTestSubject.capturedInputs.subList(0, 3))
+                    .containsExactly("add milk", "remove bread", "clear cart");
+        }
+    }
+
     // ========== Test Subjects ==========
 
     private static final ServiceContract<String, String> CONTRACT = ServiceContract
@@ -216,6 +242,27 @@ class InputSourceIntegrationTest {
             capturedInputs.add(input);
             TestUseCase useCase = new TestUseCase();
             captor.record(useCase.process(input));
+        }
+    }
+
+    /**
+     * Test subject for ProbabilisticTest with @InputSource.
+     */
+    public static class ProbabilisticTestSubject {
+        static List<String> capturedInputs = new ArrayList<>();
+
+        static Stream<String> testInputs() {
+            return Stream.of("add milk", "remove bread", "clear cart");
+        }
+
+        @ProbabilisticTest(useCase = TestUseCase.class, samples = 6, minPassRate = 0.5)
+        @InputSource("testInputs")
+        void testWithInputs(String input) {
+            capturedInputs.add(input);
+            // Simple assertion that always passes
+            if (input == null) {
+                throw new AssertionError("Input should not be null");
+            }
         }
     }
 }

@@ -14,7 +14,7 @@ class OptimizeStatisticsTest {
     @Test
     void shouldCreateFromExplicitValues() {
         OptimizeStatistics stats = new OptimizeStatistics(
-                100, 85, 15, 0.85, 50000L, 120.5
+                100, 85, 15, 0.85, 50000L, 120.5, null
         );
 
         assertEquals(100, stats.sampleCount());
@@ -62,46 +62,46 @@ class OptimizeStatisticsTest {
     @Test
     void shouldRejectNegativeSampleCount() {
         assertThrows(IllegalArgumentException.class, () ->
-                new OptimizeStatistics(-1, 0, 0, 0.0, 0L, 0.0)
+                new OptimizeStatistics(-1, 0, 0, 0.0, 0L, 0.0, null)
         );
     }
 
     @Test
     void shouldRejectNegativeSuccessCount() {
         assertThrows(IllegalArgumentException.class, () ->
-                new OptimizeStatistics(10, -1, 11, 0.0, 0L, 0.0)
+                new OptimizeStatistics(10, -1, 11, 0.0, 0L, 0.0, null)
         );
     }
 
     @Test
     void shouldRejectMismatchedCounts() {
         assertThrows(IllegalArgumentException.class, () ->
-                new OptimizeStatistics(10, 5, 6, 0.5, 0L, 0.0)  // 5 + 6 != 10
+                new OptimizeStatistics(10, 5, 6, 0.5, 0L, 0.0, null)  // 5 + 6 != 10
         );
     }
 
     @Test
     void shouldRejectInvalidSuccessRate() {
         assertThrows(IllegalArgumentException.class, () ->
-                new OptimizeStatistics(10, 5, 5, 1.5, 0L, 0.0)  // > 1.0
+                new OptimizeStatistics(10, 5, 5, 1.5, 0L, 0.0, null)  // > 1.0
         );
 
         assertThrows(IllegalArgumentException.class, () ->
-                new OptimizeStatistics(10, 5, 5, -0.1, 0L, 0.0)  // < 0.0
+                new OptimizeStatistics(10, 5, 5, -0.1, 0L, 0.0, null)  // < 0.0
         );
     }
 
     @Test
     void shouldRejectNegativeTokens() {
         assertThrows(IllegalArgumentException.class, () ->
-                new OptimizeStatistics(10, 5, 5, 0.5, -1L, 0.0)
+                new OptimizeStatistics(10, 5, 5, 0.5, -1L, 0.0, null)
         );
     }
 
     @Test
     void shouldRejectNegativeLatency() {
         assertThrows(IllegalArgumentException.class, () ->
-                new OptimizeStatistics(10, 5, 5, 0.5, 0L, -1.0)
+                new OptimizeStatistics(10, 5, 5, 0.5, 0L, -1.0, null)
         );
     }
 

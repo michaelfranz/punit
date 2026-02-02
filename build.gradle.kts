@@ -113,6 +113,7 @@ tasks.test {
 // Output directories for experiment modes
 val specsDir = "src/test/resources/punit/specs"
 val explorationsDir = "src/test/resources/punit/explorations"
+val optimizationsDir = "src/test/resources/punit/optimizations"
 
 // Shared configuration for experiment tasks
 fun Test.configureAsExperimentTask() {
@@ -142,6 +143,7 @@ fun Test.configureAsExperimentTask() {
     // Output directories for each mode (used by the framework based on annotation mode)
     systemProperty("punit.specs.outputDir", specsDir)
     systemProperty("punit.explorations.outputDir", explorationsDir)
+    systemProperty("punit.optimizations.outputDir", optimizationsDir)
 
     // Deactivate @Disabled so experiments can run even when disabled
     // (they're @Disabled to prevent accidental execution in regular test runs)
@@ -179,25 +181,32 @@ fun Test.configureAsExperimentTask() {
     
     doLast {
         println("\n✓ Experiment complete.")
-        
+
         // Check which directories received new files during this run
         val specsFile = file(specsDir)
         val explorationsFile = file(explorationsDir)
-        
+        val optimizationsFile = file(optimizationsDir)
+
         val specsUpdated = specsFile.exists() && specsFile.walkTopDown()
             .filter { it.isFile && it.lastModified() >= startTime }
             .any()
         val explorationsUpdated = explorationsFile.exists() && explorationsFile.walkTopDown()
             .filter { it.isFile && it.lastModified() >= startTime }
             .any()
-        
+        val optimizationsUpdated = optimizationsFile.exists() && optimizationsFile.walkTopDown()
+            .filter { it.isFile && it.lastModified() >= startTime }
+            .any()
+
         if (specsUpdated) {
             println("  MEASURE specs written to: $specsDir/")
         }
         if (explorationsUpdated) {
             println("  EXPLORE results written to: $explorationsDir/")
         }
-        if (!specsUpdated && !explorationsUpdated) {
+        if (optimizationsUpdated) {
+            println("  OPTIMIZE results written to: $optimizationsDir/")
+        }
+        if (!specsUpdated && !explorationsUpdated && !optimizationsUpdated) {
             println("  No output files were written.")
         }
     }

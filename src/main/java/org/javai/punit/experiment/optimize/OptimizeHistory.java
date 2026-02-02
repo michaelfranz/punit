@@ -172,6 +172,10 @@ public final class OptimizeHistory {
     /**
      * Find the best iteration according to the objective.
      *
+     * <p>When multiple iterations have equal scores, the iteration with the
+     * shortest control factor value wins (tie-breaker). This favors concise
+     * prompts when optimizing system prompts.
+     *
      * @return the best iteration, or empty if no successful iterations
      */
     public Optional<OptimizationRecord> bestIteration() {
@@ -185,7 +189,24 @@ public final class OptimizeHistory {
             comparator = comparator.reversed();
         }
 
+        // Tie-breaker: prefer shorter control factor values (e.g., shorter prompts)
+        comparator = comparator.thenComparingInt(OptimizeHistory::controlFactorLength);
+
         return successful.stream().min(comparator);
+    }
+
+    /**
+     * Returns the length of the control factor value for tie-breaking.
+     *
+     * <p>For String values (like prompts), returns the string length.
+     * For other types, returns 0 (no tie-breaking).
+     */
+    private static int controlFactorLength(OptimizationRecord record) {
+        Object value = record.aggregate().controlFactorValue();
+        if (value instanceof String s) {
+            return s.length();
+        }
+        return 0;
     }
 
     /**

@@ -1,6 +1,7 @@
 package org.javai.punit.examples.infrastructure.llm;
 
 import java.util.Optional;
+import org.javai.punit.experiment.optimize.IterationFeedback;
 import org.javai.punit.experiment.optimize.MutationException;
 import org.javai.punit.experiment.optimize.OptimizationRecord;
 import org.javai.punit.experiment.optimize.OptimizeHistory;
@@ -11,15 +12,25 @@ import org.javai.punit.experiment.optimize.OptimizeStatistics;
  *
  * <p>Uses an LLM to analyze failure patterns and generate improved prompts.
  * This demonstrates genuine AI-assisted prompt engineering, where the model
- * analyzes the current prompt's performance and suggests targeted improvements.
+ * analyzes the current prompt's performance and actual failure feedback
+ * to suggest targeted improvements.
  *
  * <h2>How It Works</h2>
  * <ol>
- *   <li>Extracts performance data from optimization history (success rate, iteration count)</li>
- *   <li>Constructs a meta-prompt asking the LLM to improve the current prompt</li>
+ *   <li>Extracts performance data and failure feedback from optimization history</li>
+ *   <li>Constructs a meta-prompt with actual error messages from postcondition failures</li>
  *   <li>Sends the meta-prompt to the configured mutation model</li>
  *   <li>Returns the improved prompt for the next iteration</li>
  * </ol>
+ *
+ * <h2>Feedback-Driven Improvement</h2>
+ * <p>Unlike approaches that hardcode the expected schema, this strategy learns from
+ * actual feedback including:
+ * <ul>
+ *   <li>Postcondition failure messages (e.g., "Invalid JSON: unexpected token")</li>
+ *   <li>Validation errors (e.g., "Invalid action 'purchase' for context SHOP")</li>
+ *   <li>Instance conformance mismatches (expected vs actual results)</li>
+ * </ul>
  *
  * <h2>Configuration</h2>
  * <p>The model used for mutations can be configured separately from experiment models:
@@ -41,14 +52,23 @@ public final class LlmPromptMutationStrategy implements PromptMutationStrategy {
 
     private static final String META_PROMPT_SYSTEM = """
         You are an expert prompt engineer. Your task is to improve prompts that instruct
-        an LLM to convert natural language into structured JSON.
+        an LLM to produce structured output.
 
-        Analyze the given prompt and its performance metrics, then produce an improved version.
-        Focus on:
-        - Clarity and specificity of instructions
-        - Explicit format requirements
-        - Examples that demonstrate correct output
-        - Constraints that prevent common errors
+        You will receive:
+        1. The current prompt being used
+        2. Performance metrics (success rate, iteration count)
+        3. ACTUAL FAILURE FEEDBACK from the system - this is the most important part!
+
+        Analyze the failure feedback carefully to understand:
+        - What postconditions are failing and why
+        - What the actual error messages say
+        - If there are expected vs actual mismatches, what the difference is
+
+        Based on this analysis, produce an improved prompt that:
+        - Addresses the specific failures shown in the feedback
+        - Adds explicit instructions to prevent the observed errors
+        - Includes examples if the feedback suggests format confusion
+        - Is clear and unambiguous
 
         Output ONLY the improved prompt text. No explanations, no markdown, just the prompt.""";
 
@@ -61,16 +81,9 @@ public final class LlmPromptMutationStrategy implements PromptMutationStrategy {
         - Success rate: %.1f%% (%d/%d samples)
         - Previous best: %.1f%%
 
-        The prompt is being used to convert shopping instructions like "Add 2 apples"
-        into JSON format: {"context": "SHOP", "name": "add", "parameters": [...]}
+        %s
 
-        Common failure modes to address:
-        - Invalid JSON (missing brackets, quotes)
-        - Wrong field names or structure
-        - Invalid action names (should be: add, remove, clear)
-        - Missing required fields
-
-        Produce an improved prompt that achieves higher success rate.""";
+        Based on the failure feedback above, produce an improved prompt that addresses these specific issues.""";
 
     private final ChatLlm llm;
 
@@ -101,6 +114,9 @@ public final class LlmPromptMutationStrategy implements PromptMutationStrategy {
         int samples = getLastSamples(history);
         double bestRate = getBestSuccessRate(history);
 
+        // Extract actual failure feedback from the last iteration
+        String feedbackSection = extractFeedbackSection(history);
+
         // Build the meta-prompt
         String userMessage = META_PROMPT_TEMPLATE.formatted(
                 currentPrompt,
@@ -108,7 +124,8 @@ public final class LlmPromptMutationStrategy implements PromptMutationStrategy {
                 successRate * 100,
                 successes,
                 samples,
-                bestRate * 100
+                bestRate * 100,
+                feedbackSection
         );
 
         try {
@@ -117,6 +134,40 @@ public final class LlmPromptMutationStrategy implements PromptMutationStrategy {
         } catch (LlmApiException e) {
             throw new MutationException("LLM mutation failed: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Extracts the failure feedback section from the optimization history.
+     *
+     * <p>This is the key method that provides real feedback to the mutator LLM
+     * instead of hardcoded schema knowledge.
+     */
+    private String extractFeedbackSection(OptimizeHistory history) {
+        if (history.iterationCount() == 0) {
+            return "FAILURE FEEDBACK:\nNo feedback yet - this is the first iteration.";
+        }
+
+        OptimizationRecord lastIteration = history.iterations().get(history.iterationCount() - 1);
+        OptimizeStatistics stats = lastIteration.aggregate().statistics();
+        IterationFeedback feedback = stats.feedback();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("FAILURE FEEDBACK FROM LAST ITERATION:\n");
+
+        if (feedback == null || !feedback.hasFailures()) {
+            if (stats.failureCount() > 0) {
+                sb.append("There were ").append(stats.failureCount())
+                        .append(" failures but detailed feedback was not captured.\n");
+            } else {
+                sb.append("All samples passed! Looking for further optimization opportunities.\n");
+            }
+            return sb.toString();
+        }
+
+        // Include the formatted feedback from IterationFeedback
+        sb.append(feedback.formatForMutator());
+
+        return sb.toString();
     }
 
     @Override
