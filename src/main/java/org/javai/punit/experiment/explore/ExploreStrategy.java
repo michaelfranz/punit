@@ -1,6 +1,7 @@
 package org.javai.punit.experiment.explore;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,8 +12,10 @@ import java.util.stream.Stream;
 import org.javai.punit.api.DiffableContentProvider;
 import org.javai.punit.api.ExperimentMode;
 import org.javai.punit.api.ExploreExperiment;
+import org.javai.punit.api.Factor;
 import org.javai.punit.api.FactorArguments;
 import org.javai.punit.api.FactorSource;
+import org.javai.punit.api.InputSource;
 import org.javai.punit.api.OutcomeCaptor;
 import org.javai.punit.api.UseCase;
 import org.javai.punit.api.UseCaseProvider;
@@ -21,6 +24,7 @@ import org.javai.punit.experiment.engine.ExperimentModeStrategy;
 import org.javai.punit.experiment.engine.ExperimentProgressReporter;
 import org.javai.punit.experiment.engine.ExperimentResultAggregator;
 import org.javai.punit.experiment.engine.ResultProjectionBuilder;
+import org.javai.punit.experiment.engine.input.InputSourceResolver;
 import org.javai.punit.experiment.engine.shared.FactorInfo;
 import org.javai.punit.experiment.engine.shared.FactorResolver;
 import org.javai.punit.experiment.engine.shared.ResultRecorder;
@@ -83,13 +87,22 @@ public class ExploreStrategy implements ExperimentModeStrategy {
         String useCaseId = exploreConfig.useCaseId();
 
         Method testMethod = context.getRequiredTestMethod();
-        FactorSource factorSource = testMethod.getAnnotation(FactorSource.class);
 
+        // Check for @InputSource annotation (preferred)
+        InputSource inputSource = testMethod.getAnnotation(InputSource.class);
+        if (inputSource != null) {
+            return provideWithInputsInvocationContexts(
+                    testMethod, inputSource, context.getRequiredTestClass(),
+                    exploreConfig, store);
+        }
+
+        // Check for @FactorSource annotation (legacy)
+        FactorSource factorSource = testMethod.getAnnotation(FactorSource.class);
         if (factorSource == null) {
-            // Warn: EXPLORE without factors is equivalent to MEASURE
+            // Warn: EXPLORE without inputs or factors is equivalent to MEASURE
             context.publishReportEntry("punit.warning",
-                    "EXPLORE without @FactorSource is equivalent to MEASURE. " +
-                            "Consider adding @FactorSource or using @MeasureExperiment.");
+                    "EXPLORE without @InputSource or @FactorSource is equivalent to MEASURE. " +
+                            "Consider adding @InputSource, @FactorSource, or using @MeasureExperiment.");
 
             return provideSimpleInvocationContexts(exploreConfig, store);
         }
@@ -145,6 +158,95 @@ public class ExploreStrategy implements ExperimentModeStrategy {
                 .limit(samplesPerConfig)
                 .map(i -> new MeasureInvocationContext(
                         i, samplesPerConfig, useCaseId, new OutcomeCaptor()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Stream<TestTemplateInvocationContext> provideWithInputsInvocationContexts(
+            Method testMethod,
+            InputSource inputSource,
+            Class<?> testClass,
+            ExploreConfig config,
+            ExtensionContext.Store store) {
+
+        int samplesPerConfig = config.effectiveSamplesPerConfig();
+        String useCaseId = config.useCaseId();
+
+        // Determine input type from method parameters
+        Class<?> inputType = findInputParameterType(testMethod);
+
+        // Resolve inputs
+        InputSourceResolver resolver = new InputSourceResolver();
+        List<Object> inputs = resolver.resolve(inputSource, testClass, inputType);
+
+        if (inputs.isEmpty()) {
+            throw new ExtensionConfigurationException(
+                    "@InputSource resolved to empty list");
+        }
+
+        // Store explore-mode metadata
+        store.put("mode", ExperimentMode.EXPLORE);
+        store.put("inputs", inputs);
+        store.put("inputType", inputType);
+        store.put("configAggregators", new LinkedHashMap<String, ExperimentResultAggregator>());
+        store.put("terminated", new AtomicBoolean(false));
+
+        // Generate invocation contexts for all inputs × samples
+        List<ExploreWithInputsInvocationContext> invocations = new ArrayList<>();
+
+        for (int inputIndex = 0; inputIndex < inputs.size(); inputIndex++) {
+            Object inputValue = inputs.get(inputIndex);
+            String configName = buildInputConfigName(inputValue, inputIndex);
+
+            ExperimentResultAggregator configAggregator =
+                    new ExperimentResultAggregator(useCaseId + "/" + configName, samplesPerConfig);
+            ((Map<String, ExperimentResultAggregator>) store.get("configAggregators", Map.class))
+                    .put(configName, configAggregator);
+
+            for (int sample = 1; sample <= samplesPerConfig; sample++) {
+                invocations.add(new ExploreWithInputsInvocationContext(
+                        sample, samplesPerConfig, inputIndex, inputs.size(),
+                        useCaseId, configName, inputValue, inputType, new OutcomeCaptor()
+                ));
+            }
+        }
+
+        return invocations.stream().map(c -> (TestTemplateInvocationContext) c);
+    }
+
+    /**
+     * Finds the input parameter type from method parameters.
+     */
+    private Class<?> findInputParameterType(Method method) {
+        for (Parameter param : method.getParameters()) {
+            Class<?> type = param.getType();
+            if (type == OutcomeCaptor.class) {
+                continue;
+            }
+            if (param.isAnnotationPresent(Factor.class)) {
+                continue;
+            }
+            return type;
+        }
+        throw new ExtensionConfigurationException(
+                "@InputSource requires a method parameter to inject the input value. " +
+                "The parameter must not be OutcomeCaptor or @Factor-annotated.");
+    }
+
+    /**
+     * Builds a configuration name from an input value.
+     */
+    private String buildInputConfigName(Object inputValue, int index) {
+        if (inputValue == null) {
+            return "input-" + (index + 1);
+        }
+        String str = inputValue.toString();
+        // Truncate and sanitize for use as config name
+        if (str.length() > 40) {
+            str = str.substring(0, 37) + "...";
+        }
+        // Replace characters that might be problematic in file names
+        str = str.replaceAll("[^a-zA-Z0-9_-]", "_");
+        return "input-" + (index + 1) + "-" + str;
     }
 
     @Override
@@ -246,6 +348,16 @@ public class ExploreStrategy implements ExperimentModeStrategy {
         ExploreConfig exploreConfig = (ExploreConfig) config;
         int samplesPerConfig = exploreConfig.effectiveSamplesPerConfig();
 
+        // Check for @InputSource first
+        InputSource inputSource = testMethod.getAnnotation(InputSource.class);
+        if (inputSource != null) {
+            Class<?> inputType = findInputParameterType(testMethod);
+            InputSourceResolver resolver = new InputSourceResolver();
+            List<Object> inputs = resolver.resolve(inputSource, testMethod.getDeclaringClass(), inputType);
+            return samplesPerConfig * inputs.size();
+        }
+
+        // Check for @FactorSource
         FactorSource factorSource = testMethod.getAnnotation(FactorSource.class);
         if (factorSource == null) {
             return samplesPerConfig;

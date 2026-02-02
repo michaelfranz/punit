@@ -309,24 +309,24 @@ statistics:
 
 ### EXPLORE
 
-Factors vary configuration; inputs vary test data:
+Each input becomes a configuration with `samplesPerConfig` samples:
 
 ```java
 record TranslationInput(String instruction) {}
 
-@ExploreExperiment(samples = 20)
+@ExploreExperiment(samplesPerConfig = 5)
 @InputSource("testInputs")
-void exploreModels(
-        ShoppingBasketUseCase useCase,  // Factors injected: model, temperature
+void exploreInputs(
+        ShoppingBasketUseCase useCase,
         TranslationInput input) {
     useCase.translateInstruction(input.instruction());
 }
 ```
 
-This creates a cross-product:
-- Each factor combination (model × temperature)
-- Tested with each input
-- 20 samples total per factor combination, distributed across inputs
+This generates separate spec files per input:
+- 10 inputs × 5 samplesPerConfig = 50 total samples
+- Each input becomes a named configuration
+- One spec file per input for diff comparison
 
 ### @ProbabilisticTest
 

@@ -103,7 +103,6 @@ public class ShoppingBasketExplore {
      * </ul>
      *
      * @param useCase the use case instance
-     * @param model the model identifier
      * @param temperature the temperature setting
      * @param captor records outcomes
      */
