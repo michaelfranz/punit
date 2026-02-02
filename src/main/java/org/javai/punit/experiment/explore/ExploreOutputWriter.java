@@ -1,14 +1,15 @@
-package org.javai.punit.experiment.engine;
+package org.javai.punit.experiment.explore;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.format.DateTimeFormatter;
-import java.util.HexFormat;
 import java.util.Objects;
+import org.javai.punit.experiment.engine.YamlBuilder;
+import org.javai.punit.experiment.engine.output.DescriptiveStatistics;
+import org.javai.punit.experiment.engine.output.OutputUtilities;
+import org.javai.punit.experiment.engine.output.OutputUtilities.OutputHeader;
 import org.javai.punit.experiment.model.EmpiricalBaseline;
 import org.javai.punit.experiment.model.ResultProjection;
 import org.javai.punit.model.CovariateProfile;
@@ -16,21 +17,43 @@ import org.javai.punit.model.CovariateValue;
 import org.javai.punit.model.ExpirationPolicy;
 
 /**
- * Writes empirical baselines to YAML files.
+ * Writes exploration output for @ExploreExperiment.
  *
- * <p>Generated specs include:
+ * <p>Explore output is designed for <b>comparative discovery</b> with small samples
+ * (~20 per configuration). The output emphasizes what was observed without the
+ * misleading precision of inferential statistics.
+ *
+ * <h2>Key Differences from MEASURE Output</h2>
  * <ul>
- *   <li>{@code schemaVersion} - version identifier for spec format</li>
- *   <li>{@code contentFingerprint} - SHA-256 hash for integrity verification</li>
+ *   <li><b>No requirements section</b> - exploration is comparative, not prescriptive</li>
+ *   <li><b>No standard error</b> - unreliable with small samples</li>
+ *   <li><b>No confidence interval</b> - wide intervals state the obvious</li>
+ *   <li><b>Descriptive statistics only</b> - observed rate, counts, failure distribution</li>
  * </ul>
+ *
+ * <h2>Output Structure</h2>
+ * <pre>
+ * schemaVersion: punit-spec-1
+ * useCaseId: ...
+ * execution: ...
+ * statistics:
+ *   observed: 0.7000     # What we saw
+ *   successes: 14        # Raw counts
+ *   failures: 6
+ *   failureDistribution: # Qualitative insight
+ *     TIMEOUT: 3
+ * cost: ...
+ * resultProjection: ...
+ * </pre>
+ *
+ * @see org.javai.punit.experiment.measure.MeasureOutputWriter
  */
-public class BaselineWriter {
-    
+public class ExploreOutputWriter {
+
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_INSTANT;
-    private static final String SCHEMA_VERSION = "punit-spec-1";
-    
+
     /**
-     * Writes a baseline to the specified path in YAML format.
+     * Writes an exploration baseline to the specified path in YAML format.
      *
      * @param baseline the baseline to write
      * @param path the output path
@@ -39,54 +62,34 @@ public class BaselineWriter {
     public void write(EmpiricalBaseline baseline, Path path) throws IOException {
         Objects.requireNonNull(baseline, "baseline must not be null");
         Objects.requireNonNull(path, "path must not be null");
-        
-        // Ensure parent directories exist
+
         Path parent = path.getParent();
         if (parent != null) {
             Files.createDirectories(parent);
         }
-        
+
         String content = toYaml(baseline);
         Files.writeString(path, content, StandardCharsets.UTF_8);
     }
-    
+
     /**
-     * Writes a baseline to YAML format.
-     *
-     * <p>The generated YAML includes:
-     * <ul>
-     *   <li>{@code schemaVersion} - version identifier for spec format</li>
-     *   <li>{@code contentFingerprint} - SHA-256 hash for integrity verification</li>
-     * </ul>
+     * Converts a baseline to YAML format for exploration output.
      *
      * @param baseline the baseline
      * @return YAML string
      */
     public String toYaml(EmpiricalBaseline baseline) {
-        // Build the content without fingerprint first
         String contentWithoutFingerprint = buildYamlContent(baseline);
-        
-        // Compute fingerprint of the content
-        String fingerprint = computeFingerprint(contentWithoutFingerprint);
-        
-        // Build final content with fingerprint at the end
-        // Note: contentWithoutFingerprint already ends with \n, so no extra newline needed
-        StringBuilder sb = new StringBuilder(contentWithoutFingerprint);
-        sb.append("contentFingerprint: ").append(fingerprint).append("\n");
-        
-        return sb.toString();
+        return OutputUtilities.appendFingerprint(contentWithoutFingerprint);
     }
-    
-    /**
-     * Builds the YAML content (without the fingerprint line).
-     */
+
     private String buildYamlContent(EmpiricalBaseline baseline) {
         YamlBuilder builder = YamlBuilder.create();
 
         writeHeader(builder, baseline);
         writeCovariates(builder, baseline);
         writeExecution(builder, baseline);
-        writeRequirements(builder, baseline);
+        // NO requirements section - exploration is comparative, not prescriptive
         writeStatistics(builder, baseline);
         writeCost(builder, baseline);
         writeSuccessCriteria(builder, baseline);
@@ -97,16 +100,14 @@ public class BaselineWriter {
     }
 
     private void writeHeader(YamlBuilder builder, EmpiricalBaseline baseline) {
-        builder.comment("Empirical Baseline for " + baseline.getUseCaseId())
-            .comment("Generated automatically by punit experiment runner")
-            .comment("DO NOT EDIT - create a specification based on this baseline instead")
-            .blankLine()
-            .field("schemaVersion", SCHEMA_VERSION)
-            .field("useCaseId", baseline.getUseCaseId())
-            .fieldIfPresent("experimentId", baseline.getExperimentId())
-            .field("generatedAt", ISO_FORMATTER.format(baseline.getGeneratedAt()))
-            .fieldIfPresent("experimentClass", baseline.getExperimentClass())
-            .fieldIfPresent("experimentMethod", baseline.getExperimentMethod());
+        OutputHeader header = OutputHeader.forBaseline(
+            baseline.getUseCaseId(),
+            baseline.getExperimentId(),
+            baseline.getGeneratedAt(),
+            baseline.getExperimentClass(),
+            baseline.getExperimentMethod()
+        );
+        OutputUtilities.writeHeader(builder, header);
 
         if (baseline.hasFootprint()) {
             builder.field("footprint", baseline.getFootprint());
@@ -135,34 +136,21 @@ public class BaselineWriter {
             .endObject();
     }
 
-    private void writeRequirements(YamlBuilder builder, EmpiricalBaseline baseline) {
-        // minPassRate is set to the lower bound of the 95% confidence interval
-        double derivedMinPassRate = baseline.getStatistics().confidenceIntervalLower();
-        builder.startObject("requirements")
-            .field("minPassRate", derivedMinPassRate, "%.4f")
-            .endObject();
-    }
-
+    /**
+     * Writes descriptive statistics only - no SE, CI, or derived thresholds.
+     */
     private void writeStatistics(YamlBuilder builder, EmpiricalBaseline baseline) {
-        builder.startObject("statistics")
-            .startObject("successRate")
-                .field("observed", baseline.getStatistics().observedSuccessRate(), "%.4f")
-                .field("standardError", baseline.getStatistics().standardError(), "%.4f")
-                .formattedInlineArray("confidenceInterval95", "%.4f",
-                    baseline.getStatistics().confidenceIntervalLower(),
-                    baseline.getStatistics().confidenceIntervalUpper())
-            .endObject()
-            .field("successes", baseline.getStatistics().successes())
-            .field("failures", baseline.getStatistics().failures());
+        var stats = baseline.getStatistics();
 
-        if (!baseline.getStatistics().failureDistribution().isEmpty()) {
-            builder.startObject("failureDistribution");
-            for (var entry : baseline.getStatistics().failureDistribution().entrySet()) {
-                builder.field(entry.getKey(), entry.getValue());
-            }
-            builder.endObject();
-        }
-        builder.endObject();
+        // Convert to descriptive statistics (drop inferential stats)
+        DescriptiveStatistics descriptive = DescriptiveStatistics.of(
+            stats.observedSuccessRate(),
+            stats.successes(),
+            stats.failures(),
+            stats.failureDistribution()
+        );
+
+        descriptive.writeTo(builder);
     }
 
     private void writeCost(YamlBuilder builder, EmpiricalBaseline baseline) {
@@ -230,18 +218,4 @@ public class BaselineWriter {
             builder.field("expirationDate", ISO_FORMATTER.format(exp)));
         builder.endObject();
     }
-    
-    /**
-     * Computes a SHA-256 fingerprint of the content.
-     */
-    private String computeFingerprint(String content) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 not available", e);
-        }
-    }
-    
 }
