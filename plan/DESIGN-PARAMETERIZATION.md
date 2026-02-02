@@ -9,7 +9,7 @@ This document captures the design for clarifying and refactoring how measure exp
 Currently, PUnit uses `@Factor` for two conceptually different things:
 
 1. **Use case configuration** — model, temperature, systemPrompt (legitimate)
-2. **Test inputs** — instruction, query data (semantic stretch)
+2. **Experiment and test inputs** — instruction, query data (semantic stretch)
 
 Example of the current conflation:
 
@@ -23,7 +23,7 @@ void measureBaseline(ShoppingBasketUseCase useCase, @Factor String instruction) 
 Here, `instruction` is not a configuration factor — it's test data. Using `@Factor` for this:
 - Muddies the conceptual model
 - Makes the Factor system do double duty
-- Misses an opportunity to use familiar JUnit patterns
+- Misses an opportunity for a cleaner, dedicated mechanism
 
 ### The Clean Distinction
 
@@ -51,41 +51,75 @@ public void setModel(String model) { this.model = model; }
 public void setTemperature(double temperature) { this.temperature = temperature; }
 ```
 
-### 2. Test Inputs Use Standard JUnit Parameterization
+### 2. Test Inputs Use `@InputSource`
 
-For varying test data, use JUnit 5's familiar `@ParameterizedTest`:
-- `@MethodSource` for complex data or loading from files
-- `@CsvSource` for inline tabular data
-- `@ValueSource` for simple lists
+A dedicated PUnit annotation provides test input data to experiments and probabilistic tests. This avoids the complexity of composing JUnit's `@ParameterizedTest` (which is also a TestTemplateInvocationContextProvider) with PUnit's experiment extensions.
 
-This is intuitive for Java developers and doesn't require learning PUnit-specific concepts.
+### 3. Remove @Factor on Method Parameters
 
-### 3. Deprecate @Factor on Method Parameters
+The ability to place `@Factor` on experiment method parameters will be removed. Test inputs should use `@InputSource` instead.
 
-The ability to place `@Factor` on experiment method parameters should be deprecated and eventually removed. This forces the clean separation.
+## The `@InputSource` Annotation
 
-## The Proposed Approach
-
-### Before (Current)
+### Definition
 
 ```java
-@MeasureExperiment(samples = 1000)
-void measureBaseline(ShoppingBasketUseCase useCase, @Factor String instruction) {
-    useCase.translateInstruction(instruction);
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface InputSource {
+    /**
+     * Name of a static method that provides input values.
+     * The method should return Stream<T>, Iterable<T>, or T[] where T
+     * matches the input parameter type.
+     */
+    String value() default "";
+
+    /**
+     * Classpath resource path to a data file.
+     * Supported formats (detected by extension):
+     * - .json: JSON array, each element deserialized to input parameter type
+     * - .csv: CSV with headers matching record component names
+     */
+    String file() default "";
 }
 ```
 
-### After (Proposed)
+### Type Inference
+
+The framework infers the input type from the method parameter — no explicit `type` attribute needed:
+
+```java
+@InputSource(file = "golden/shopping.json")
+void measure(ShoppingBasketUseCase useCase, TranslationInput input) {
+    //                                       ^^^^^^^^^^^^^^^^
+    //                                       Framework inspects this parameter's type
+    //                                       and deserializes JSON to TranslationInput
+}
+```
+
+### File Format Detection
+
+The file extension determines the parsing strategy:
+
+| Extension | Format           | Parser               |
+|-----------|------------------|----------------------|
+| `.json`   | JSON array       | Jackson ObjectMapper |
+| `.csv`    | CSV with headers | Jackson CsvMapper    |
+
+## Usage Patterns
+
+### Pattern 1: Simple String Input (Method Source)
+
+For single-value inputs without expected values:
 
 ```java
 @MeasureExperiment(samples = 1000)
-@ParameterizedTest
-@MethodSource("testInstructions")
+@InputSource("instructions")
 void measureBaseline(ShoppingBasketUseCase useCase, String instruction) {
     useCase.translateInstruction(instruction);
 }
 
-static Stream<String> testInstructions() {
+static Stream<String> instructions() {
     return Stream.of(
         "add milk to my basket",
         "remove the bread",
@@ -95,63 +129,143 @@ static Stream<String> testInstructions() {
 }
 ```
 
-### With Expected Values (Instance Matching)
+### Pattern 2: Record Input (Method Source)
+
+For multiple fields and/or expected values, define a record:
 
 ```java
+record TranslationInput(String instruction, String expected) {}
+
 @MeasureExperiment(samples = 1000)
-@ParameterizedTest
-@MethodSource("goldenInputs")
-void measureWithGoldenData(ShoppingBasketUseCase useCase, String instruction, String expected) {
-    useCase.translateInstruction(instruction, expected);  // Uses .expecting() internally
+@InputSource("goldenInputs")
+void measureWithGolden(ShoppingBasketUseCase useCase, TranslationInput input) {
+    useCase.translateInstruction(input.instruction(), input.expected());
 }
 
-static Stream<Arguments> goldenInputs() {
+static Stream<TranslationInput> goldenInputs() {
     return Stream.of(
-        Arguments.of("add milk", "{\"action\":\"addItem\",\"product\":\"milk\",\"quantity\":1}"),
-        Arguments.of("remove bread", "{\"action\":\"removeItem\",\"product\":\"bread\"}"),
-        Arguments.of("I need 6 eggs", "{\"action\":\"addItem\",\"product\":\"eggs\",\"quantity\":6}")
+        new TranslationInput("add milk", """{"action":"addItem","product":"milk"}"""),
+        new TranslationInput("remove bread", """{"action":"removeItem","product":"bread"}"""),
+        new TranslationInput("I need 6 eggs", """{"action":"addItem","product":"eggs","quantity":6}""")
     );
 }
 ```
 
-### Loading from Golden Dataset File
+### Pattern 3: JSON File Source
+
+Load inputs from a JSON file on the classpath:
 
 ```java
-static Stream<Arguments> goldenInputs() {
-    return GoldenDataset.load("shopping_actions/actions.json")
-        .stream()
-        .map(entry -> Arguments.of(entry.input(), entry.expected()));
+record TranslationInput(String instruction, String expected) {}
+
+@MeasureExperiment(samples = 1000)
+@InputSource(file = "golden/shopping.json")
+void measureFromFile(ShoppingBasketUseCase useCase, TranslationInput input) {
+    useCase.translateInstruction(input.instruction(), input.expected());
 }
 ```
 
-Where `GoldenDataset` is a simple utility:
+**`golden/shopping.json`:**
+```json
+[
+  {"instruction": "add milk", "expected": "{\"action\":\"addItem\",\"product\":\"milk\"}"},
+  {"instruction": "remove bread", "expected": "{\"action\":\"removeItem\",\"product\":\"bread\"}"},
+  {"instruction": "I need 6 eggs", "expected": "{\"action\":\"addItem\",\"product\":\"eggs\",\"quantity\":6}"}
+]
+```
+
+### Pattern 4: CSV File Source
+
+Load inputs from a CSV file — headers map to record component names:
 
 ```java
-public class GoldenDataset {
+record TranslationInput(String instruction, String expected) {}
 
-    public record Entry(String id, String input, String expected) {}
-
-    public static List<Entry> load(String resourcePath) {
-        // Load JSON array from classpath, map to Entry records
-    }
+@MeasureExperiment(samples = 1000)
+@InputSource(file = "golden/shopping.csv")
+void measureFromCsv(ShoppingBasketUseCase useCase, TranslationInput input) {
+    useCase.translateInstruction(input.instruction(), input.expected());
 }
 ```
+
+**`golden/shopping.csv`:**
+```csv
+instruction,expected
+"add milk","{""action"":""addItem"",""product"":""milk""}"
+"remove bread","{""action"":""removeItem"",""product"":""bread""}"
+"I need 6 eggs","{""action"":""addItem"",""product"":""eggs"",""quantity"":6}"
+```
+
+### Pattern 5: Complex Multi-Field Input
+
+For use cases with multiple input parameters, the record captures all of them:
+
+```java
+record OrderInput(String customerId, String productId, int quantity, String expectedResponse) {}
+
+@MeasureExperiment(samples = 500)
+@InputSource(file = "orders/test-orders.json")
+void measureOrderProcessing(OrderUseCase useCase, OrderInput input) {
+    useCase.processOrder(input.customerId(), input.productId(), input.quantity(), input.expectedResponse());
+}
+```
+
+### Pattern 6: With Probabilistic Tests
+
+Works identically with `@ProbabilisticTest`:
+
+```java
+record TranslationInput(String instruction, String expected) {}
+
+@ProbabilisticTest(samples = 100, minPassRate = 0.85)
+@InputSource("goldenInputs")
+void testTranslation(ShoppingBasketUseCase useCase, TranslationInput input) {
+    var outcome = useCase.translateInstruction(input.instruction(), input.expected());
+    assertThat(outcome.fullySatisfied()).isTrue();
+}
+
+static Stream<TranslationInput> goldenInputs() {
+    return Stream.of(
+        new TranslationInput("add milk", """{"action":"addItem","product":"milk"}"""),
+        new TranslationInput("remove bread", """{"action":"removeItem","product":"bread"}""")
+    );
+}
+```
+
+## The Record Pattern
+
+Records are the **recommended approach** for test inputs because they:
+
+| Benefit | Description |
+|---------|-------------|
+| **Self-documenting** | Record components clearly define the input structure |
+| **Type-safe** | Compile-time checking, refactor-friendly |
+| **JSON-compatible** | Jackson deserializes JSON directly to records |
+| **CSV-compatible** | Headers map to component names automatically |
+| **Single parameter** | One parameter regardless of input complexity |
+
+### When to Use Each Pattern
+
+| Scenario | Recommended Pattern |
+|----------|---------------------|
+| Single string input, no expected | `Stream<String>` method source |
+| Multiple fields or expected value | Record with method source |
+| Large dataset or shared test data | Record with file source (.json or .csv) |
 
 ## Sample Distribution Rule
 
-When combining `@ParameterizedTest` with experiments or probabilistic tests:
+When combining `@InputSource` with experiments or probabilistic tests:
 
 - **samples** = total samples to collect
-- **parameter rows** = number of test inputs
-- **samples per input** = samples / parameter rows
+- **input count** = number of inputs from source
+- **samples per input** = samples / input count
 
 ### Example
 
 ```java
 @MeasureExperiment(samples = 1000)
-@ParameterizedTest
-@MethodSource("inputs")  // 100 rows
-void measure(UseCase useCase, String input) { ... }
+@InputSource("inputs")  // 100 inputs
+void measure(UseCase useCase, TestInput input) { ... }
 ```
 
 Result: 1000 samples / 100 inputs = **10 samples per input**
@@ -161,21 +275,20 @@ This distributes the sampling effort across the input space, giving a representa
 ### Rounding Behavior
 
 If samples don't divide evenly:
-- 1000 samples / 17 inputs = 58 samples per input (with remainder distributed)
+- 1000 samples / 17 inputs = 58 samples per input (with remainder distributed to early inputs)
 - Total samples collected will equal the requested amount
 
 ## Impact on Experiment Types
 
 ### MEASURE
 
-Works with parameterized inputs:
-
 ```java
+record TranslationInput(String instruction, String expected) {}
+
 @MeasureExperiment(samples = 1000)
-@ParameterizedTest
-@MethodSource("instructions")
-void measureBaseline(ShoppingBasketUseCase useCase, String instruction) {
-    useCase.translateInstruction(instruction);
+@InputSource("goldenInputs")
+void measureBaseline(ShoppingBasketUseCase useCase, TranslationInput input) {
+    useCase.translateInstruction(input.instruction(), input.expected());
 }
 ```
 
@@ -185,8 +298,8 @@ Output aggregates across all inputs:
 execution:
   samplesPlanned: 1000
   samplesExecuted: 1000
-  inputsCount: 50           # NEW: number of distinct inputs
-  samplesPerInput: 20       # NEW: samples per input
+  inputsCount: 50           # Number of distinct inputs
+  samplesPerInput: 20       # Samples per input
 
 statistics:
   # Aggregate across all inputs
@@ -199,13 +312,14 @@ statistics:
 Factors vary configuration; inputs vary test data:
 
 ```java
+record TranslationInput(String instruction) {}
+
 @ExploreExperiment(samples = 20)
-@ParameterizedTest
-@MethodSource("testInputs")
+@InputSource("testInputs")
 void exploreModels(
         ShoppingBasketUseCase useCase,  // Factors injected: model, temperature
-        String instruction) {
-    useCase.translateInstruction(instruction);
+        TranslationInput input) {
+    useCase.translateInstruction(input.instruction());
 }
 ```
 
@@ -216,76 +330,90 @@ This creates a cross-product:
 
 ### @ProbabilisticTest
 
-Works identically:
-
 ```java
+record TranslationInput(String instruction, String expected) {}
+
 @ProbabilisticTest(samples = 100, minPassRate = 0.85)
-@ParameterizedTest
-@MethodSource("testInputs")
-void testTranslation(ShoppingBasketUseCase useCase, String instruction, String expected) {
-    var outcome = useCase.translateInstruction(instruction, expected);
+@InputSource("goldenInputs")
+void testTranslation(ShoppingBasketUseCase useCase, TranslationInput input) {
+    var outcome = useCase.translateInstruction(input.instruction(), input.expected());
     assertThat(outcome.fullySatisfied()).isTrue();
 }
 ```
 
-## Technical Integration
+## Technical Implementation
 
-### JUnit Extension Composition
+### InputSourceResolver
 
-Both `@ParameterizedTest` and `@MeasureExperiment` are JUnit 5 test template providers. The integration requires:
+A new component that resolves `@InputSource` to a list of input values:
 
-1. `@MeasureExperiment` (or `@ProbabilisticTest`) wraps the parameterized test
-2. For each parameter set, the experiment runs its sampling loop
-3. Samples are distributed across parameter sets
+```java
+class InputSourceResolver {
 
-### Extension Ordering
+    /**
+     * Resolves inputs from method source or file source.
+     *
+     * @param annotation the @InputSource annotation
+     * @param testClass the test class (for method lookup)
+     * @param inputType the input parameter type (for deserialization)
+     * @return list of input values
+     */
+    List<Object> resolve(InputSource annotation, Class<?> testClass, Class<?> inputType) {
+        if (!annotation.value().isEmpty()) {
+            return resolveMethodSource(annotation.value(), testClass);
+        } else if (!annotation.file().isEmpty()) {
+            return resolveFileSource(annotation.file(), inputType);
+        }
+        throw new IllegalArgumentException("@InputSource requires either value() or file()");
+    }
 
+    private List<Object> resolveFileSource(String path, Class<?> inputType) {
+        if (path.endsWith(".json")) {
+            return loadJson(path, inputType);
+        } else if (path.endsWith(".csv")) {
+            return loadCsv(path, inputType);
+        }
+        throw new IllegalArgumentException("Unsupported file format: " + path);
+    }
+}
 ```
-@MeasureExperiment  ─┐
-                    ├─→  For each parameter set from @MethodSource
-@ParameterizedTest  ─┘       Run samples/paramCount iterations
-                             Aggregate results
+
+### Integration Points
+
+The experiment extensions detect `@InputSource` and:
+1. Resolve all inputs at the start of the experiment
+2. Calculate samples per input
+3. Iterate through inputs, running the appropriate number of samples for each
+4. Aggregate statistics across all inputs
+
+### Parameter Resolution Order
+
+For a method like:
+```java
+void measure(ShoppingBasketUseCase useCase, TranslationInput input)
 ```
 
-### Detection
+1. `useCase` — resolved by PUnit's use case parameter resolver
+2. `input` — resolved from `@InputSource`
 
-The experiment extension detects `@ParameterizedTest` presence and:
-- Counts parameter sets to determine distribution
-- Iterates through parameters, running samples for each
-- Aggregates statistics across all parameter sets
+The framework identifies the input parameter as the first parameter that:
+- Is not a use case type
+- Is not annotated with `@Factor`
 
-## Breaking Change: @Factor on Method Parameters
+## Migration from @Factor on Method Parameters
 
-### Current Behavior (To Be Deprecated)
+### Before
 
 ```java
 @MeasureExperiment(samples = 1000)
 void measure(UseCase useCase, @Factor String instruction) { ... }
 ```
 
-### Migration Path
+### After
 
-1. **Phase 1: Deprecate** — Mark `@Factor` on method parameters as `@Deprecated`
-2. **Phase 2: Warn** — Log warnings when deprecated usage detected
-3. **Phase 3: Remove** — Remove support in next major version
-
-### Migration Example
-
-**Before:**
 ```java
 @MeasureExperiment(samples = 1000)
-void measureBaseline(ShoppingBasketUseCase useCase, @Factor String instruction) {
-    useCase.translateInstruction(instruction);
-}
-
-// Factor values from @FactorSource or similar
-```
-
-**After:**
-```java
-@MeasureExperiment(samples = 1000)
-@ParameterizedTest
-@MethodSource("instructions")
+@InputSource("instructions")
 void measureBaseline(ShoppingBasketUseCase useCase, String instruction) {
     useCase.translateInstruction(instruction);
 }
@@ -295,102 +423,56 @@ static Stream<String> instructions() {
 }
 ```
 
-## Golden Dataset Utility
-
-A simple utility for loading test data from JSON files:
-
-```java
-public class GoldenDataset {
-
-    public record Entry(String id, String input, String expected) {}
-
-    /**
-     * Loads a golden dataset from the classpath.
-     *
-     * Expected format:
-     * [
-     *   {"id": "test-1", "instruction": "add milk", "expected": {...}},
-     *   {"id": "test-2", "instruction": "remove bread", "expected": {...}}
-     * ]
-     */
-    public static List<Entry> load(String resourcePath) {
-        return load(resourcePath, "instruction", "expected");
-    }
-
-    public static List<Entry> load(String resourcePath, String inputField, String expectedField) {
-        // Load JSON array from classpath
-        // Map each element to Entry record
-        // Return list
-    }
-
-    public Stream<Entry> stream() {
-        return entries.stream();
-    }
-}
-```
-
-Usage:
-
-```java
-static Stream<Arguments> goldenInputs() {
-    return GoldenDataset.load("shopping_actions/actions.json")
-        .stream()
-        .map(e -> Arguments.of(e.input(), e.expected()));
-}
-```
-
-This keeps the golden dataset as just a data source — no special framework integration needed beyond standard JUnit parameterization.
-
 ## Implementation Plan
 
-### Phase 1: JUnit Integration
+### Phase 1: Core Infrastructure
 
-1. Ensure `@ParameterizedTest` composes correctly with `@MeasureExperiment`
-2. Implement sample distribution across parameter rows
-3. Update result aggregation to handle multiple inputs
+1. Create `@InputSource` annotation in `org.javai.punit.api`
+2. Implement `InputSourceResolver` for method and file sources
+3. Add Jackson CSV dependency for CSV parsing
+4. Create unit tests for resolver
 
-### Phase 2: Deprecation
+### Phase 2: Extension Integration
 
-1. Mark `@Factor` on method parameters as `@Deprecated`
-2. Add compiler/runtime warnings
-3. Update documentation with migration guide
+1. Integrate `InputSourceResolver` with `MeasureStrategy`
+2. Integrate with `ExploreStrategy`
+3. Integrate with `ProbabilisticTestExtension`
+4. Implement sample distribution logic
+5. Remove support for `@Factor` on method parameters
+6. Create integration tests
 
-### Phase 3: Utilities
+### Phase 3: Documentation and Examples
 
-1. Implement `GoldenDataset` loader utility
-2. Add examples in documentation
-
-### Phase 4: Documentation
-
-1. Document the Factor vs Test Input distinction clearly
-2. Update existing examples to use `@ParameterizedTest`
-3. Add migration guide for existing code
+1. Update existing examples to use `@InputSource`
+2. Add golden dataset examples (JSON and CSV)
 
 ## Success Criteria
 
-- [ ] `@ParameterizedTest` composes correctly with `@MeasureExperiment`
-- [ ] `@ParameterizedTest` composes correctly with `@ExploreExperiment`
-- [ ] `@ParameterizedTest` composes correctly with `@ProbabilisticTest`
-- [ ] Sample distribution across parameter rows works correctly
-- [ ] `@Factor` on method parameters deprecated with warnings
-- [ ] `GoldenDataset` loader utility implemented
+- [ ] `@InputSource` annotation created with `value()` and `file()` attributes
+- [ ] Method source resolution works with `Stream<T>`, `Iterable<T>`, and arrays
+- [ ] JSON file source works with automatic type inference
+- [ ] CSV file source works with header-to-component mapping
+- [ ] Sample distribution across inputs works correctly
+- [ ] Integration with `@MeasureExperiment` complete
+- [ ] Integration with `@ExploreExperiment` complete
+- [ ] Integration with `@ProbabilisticTest` complete
+- [ ] `@Factor` on method parameters removed
 - [ ] Output includes input count and samples-per-input metrics
-- [ ] Documentation updated with Factor vs Input distinction
-- [ ] Migration guide for existing `@Factor` on parameters usage
 
 ## Summary
 
-| Before                           | After                                |
-|----------------------------------|--------------------------------------|
-| `@Factor` for configuration + data | `@Factor` for configuration only   |
-| PUnit-specific parameter mechanism | Standard JUnit `@ParameterizedTest` |
-| New concept to learn             | Familiar JUnit patterns              |
-| Semantic confusion               | Clear separation of concerns         |
+| Before                             | After                                     |
+|------------------------------------|-------------------------------------------|
+| `@Factor` for configuration + data | `@Factor` for configuration only          |
+| Semantic confusion                 | Clear separation of concerns              |
+| No file loading support            | Built-in JSON and CSV file sources        |
+| Positional parameter binding       | Type-safe record pattern                  |
 
 The refactoring achieves:
-- **Clarity** — Factors configure, parameters provide test data
-- **Familiarity** — Standard JUnit patterns for Java developers
-- **Simplicity** — No new PUnit-specific concepts for test inputs
+- **Clarity** — Factors configure, `@InputSource` provides test data
+- **Type Safety** — Records define input structure with compile-time checking
+- **Flexibility** — Method source, JSON files, or CSV files
+- **Simplicity** — Type inference eliminates boilerplate
 - **Composability** — Works with all experiment types and probabilistic tests
 
 ---
