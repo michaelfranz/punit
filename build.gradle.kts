@@ -55,6 +55,10 @@ dependencies {
     // 1. Make michaelfranz/outcome public for JitPack access, or
     // 2. Publish to a private artifact repository accessible by CI
     api("org.javai:outcome:1.0-SNAPSHOT")
+
+    // Optional JSON matching support for instance conformance
+    // Users who want JsonMatcher need to add this dependency to their project
+    compileOnly("com.flipkart.zjsonpatch:zjsonpatch:0.4.16")
     implementation("org.apache.logging.log4j:log4j-api:2.25.3")
     runtimeOnly("org.apache.logging.log4j:log4j-core:2.25.3")
     // Bridge SLF4J to Log4j2 (some dependencies use SLF4J)
@@ -68,6 +72,7 @@ dependencies {
     testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.25.3")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.21.0")
+    testImplementation("com.flipkart.zjsonpatch:zjsonpatch:0.4.16")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

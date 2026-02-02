@@ -11,6 +11,10 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
+import org.javai.punit.contract.match.ResultExtractor;
+import org.javai.punit.contract.match.VerificationMatcher;
+import org.javai.punit.contract.match.VerificationMatcher.MatchResult;
+
 /**
  * The outcome of a use case execution, containing the result, timing, and postcondition evaluation.
  *
@@ -20,6 +24,7 @@ import java.util.function.Function;
  *   <li>Execution time (automatically captured)</li>
  *   <li>Arbitrary metadata (e.g., token counts)</li>
  *   <li>Lazy postcondition evaluation</li>
+ *   <li>Optional expected value matching (instance conformance)</li>
  * </ul>
  *
  * <h2>Usage</h2>
@@ -34,20 +39,41 @@ import java.util.function.Function;
  * }
  * }</pre>
  *
+ * <h2>Instance Conformance</h2>
+ * <p>For testing against expected results:
+ * <pre>{@code
+ * return UseCaseOutcome
+ *     .withContract(CONTRACT)
+ *     .input(input)
+ *     .execute(service::call)
+ *     .expecting("expected result", ResultExtractor.identity(), StringMatcher.exact())
+ *     .build();
+ *
+ * // Check full conformance
+ * if (outcome.fullySatisfied()) {
+ *     // Both postconditions passed AND expected value matched
+ * }
+ * }</pre>
+ *
  * @param result the raw result from the service
  * @param executionTime the duration of the service execution
  * @param metadata arbitrary key-value metadata (e.g., token counts)
  * @param postconditionEvaluator evaluates postconditions against the result
+ * @param expectedValue the expected value for instance conformance (nullable)
+ * @param matchResult the result of matching expected vs actual (nullable)
  * @param <R> the result type
  * @see ServiceContract
  * @see PostconditionEvaluator
+ * @see VerificationMatcher
  */
 public record UseCaseOutcome<R>(
         R result,
         Duration executionTime,
         Instant timestamp,
         Map<String, Object> metadata,
-        PostconditionEvaluator<R> postconditionEvaluator
+        PostconditionEvaluator<R> postconditionEvaluator,
+        Object expectedValue,
+        MatchResult matchResult
 ) {
 
     /**
@@ -84,6 +110,50 @@ public record UseCaseOutcome<R>(
      */
     public boolean allPostconditionsSatisfied() {
         return evaluatePostconditions().stream().noneMatch(PostconditionResult::failed);
+    }
+
+    /**
+     * Returns whether this outcome has an expected value for instance conformance.
+     *
+     * @return true if an expected value was specified
+     */
+    public boolean hasExpectedValue() {
+        return expectedValue != null;
+    }
+
+    /**
+     * Returns whether the actual result matches the expected value.
+     *
+     * <p>If no expected value was specified, this returns true (no expectation = trivially satisfied).
+     *
+     * @return true if no expectation exists or if the actual value matches the expected value
+     */
+    public boolean matchesExpected() {
+        return matchResult == null || matchResult.matches();
+    }
+
+    /**
+     * Returns the match result as an optional.
+     *
+     * @return the match result, or empty if no expected value was specified
+     */
+    public Optional<MatchResult> getMatchResult() {
+        return Optional.ofNullable(matchResult);
+    }
+
+    /**
+     * Returns whether this outcome is fully satisfied.
+     *
+     * <p>An outcome is fully satisfied when:
+     * <ul>
+     *   <li>All postconditions pass (behavioral conformance)</li>
+     *   <li>The expected value matches, if specified (instance conformance)</li>
+     * </ul>
+     *
+     * @return true if all postconditions pass and the expected value matches (if any)
+     */
+    public boolean fullySatisfied() {
+        return allPostconditionsSatisfied() && matchesExpected();
     }
 
     /**
@@ -272,6 +342,8 @@ public record UseCaseOutcome<R>(
         private final Duration executionTime;
         private final Instant timestamp;
         private final Map<String, Object> metadata = new HashMap<>();
+        private Object expectedValue;
+        private MatchResult matchResult;
 
         private MetadataBuilder(PostconditionEvaluator<R> evaluator, R result, Duration executionTime, Instant timestamp) {
             this.evaluator = evaluator;
@@ -322,12 +394,64 @@ public record UseCaseOutcome<R>(
         }
 
         /**
+         * Specifies an expected value for instance conformance checking.
+         *
+         * <p>The extractor transforms the result into a matchable value, which is then
+         * compared against the expected value using the provided matcher. This enables
+         * comparison when the result type differs from the expected value type.
+         *
+         * <p>Example:
+         * <pre>{@code
+         * .execute(this::callLLM)
+         * .expecting("Hello", LLMResponse::content, StringMatcher.exact())
+         * .build();
+         * }</pre>
+         *
+         * @param expected the expected value
+         * @param extractor extracts the matchable value from the result
+         * @param matcher compares the expected and actual values
+         * @param <T> the type of value being compared
+         * @return this builder for method chaining
+         * @throws NullPointerException if extractor or matcher is null
+         */
+        public <T> MetadataBuilder<R> expecting(
+                T expected,
+                ResultExtractor<R, T> extractor,
+                VerificationMatcher<T> matcher) {
+            Objects.requireNonNull(extractor, "extractor must not be null");
+            Objects.requireNonNull(matcher, "matcher must not be null");
+
+            this.expectedValue = expected;
+            T actualValue = extractor.extract(result);
+            this.matchResult = matcher.match(expected, actualValue);
+            return this;
+        }
+
+        /**
+         * Specifies an expected value for instance conformance checking.
+         *
+         * <p>This is a convenience method for when the result type matches the expected
+         * value type directly. Equivalent to:
+         * <pre>{@code
+         * expecting(expected, ResultExtractor.identity(), matcher)
+         * }</pre>
+         *
+         * @param expected the expected value
+         * @param matcher compares the expected and actual values
+         * @return this builder for method chaining
+         * @throws NullPointerException if matcher is null
+         */
+        public MetadataBuilder<R> expecting(R expected, VerificationMatcher<R> matcher) {
+            return expecting(expected, ResultExtractor.identity(), matcher);
+        }
+
+        /**
          * Builds the use case outcome.
          *
          * @return the immutable outcome
          */
         public UseCaseOutcome<R> build() {
-            return new UseCaseOutcome<>(result, executionTime, timestamp, metadata, evaluator);
+            return new UseCaseOutcome<>(result, executionTime, timestamp, metadata, evaluator, expectedValue, matchResult);
         }
     }
 }

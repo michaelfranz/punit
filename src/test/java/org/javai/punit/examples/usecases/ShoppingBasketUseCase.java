@@ -13,6 +13,7 @@ import org.javai.punit.api.StandardCovariate;
 import org.javai.punit.api.UseCase;
 import org.javai.punit.contract.ServiceContract;
 import org.javai.punit.contract.UseCaseOutcome;
+import org.javai.punit.contract.match.JsonMatcher;
 import org.javai.punit.examples.infrastructure.llm.ChatLlm;
 import org.javai.punit.examples.infrastructure.llm.ChatLlmProvider;
 import org.javai.punit.examples.infrastructure.llm.ChatResponse;
@@ -198,7 +199,7 @@ public class ShoppingBasketUseCase {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // USE CASE METHOD
+    // USE CASE METHODS
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
@@ -208,14 +209,43 @@ public class ShoppingBasketUseCase {
      * @return outcome containing the result and postcondition evaluations
      */
     public UseCaseOutcome<ChatResponse> translateInstruction(String instruction) {
-        return UseCaseOutcome
+        return translateInstructionCore(instruction, null);
+    }
+
+    /**
+     * Translates a natural language shopping instruction to a structured action,
+     * with instance conformance checking against an expected JSON result.
+     *
+     * <p>This method extends {@link #translateInstruction(String)} by also comparing
+     * the actual LLM response against the expected JSON. The comparison is semantic,
+     * meaning JSON property order and whitespace differences are ignored.
+     *
+     * <p>Use {@link UseCaseOutcome#fullySatisfied()} to check both behavioral conformance
+     * (postconditions) and instance conformance (expected value match).
+     *
+     * @param instruction the natural language instruction (e.g., "Add 2 apples")
+     * @param expectedJson the expected JSON response for instance conformance checking
+     * @return outcome containing the result, postcondition evaluations, and match result
+     */
+    public UseCaseOutcome<ChatResponse> translateInstruction(String instruction, String expectedJson) {
+        return translateInstructionCore(instruction, expectedJson);
+    }
+
+    private UseCaseOutcome<ChatResponse> translateInstructionCore(String instruction, String expectedJson) {
+        var builder = UseCaseOutcome
                 .withContract(CONTRACT)
                 .input(new ServiceInput(systemPrompt, instruction, model, temperature))
                 .execute(this::executeTranslation)
                 .withResult((response, meta) -> meta
                         .meta("tokensUsed", response.totalTokens())
                         .meta("promptTokens", response.promptTokens())
-                        .meta("completionTokens", response.completionTokens()))
+                        .meta("completionTokens", response.completionTokens()));
+
+        if (expectedJson != null) {
+            builder.expecting(expectedJson, ChatResponse::content, JsonMatcher.create());
+        }
+
+        return builder
                 .meta("instruction", instruction)
                 .meta("model", model)
                 .meta("temperature", temperature)

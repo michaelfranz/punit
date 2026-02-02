@@ -376,7 +376,9 @@ public class OptimizeStrategy implements ExperimentModeStrategy {
                 Duration.ZERO,
                 Instant.now(),
                 Map.of("error", errorMessage, "exceptionType", e.getClass().getName()),
-                new FailedInvocationEvaluator(errorMessage)
+                new FailedInvocationEvaluator(errorMessage),
+                null,
+                null
         );
     }
 

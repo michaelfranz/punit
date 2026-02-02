@@ -160,7 +160,9 @@ class ExperimentPacingIntegrationTest {
                 Duration.ofMillis(10),
                 Instant.now(),
                 Map.of(),
-                SIMPLE_CONTRACT
+                SIMPLE_CONTRACT,
+                null,
+                null
         );
     }
 

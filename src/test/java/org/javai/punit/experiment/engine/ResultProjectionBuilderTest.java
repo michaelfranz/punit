@@ -47,7 +47,9 @@ class ResultProjectionBuilderTest {
             executionTime,
             Instant.now(),
             Map.of(),
-            alwaysPassing()
+            alwaysPassing(),
+            null,
+            null
         );
     }
 
@@ -149,7 +151,9 @@ class ResultProjectionBuilderTest {
                 Duration.ZERO,
                 Instant.now(),
                 Map.of(),
-                alwaysPassing()
+                alwaysPassing(),
+                null,
+                null
             );
 
             ResultProjection projection = builder.build(0, outcome);
@@ -344,7 +348,9 @@ class ResultProjectionBuilderTest {
                 Duration.ZERO,
                 Instant.now(),
                 Map.of(),
-                alwaysPassing()
+                alwaysPassing(),
+                null,
+                null
             );
 
             ResultProjection projection = builder.build(0, outcome);
@@ -381,7 +387,9 @@ class ResultProjectionBuilderTest {
                 Duration.ZERO,
                 Instant.now(),
                 Map.of(),
-                evaluator
+                evaluator,
+                null,
+                null
             );
 
             ResultProjection projection = builder.build(0, outcome);
@@ -416,7 +424,9 @@ class ResultProjectionBuilderTest {
                 Duration.ZERO,
                 Instant.now(),
                 Map.of(),
-                evaluator
+                evaluator,
+                null,
+                null
             );
 
             ResultProjection projection = builder.build(0, outcome);
