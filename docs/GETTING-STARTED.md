@@ -245,7 +245,7 @@ In real mode, the model name determines which provider handles the request:
 | Model Pattern | Provider | Examples |
 |---------------|----------|----------|
 | `gpt-*`, `o1-*`, `o3-*` | OpenAI | `gpt-4o-mini`, `gpt-4o`, `o1-preview` |
-| `claude-*` | Anthropic | `claude-3-5-haiku-20241022`, `claude-3-5-sonnet-20241022` |
+| `claude-*` | Anthropic | `claude-haiku-4-5-20251001`, `claude-sonnet-4-5-20250929` |
 
 ### Cost Awareness
 

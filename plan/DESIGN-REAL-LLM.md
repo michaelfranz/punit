@@ -21,7 +21,7 @@ PUnit's examples currently use `MockChatLlm` to simulate LLM behavior. While thi
 Experiments like `ShoppingBasketExplore.compareModels` deliberately explore **multiple models from different providers** in a single run. Therefore:
 
 - The switch is **`mock` vs `real`** — not a provider selection
-- In `real` mode, the **model name determines the provider** (e.g., `gpt-4o-mini` → OpenAI, `claude-3-5-haiku-20241022` → Anthropic)
+- In `real` mode, the **model name determines the provider** (e.g., `gpt-4o-mini` → OpenAI, `claude-haiku-4-5-20251001` → Anthropic)
 - API keys are looked up **per provider** as needed
 
 This also applies to **mutators**: `ShoppingBasketPromptMutator` currently uses deterministic prompt progression, but in `real` mode could use an LLM to analyze failure patterns and generate targeted improvements.
@@ -93,7 +93,7 @@ org.javai.punit.examples.infrastructure.llm/
 | Provider | Static Method | Patterns | Examples |
 |----------|---------------|----------|----------|
 | `OpenAiChatLlm` | `supportsModel(model)` | `gpt-*`, `o1-*`, `o3-*`, `text-*`, `davinci*` | `gpt-4o`, `gpt-4o-mini`, `o1-preview` |
-| `AnthropicChatLlm` | `supportsModel(model)` | `claude-*` | `claude-3-5-haiku-20241022`, `claude-sonnet-4-20250514` |
+| `AnthropicChatLlm` | `supportsModel(model)` | `claude-*` | `claude-haiku-4-5-20251001`, `claude-sonnet-4-20250514` |
 | Unknown | — | — | Error with message listing `supportedModelPatterns()` from each provider |
 
 **Benefits of this approach:**
@@ -164,7 +164,7 @@ package org.javai.punit.examples.infrastructure.llm;
  * ChatLlm llm = ChatLlmProvider.resolve();
  * // Model is passed explicitly in each call - in real mode, routes to appropriate provider
  * llm.chat("You are helpful.", "Hello", "gpt-4o-mini", 0.3);        // Routes to OpenAI
- * llm.chat("You are helpful.", "Hello", "claude-3-5-haiku-20241022", 0.3);  // Routes to Anthropic
+ * llm.chat("You are helpful.", "Hello", "claude-haiku-4-5-20251001", 0.3);  // Routes to Anthropic
  * }</pre>
  */
 public final class ChatLlmProvider {
@@ -434,7 +434,7 @@ package org.javai.punit.examples.infrastructure.llm;
  * <p>Uses {@link java.net.http.HttpClient} for zero external dependencies.
  *
  * <h2>Model Naming</h2>
- * <p>Pass Anthropic model names directly in each call (e.g., "claude-3-5-haiku-20241022",
+ * <p>Pass Anthropic model names directly in each call (e.g., "claude-haiku-4-5-20251001",
  * "claude-sonnet-4-20250514").
  *
  * <h2>API Differences from OpenAI</h2>
@@ -501,7 +501,7 @@ final class AnthropicChatLlm implements ChatLlm {
 
 ```json
 {
-  "model": "claude-3-5-haiku-20241022",
+  "model": "claude-haiku-4-5-20251001",
   "max_tokens": 1024,
   "temperature": 0.3,
   "system": "...",
@@ -738,7 +738,7 @@ public interface ChatLlm {
      *
      * @param systemMessage the system prompt
      * @param userMessage the user message
-     * @param model the model identifier (e.g., "gpt-4o-mini", "claude-3-5-haiku-20241022")
+     * @param model the model identifier (e.g., "gpt-4o-mini", "claude-haiku-4-5-20251001")
      * @param temperature the sampling temperature (0.0 to 1.0)
      * @return Outcome containing ChatResponse on success, or Failure on error
      */
@@ -1284,7 +1284,7 @@ curl https://api.anthropic.com/v1/messages \
   -H "x-api-key: $ANTHROPIC_API_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
-    "model": "claude-3-5-haiku-20241022",
+    "model": "claude-haiku-4-5-20251001",
     "max_tokens": 1024,
     "temperature": 0.3,
     "system": "You are a helpful assistant.",

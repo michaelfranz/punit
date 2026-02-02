@@ -2,7 +2,6 @@ package org.javai.punit.examples.infrastructure.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
@@ -118,12 +117,12 @@ class RealLlmIntegrationTest {
         }
 
         @Test
-        @DisplayName("claude-3-5-haiku can complete a simple chat")
+        @DisplayName("claude-haiku-4-5 can complete a simple chat")
         void claudeHaikuCanCompleteSimpleChat() {
             ChatResponse response = llm.chatWithMetadata(
                     "You are a helpful assistant. Respond with just 'Hello!' and nothing else.",
                     "Say hello",
-                    "claude-3-5-haiku-20241022",
+                    "claude-haiku-4-5-20251001",
                     0.0
             );
 
@@ -134,12 +133,12 @@ class RealLlmIntegrationTest {
         }
 
         @Test
-        @DisplayName("claude-3-5-sonnet can complete a simple chat")
+        @DisplayName("claude-sonnet-4-5 can complete a simple chat")
         void claudeSonnetCanCompleteSimpleChat() {
             ChatResponse response = llm.chatWithMetadata(
                     "You are a helpful assistant. Respond with just 'Hello!' and nothing else.",
                     "Say hello",
-                    "claude-3-5-sonnet-20241022",
+                    "claude-sonnet-4-5-20250929",
                     0.0
             );
 
@@ -158,7 +157,7 @@ class RealLlmIntegrationTest {
                     Always respond with: {"greeting": "hello"}
                     """,
                     "Generate a greeting",
-                    "claude-3-5-haiku-20241022",
+                    "claude-haiku-4-5-20251001",
                     0.0
             );
 
@@ -207,7 +206,7 @@ class RealLlmIntegrationTest {
                 ChatResponse anthropicResponse = router.chatWithMetadata(
                         "Respond with 'Anthropic works'",
                         "Test",
-                        "claude-3-5-haiku-20241022",
+                        "claude-haiku-4-5-20251001",
                         0.0
                 );
                 assertThat(anthropicResponse.content()).isNotBlank();

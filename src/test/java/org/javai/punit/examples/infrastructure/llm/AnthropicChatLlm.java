@@ -23,8 +23,8 @@ import org.javai.outcome.retry.RetryPolicy;
  * (aside from Jackson for JSON parsing).
  *
  * <h2>Model Naming</h2>
- * <p>Pass Anthropic model names directly in each call (e.g., "claude-3-5-haiku-20241022",
- * "claude-sonnet-4-20250514"). Use {@link #supportsModel(String)} to check if a model
+ * <p>Pass Anthropic model names directly in each call (e.g., "claude-haiku-4-5-20251001",
+ * "claude-sonnet-4-5-20250929"). Use {@link #supportsModel(String)} to check if a model
  * name is supported.
  *
  * <h2>API Differences from OpenAI</h2>
@@ -256,13 +256,13 @@ public final class AnthropicChatLlm implements ChatLlm {
     }
 
     private double estimateCost(String model, int promptTokens, int completionTokens) {
-        // Approximate costs per 1M tokens (as of Jan 2025)
+        // Approximate costs per 1M tokens (as of Feb 2026 - Claude 4.5 family)
         if (model.contains("opus")) {
-            return (promptTokens * 15.00 + completionTokens * 75.00) / 1_000_000;
+            return (promptTokens * 5.00 + completionTokens * 25.00) / 1_000_000;
         } else if (model.contains("sonnet")) {
             return (promptTokens * 3.00 + completionTokens * 15.00) / 1_000_000;
         } else if (model.contains("haiku")) {
-            return (promptTokens * 0.25 + completionTokens * 1.25) / 1_000_000;
+            return (promptTokens * 1.00 + completionTokens * 5.00) / 1_000_000;
         } else {
             // Conservative estimate for unknown models
             return (promptTokens * 3.00 + completionTokens * 15.00) / 1_000_000;

@@ -25,7 +25,7 @@ package org.javai.punit.examples.infrastructure.llm;
  * // Model is passed explicitly in each call
  * // In real mode, routes to appropriate provider based on model name
  * llm.chat("You are helpful.", "Hello", "gpt-4o-mini", 0.3);        // Routes to OpenAI
- * llm.chat("You are helpful.", "Hello", "claude-3-5-haiku-20241022", 0.3);  // Routes to Anthropic
+ * llm.chat("You are helpful.", "Hello", "claude-haiku-4-5-20251001", 0.3);  // Routes to Anthropic
  * }</pre>
  *
  * <h2>Running with Real LLMs</h2>

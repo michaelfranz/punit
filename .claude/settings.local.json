@@ -46,7 +46,13 @@
       "Bash(gh run:*)",
       "Bash(git rev-parse:*)",
       "Bash(curl:*)",
-      "Bash(if ! grep -q \"@Disabled\" \"$f\")"
+      "Bash(if ! grep -q \"@Disabled\" \"$f\")",
+      "Bash(jar tf:*)",
+      "Bash(claude auth status:*)",
+      "Bash(claude whoami:*)",
+      "Bash(claude config list:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.anthropic.com)"
     ]
   }
 }

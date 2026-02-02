@@ -375,8 +375,8 @@ See [Appendix A: Configuration Reference](#a-configuration-reference) for all LL
 > |-------|-------|--------|
 > | `gpt-4o-mini` | $0.15 | $0.60 |
 > | `gpt-4o` | $2.50 | $10.00 |
-> | `claude-3-5-haiku-20241022` | $0.25 | $1.25 |
-> | `claude-3-5-sonnet-20241022` | $3.00 | $15.00 |
+> | `claude-haiku-4-5-20251001` | $1.00 | $5.00 |
+> | `claude-sonnet-4-5-20250929` | $3.00 | $15.00 |
 >
 > Use budget constraints (`tokenBudget`, `timeBudgetMs`) to cap costs. Start with mock mode or small sample sizes to verify your experiment works before running with real APIs.
 
@@ -1150,7 +1150,7 @@ In `real` mode, the model name determines which provider handles the request:
 | Model Pattern | Provider | Examples |
 |---------------|----------|----------|
 | `gpt-*`, `o1-*`, `o3-*`, `text-*`, `davinci*` | OpenAI | `gpt-4o`, `gpt-4o-mini`, `o1-preview` |
-| `claude-*` | Anthropic | `claude-3-5-haiku-20241022`, `claude-3-5-sonnet-20241022` |
+| `claude-*` | Anthropic | `claude-haiku-4-5-20251001`, `claude-sonnet-4-5-20250929` |
 
 **Example: Running experiments with real LLMs:**
 

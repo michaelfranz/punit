@@ -84,7 +84,7 @@ public class ShoppingBasketExplore {
             OutcomeCaptor captor
     ) {
         useCase.setModel(model);
-        useCase.setTemperature(0.3);  // Fixed temperature for fair comparison
+        useCase.setTemperature(0.1);  // Fixed temperature for fair comparison
         captor.record(useCase.translateInstruction(SIMPLE_INSTRUCTION));
     }
 
@@ -141,8 +141,8 @@ public class ShoppingBasketExplore {
                 .names("model")
                 .values("gpt-4o-mini")
                 .values("gpt-4o")
-//                .values("claude-3-5-haiku-20241022")
-//                .values("claude-3-5-sonnet-20241022")
+//                .values("claude-haiku-4-5-20251001")
+//                .values("claude-sonnet-4-5-20250929")
                 .stream();
     }
 
@@ -164,13 +164,13 @@ public class ShoppingBasketExplore {
                 .values("gpt-4o", 0.5)
                 .values("gpt-4o", 1.0)
                 // Claude Haiku across temperatures
-//                .values("claude-3-5-haiku-20241022", 0.0)
-//                .values("claude-3-5-haiku-20241022", 0.5)
-//                .values("claude-3-5-haiku-20241022", 1.0)
+//                .values("claude-haiku-4-5-20251001", 0.0)
+//                .values("claude-haiku-4-5-20251001", 0.5)
+//                .values("claude-haiku-4-5-20251001", 1.0)
 //                // Claude Sonnet across temperatures
-//                .values("claude-3-5-sonnet-20241022", 0.0)
-//                .values("claude-3-5-sonnet-20241022", 0.5)
-//                .values("claude-3-5-sonnet-20241022", 1.0)
+//                .values("claude-sonnet-4-5-20250929", 0.0)
+//                .values("claude-sonnet-4-5-20250929", 0.5)
+//                .values("claude-sonnet-4-5-20250929", 1.0)
                 .stream();
     }
 }

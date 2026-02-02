@@ -1,7 +1,6 @@
 package org.javai.punit.examples.infrastructure.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -34,9 +33,9 @@ class ModelRoutingTest {
 
         @ParameterizedTest
         @ValueSource(strings = {
-                "claude-3-5-haiku-20241022",
-                "claude-3-5-sonnet-20241022",
-                "claude-opus-4-20250514",
+                "claude-haiku-4-5-20251001",
+                "claude-sonnet-4-5-20250929",
+                "claude-opus-4-5-20251101",
                 "gemini-pro",
                 "llama-2-70b"
         })
@@ -68,11 +67,11 @@ class ModelRoutingTest {
 
         @ParameterizedTest
         @ValueSource(strings = {
-                "claude-3-5-haiku-20241022",
-                "claude-3-5-sonnet-20241022",
-                "claude-opus-4-20250514",
+                "claude-haiku-4-5-20251001",
+                "claude-sonnet-4-5-20250929",
+                "claude-opus-4-5-20251101",
                 "claude-sonnet-4-20250514",
-                "claude-3-opus-20240229",
+                "claude-3-haiku-20240307",
                 "claude-2.1",
                 "claude-instant-1.2"
         })
@@ -115,7 +114,7 @@ class ModelRoutingTest {
         @DisplayName("all common models are covered by exactly one provider")
         void allCommonModelsAreCoveredByExactlyOneProvider() {
             String[] openAiModels = {"gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"};
-            String[] anthropicModels = {"claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022"};
+            String[] anthropicModels = {"claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"};
 
             for (String model : openAiModels) {
                 assertThat(OpenAiChatLlm.supportsModel(model))

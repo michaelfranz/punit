@@ -44,7 +44,7 @@ public interface ChatLlm {
      *
      * @param systemMessage the system prompt establishing context and instructions
      * @param userMessage the user's request
-     * @param model the model identifier (e.g., "gpt-4o-mini", "claude-3-5-haiku-20241022")
+     * @param model the model identifier (e.g., "gpt-4o-mini", "claude-haiku-4-5-20251001")
      * @param temperature controls randomness (0.0 = deterministic, 1.0 = creative)
      * @return the LLM's response as a string
      */
@@ -64,7 +64,7 @@ public interface ChatLlm {
      *
      * @param systemMessage the system prompt establishing context and instructions
      * @param userMessage the user's request
-     * @param model the model identifier (e.g., "gpt-4o-mini", "claude-3-5-haiku-20241022")
+     * @param model the model identifier (e.g., "gpt-4o-mini", "claude-haiku-4-5-20251001")
      * @param temperature controls randomness (0.0 = deterministic, 1.0 = creative)
      * @return the response with metadata including token usage
      */
