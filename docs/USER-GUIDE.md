@@ -244,7 +244,7 @@ This single artifact serves both experiments and tests:
 
 ### Instance Conformance
 
-Beyond postconditions, use cases can validate against **expected values**—specific instances the result should match. This enables golden dataset testing:
+Beyond postconditions, use cases can validate against **expected values**—specific instances the result should match. This enables instance conformance testing:
 
 ```java
 public UseCaseOutcome<ChatResponse> translateInstruction(String instruction, String expectedJson) {
@@ -371,7 +371,6 @@ You don't need to run experiments to discover the threshold—it's given to you.
 The `PaymentGatewaySlaTest` demonstrates compliance testing:
 
 ```java
-@TestTemplate
 @ProbabilisticTest(
     useCase = PaymentGatewayUseCase.class,
     samples = 10000,
@@ -498,7 +497,6 @@ See [Appendix A: Configuration Reference](#a-configuration-reference) for all LL
 **Example: Comparing Models**
 
 ```java
-@TestTemplate
 @ExploreExperiment(
     useCase = ShoppingBasketUseCase.class,
     samplesPerConfig = 20,
@@ -529,7 +527,6 @@ public static Stream<FactorArguments> modelConfigurations() {
 **Example: Multi-Factor Exploration**
 
 ```java
-@TestTemplate
 @ExploreExperiment(
     useCase = ShoppingBasketUseCase.class,
     samplesPerConfig = 20,
@@ -589,7 +586,6 @@ OPTIMIZE iteratively refines a **control factor** through mutation and evaluatio
 **Example: Optimizing Temperature**
 
 ```java
-@TestTemplate
 @OptimizeExperiment(
     useCase = ShoppingBasketUseCase.class,
     controlFactor = "temperature",
@@ -618,7 +614,6 @@ static Double naiveStartingTemperature() {
 **Example: Optimizing Prompts**
 
 ```java
-@TestTemplate
 @OptimizeExperiment(
     useCase = ShoppingBasketUseCase.class,
     controlFactor = "systemPrompt",
@@ -630,7 +625,7 @@ static Double naiveStartingTemperature() {
     noImprovementWindow = 3,
     experimentId = "prompt-optimization-v1"
 )
-@InputSource(file = "golden/shopping-instructions.json")
+@InputSource(file = "fixtures/shopping-instructions.json")
 void optimizeSystemPrompt(
     ShoppingBasketUseCase useCase,
     @ControlFactor("systemPrompt") String systemPrompt,
@@ -681,7 +676,6 @@ A MEASURE experiment typically runs many samples (1000+ recommended) to establis
 **Example with `@InputSource`:**
 
 ```java
-@TestTemplate
 @MeasureExperiment(
     useCase = ShoppingBasketUseCase.class,
     experimentId = "baseline-v1"
@@ -704,20 +698,19 @@ static Stream<String> basketInstructions() {
 }
 ```
 
-**Using File-Based Input with Expected Values (Golden Dataset):**
+**Using File-Based Input with Expected Values:**
 
 For instance conformance testing, use a JSON file with expected values:
 
 ```java
 record TranslationInput(String instruction, String expected) {}
 
-@TestTemplate
 @MeasureExperiment(
     useCase = ShoppingBasketUseCase.class,
-    experimentId = "baseline-golden-v1"
+    experimentId = "baseline-with-expected-v1"
 )
-@InputSource(file = "golden/shopping-instructions.json")
-void measureBaselineWithGolden(
+@InputSource(file = "fixtures/shopping-instructions.json")
+void measureBaselineWithExpected(
     ShoppingBasketUseCase useCase,
     TranslationInput input,
     OutcomeCaptor captor
@@ -878,7 +871,6 @@ public class ShoppingBasketTest {
         provider.register(ShoppingBasketUseCase.class, ShoppingBasketUseCase::new);
     }
 
-    @TestTemplate
     @ProbabilisticTest(useCase = ShoppingBasketUseCase.class, samples = 100)
     void testInstructionTranslation(ShoppingBasketUseCase useCase, ...) {
         // useCase is automatically injected
@@ -910,7 +902,7 @@ static Stream<String> testInstructions() {
 record TestInput(String instruction, String expected) {}
 
 @ProbabilisticTest(samples = 100)
-@InputSource(file = "golden/inputs.json")
+@InputSource(file = "fixtures/inputs.json")
 void myTest(ShoppingBasketUseCase useCase, TestInput input) {
     useCase.translateInstruction(input.instruction(), input.expected()).assertAll();
 }
@@ -924,6 +916,27 @@ The JSON file contains an array matching the record structure:
 ]
 ```
 
+**Explicit Input Parameter with `@Input`:**
+
+When a method has multiple parameters that could receive the input value, use `@Input` to explicitly mark the target parameter:
+
+```java
+@ExploreExperiment(useCase = ShoppingBasketUseCase.class, samplesPerConfig = 10)
+@InputSource(file = "fixtures/shopping-instructions.json")
+void exploreInputVariations(
+        ShoppingBasketUseCase useCase,
+        @Input InputData inputData,    // Explicitly marked as input target
+        OutcomeCaptor captor
+) {
+    captor.record(useCase.translateInstruction(inputData.instruction()));
+}
+```
+
+Without `@Input`, the framework auto-detects the input parameter by excluding framework types (UseCase, OutcomeCaptor, TokenChargeRecorder) and `@Factor`-annotated parameters. Use `@Input` when:
+- The method has multiple candidate parameters
+- You want to be explicit for clarity
+- Auto-detection picks the wrong parameter
+
 **Sample Distribution:**
 
 Samples are distributed evenly across inputs:
@@ -935,7 +948,7 @@ Samples are distributed evenly across inputs:
 | Use Case | Recommendation |
 |----------|----------------|
 | Simple string inputs | Method source (inline, version-controlled) |
-| Golden dataset with expected values | File source (easier to maintain, share) |
+| Dataset with expected values | File source (easier to maintain, share) |
 | Generated/computed inputs | Method source (programmatic) |
 | Large input sets | File source (cleaner code) |
 
@@ -973,7 +986,6 @@ extendedStatistics:
 - The system evolves and you need to catch regressions early
 
 ```java
-@TestTemplate
 @ProbabilisticTest(
     useCase = ShoppingBasketUseCase.class,
     samples = 100
@@ -1484,7 +1496,8 @@ bestIteration:
 | **confidence**          | Probability of a correct verdict; equals 1 minus the false positive rate. Part of the parameter triangle.  |
 | **Covariate**           | Environmental factor that may affect system behavior                                                       |
 | **Factor**              | Input or configuration that varies across test executions                                                  |
-| **Instance conformance**| Validation that actual results match expected values (golden dataset testing)                              |
+| **Instance conformance**| Validation that actual results match expected values                                                        |
+| **Input**               | Annotation marking a parameter as the target for input injection from `@InputSource`                       |
 | **InputSource**         | Annotation providing test inputs from a method or file, distributed across samples                         |
 | **minDetectableEffect** | Smallest drop from baseline worth detecting; required for Confidence-First approach to compute sample size |
 | **minPassRate**         | The threshold pass rate the system must meet to pass the test. Part of the parameter triangle.             |
