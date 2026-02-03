@@ -1,6 +1,7 @@
 package org.javai.punit.examples.experiments;
 
 import org.javai.punit.api.ControlFactor;
+import org.javai.punit.api.InputSource;
 import org.javai.punit.api.OptimizeExperiment;
 import org.javai.punit.api.OutcomeCaptor;
 import org.javai.punit.api.Pacing;
@@ -98,7 +99,7 @@ public class ShoppingBasketOptimizePrompt {
     }
 
     /**
-     * Optimizes the system prompt to maximize success rate.
+     * Optimizes the system prompt to maximize success rate across a diverse input set.
      *
      * <p>Starts from {@link #weakStartingPrompt()} which has ~30% success rate,
      * and iteratively improves to ~95% by adding:
@@ -109,8 +110,18 @@ public class ShoppingBasketOptimizePrompt {
      *   <li>Response format requirements (JSON only, no explanations)</li>
      * </ul>
      *
+     * <h3>Input Source and Iteration Behavior</h3>
+     * <p>Each optimization iteration tests the current system prompt against ALL inputs
+     * from the golden dataset exactly once. With 8 inputs in the dataset, each iteration
+     * runs 8 samples (one per input), then scores the aggregate performance.
+     *
+     * <p><b>Note:</b> When using {@code @InputSource}, do not specify {@code samplesPerIteration}
+     * as they are mutually exclusive. The effective samples per iteration is automatically
+     * set to the number of inputs.
+     *
      * @param useCase the use case instance
      * @param systemPrompt the current system prompt (updated each iteration)
+     * @param input the test input with instruction and expected response
      * @param captor records outcomes for scoring
      */
     @TestTemplate
@@ -121,19 +132,36 @@ public class ShoppingBasketOptimizePrompt {
             scorer = ShoppingBasketSuccessRateScorer.class,
             mutator = ShoppingBasketPromptMutator.class,
             objective = OptimizationObjective.MAXIMIZE,
-            samplesPerIteration = 5,
             maxIterations = 10,
             noImprovementWindow = 3,
             experimentId = "prompt-optimization-v1"
     )
+    @InputSource(file = "golden/shopping-instructions.json")
     @Pacing(maxRequestsPerSecond = 5)
     void optimizeSystemPrompt(
             ShoppingBasketUseCase useCase,
             @ControlFactor("systemPrompt") String systemPrompt,
+            TranslationInput input,
             OutcomeCaptor captor
     ) {
-        // The systemPrompt is automatically injected and set via @FactorSetter, but just to prove it is:
+        // The systemPrompt is automatically injected and set via @FactorSetter
         assert systemPrompt.equals(useCase.getSystemPrompt()) : "System prompt automatically set by PUnit";
-        captor.record(useCase.translateInstruction("Add 2 apples and remove the bread"));
+        // Execute with both instruction and expected value for instance conformance checking
+        captor.record(useCase.translateInstruction(input.instruction(), input.expected()));
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // INPUT TYPES - Records for structured test inputs
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Input record for golden dataset testing with expected values.
+     *
+     * <p>This record is automatically deserialized from the JSON file by Jackson.
+     * The field names must match the JSON keys.
+     *
+     * @param instruction the natural language instruction
+     * @param expected the expected JSON response
+     */
+    public record TranslationInput(String instruction, String expected) {}
 }

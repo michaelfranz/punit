@@ -42,7 +42,9 @@ class ResultRecorderTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             OutcomeCaptor captor = new OutcomeCaptor();
@@ -69,7 +71,9 @@ class ResultRecorderTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             OutcomeCaptor captor = new OutcomeCaptor();
@@ -97,7 +101,9 @@ class ResultRecorderTest {
                         Duration.ofMillis(100),
                         Instant.now(),
                         Map.of(),
-                        contract
+                        contract,
+                        null,
+                        null
                 );
 
                 OutcomeCaptor captor = new OutcomeCaptor();
@@ -131,7 +137,9 @@ class ResultRecorderTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             OutcomeCaptor captor = new OutcomeCaptor();

@@ -98,6 +98,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 public @interface OptimizeExperiment {
 
     /**
+     * Default value for {@link #samplesPerIteration()}.
+     * Used internally to detect if the attribute was explicitly set.
+     */
+    int DEFAULT_SAMPLES_PER_ITERATION = 20;
+
+    /**
      * The use case class to execute.
      *
      * <p>The use case ID is resolved from the class:
@@ -206,11 +212,24 @@ public @interface OptimizeExperiment {
      * <p>Each iteration runs this many samples before aggregating results
      * and scoring. Like MEASURE's sample count, but within each iteration.
      *
-     * <p>Default: 20.
+     * <p><b>Mutual exclusivity with {@code @InputSource}:</b> When the experiment method
+     * is also annotated with {@link InputSource @InputSource}, this attribute must NOT
+     * be specified. With {@code @InputSource}, each iteration tests ALL inputs exactly
+     * once — the effective samples per iteration equals the number of inputs. Setting
+     * {@code samplesPerIteration} to any value other than the default when using
+     * {@code @InputSource} will throw an
+     * {@link org.junit.jupiter.api.extension.ExtensionConfigurationException}.
+     *
+     * <p>Without {@code @InputSource}, this attribute controls how many times the
+     * experiment method executes per iteration.
+     *
+     * <p>Default: {@value #DEFAULT_SAMPLES_PER_ITERATION}.
      *
      * @return the number of samples per iteration
+     * @see InputSource
+     * @see #DEFAULT_SAMPLES_PER_ITERATION
      */
-    int samplesPerIteration() default 20;
+    int samplesPerIteration() default DEFAULT_SAMPLES_PER_ITERATION;
 
     /**
      * Maximum number of iterations before termination.

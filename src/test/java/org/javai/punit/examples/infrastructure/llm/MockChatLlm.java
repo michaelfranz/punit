@@ -39,11 +39,11 @@ import java.util.Random;
  * <pre>{@code
  * ChatLlm llm = MockChatLlm.instance();
  *
- * // Simple usage
- * String response = llm.chat(systemPrompt, userMessage, 0.3);
+ * // Simple usage - model parameter is accepted but ignored
+ * String response = llm.chat(systemPrompt, userMessage, "gpt-4o-mini", 0.3);
  *
  * // With token tracking
- * ChatResponse resp = llm.chatWithMetadata(systemPrompt, userMessage, 0.3);
+ * ChatResponse resp = llm.chatWithMetadata(systemPrompt, userMessage, "gpt-4o-mini", 0.3);
  * int tokens = resp.totalTokens();
  *
  * // Check cumulative usage
@@ -100,12 +100,14 @@ public final class MockChatLlm implements ChatLlm {
     }
 
     @Override
-    public String chat(String systemMessage, String userMessage, double temperature) {
-        return chatWithMetadata(systemMessage, userMessage, temperature).content();
+    public String chat(String systemMessage, String userMessage, String model, double temperature) {
+        return chatWithMetadata(systemMessage, userMessage, model, temperature).content();
     }
 
     @Override
-    public ChatResponse chatWithMetadata(String systemMessage, String userMessage, double temperature) {
+    public ChatResponse chatWithMetadata(String systemMessage, String userMessage, String model, double temperature) {
+        // Note: model parameter is accepted for interface compatibility but ignored.
+        // Mock behavior is determined solely by temperature and prompt content.
         // Analyze what the prompt specifies - this determines response quality
         PromptRequirements requirements = analyzePromptRequirements(systemMessage);
 
@@ -218,16 +220,6 @@ public final class MockChatLlm implements ChatLlm {
             response.append("I'd be happy to help! Here's the JSON:\n\n");
         }
 
-        // Determine the root field name - deviate based on temperature
-        boolean deviateSchema = !req.specifiesSchema || random.nextDouble() < deviationChance;
-        String rootField = deviateSchema ? randomRootField() : "operations";
-
-        // Determine field names - deviate based on temperature
-        boolean deviateFields = !req.specifiesFields || random.nextDouble() < deviationChance;
-        String actionField = deviateFields ? randomFieldName("action") : "action";
-        String itemField = deviateFields ? randomFieldName("item") : "item";
-        String quantityField = deviateFields ? randomFieldName("quantity") : "quantity";
-
         // Determine action value - deviate based on temperature
         boolean deviateActions = !req.specifiesActions || random.nextDouble() < deviationChance;
         String actionValue = deviateActions ? randomAction() : "add";
@@ -236,15 +228,27 @@ public final class MockChatLlm implements ChatLlm {
         boolean deviateQuantity = !req.specifiesConstraints || random.nextDouble() < deviationChance;
         Object quantityValue = deviateQuantity ? randomQuantity() : extractQuantity(userMessage, "add");
 
-        // Build the JSON
+        // Extract item from user message
         String item = extractItem(userMessage, "add");
-        if (item.equals("item")) item = "apples";  // Default for demo
+        if (item.equals("item")) item = "apple";  // Default for demo
 
-        response.append(String.format("{\"%s\": [{", rootField));
-        response.append(String.format("\"%s\": \"%s\", ", actionField, actionValue));
-        response.append(String.format("\"%s\": \"%s\", ", itemField, item));
-        response.append(String.format("\"%s\": %s", quantityField, quantityValue));
-        response.append("}]}");
+        // Determine if we should deviate from the expected schema
+        boolean deviateSchema = random.nextDouble() < deviationChance;
+
+        if (deviateSchema) {
+            // Generate old-style schema (wrong format)
+            response.append(String.format("{\"operations\": [{\"action\": \"%s\", ", actionValue));
+            response.append(String.format("\"item\": \"%s\", ", item));
+            response.append(String.format("\"quantity\": %s}]}", quantityValue));
+        } else {
+            // Generate correct ShoppingAction schema
+            response.append("{\"context\": \"SHOP\", ");
+            response.append(String.format("\"name\": \"%s\", ", actionValue));
+            response.append("\"parameters\": [");
+            response.append(String.format("{\"name\": \"item\", \"value\": \"%s\"}, ", item));
+            response.append(String.format("{\"name\": \"quantity\", \"value\": \"%s\"}", quantityValue));
+            response.append("]}");
+        }
 
         // Additional chance of malformed JSON at high temperature
         if (random.nextDouble() < deviationChance * 0.3) {
@@ -254,24 +258,15 @@ public final class MockChatLlm implements ChatLlm {
         return response.toString();
     }
 
-    private String randomRootField() {
-        String[] options = {"operations", "items", "commands", "actions", "tasks"};
-        return options[random.nextInt(options.length)];
-    }
-
-    private String randomFieldName(String correct) {
-        if (random.nextDouble() < 0.5) return correct;
-        return switch (correct) {
-            case "action" -> new String[]{"type", "command", "op", "verb"}[random.nextInt(4)];
-            case "item" -> new String[]{"product", "name", "object", "thing"}[random.nextInt(4)];
-            case "quantity" -> new String[]{"count", "amount", "num", "qty"}[random.nextInt(4)];
-            default -> correct;
-        };
-    }
-
     private String randomAction() {
-        String[] options = {"add", "remove", "purchase", "buy", "insert", "delete"};
-        return options[random.nextInt(options.length)];
+        // 70% chance of valid SHOP actions, 30% chance of invalid/hallucinated actions
+        if (random.nextDouble() < 0.7) {
+            String[] validOptions = {"add", "remove", "clear"};
+            return validOptions[random.nextInt(validOptions.length)];
+        } else {
+            String[] invalidOptions = {"purchase", "buy", "insert", "delete"};
+            return invalidOptions[random.nextInt(invalidOptions.length)];
+        }
     }
 
     private Object randomQuantity() {

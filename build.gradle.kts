@@ -50,11 +50,19 @@ dependencies {
     // SnakeYAML - for YAML serialization in spec generation
     implementation("org.yaml:snakeyaml:2.5")
 
+    // Jackson - for JSON/CSV parsing in @InputSource
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.0")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.18.0")
+
     // Outcome - result types for contract postconditions
     // Note: outcome is a private repo. For CI builds, either:
     // 1. Make michaelfranz/outcome public for JitPack access, or
     // 2. Publish to a private artifact repository accessible by CI
     api("org.javai:outcome:1.0-SNAPSHOT")
+
+    // Optional JSON matching support for instance conformance
+    // Users who want JsonMatcher need to add this dependency to their project
+    compileOnly("com.flipkart.zjsonpatch:zjsonpatch:0.4.16")
     implementation("org.apache.logging.log4j:log4j-api:2.25.3")
     runtimeOnly("org.apache.logging.log4j:log4j-core:2.25.3")
     // Bridge SLF4J to Log4j2 (some dependencies use SLF4J)
@@ -68,6 +76,7 @@ dependencies {
     testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.25.3")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.21.0")
+    testImplementation("com.flipkart.zjsonpatch:zjsonpatch:0.4.16")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -104,6 +113,7 @@ tasks.test {
 // Output directories for experiment modes
 val specsDir = "src/test/resources/punit/specs"
 val explorationsDir = "src/test/resources/punit/explorations"
+val optimizationsDir = "src/test/resources/punit/optimizations"
 
 // Shared configuration for experiment tasks
 fun Test.configureAsExperimentTask() {
@@ -133,6 +143,7 @@ fun Test.configureAsExperimentTask() {
     // Output directories for each mode (used by the framework based on annotation mode)
     systemProperty("punit.specs.outputDir", specsDir)
     systemProperty("punit.explorations.outputDir", explorationsDir)
+    systemProperty("punit.optimizations.outputDir", optimizationsDir)
 
     // Deactivate @Disabled so experiments can run even when disabled
     // (they're @Disabled to prevent accidental execution in regular test runs)
@@ -152,7 +163,13 @@ fun Test.configureAsExperimentTask() {
     val runFilter = project.findProperty("run") as String?
     if (runFilter != null) {
         filter {
-            includeTestsMatching("*$runFilter*")
+            if (runFilter.contains(".")) {
+                // Class.method specified - match precisely (no trailing wildcard)
+                includeTestsMatching("*$runFilter")
+            } else {
+                // Just class name - match all methods in the class
+                includeTestsMatching("*$runFilter*")
+            }
         }
     }
     
@@ -164,25 +181,32 @@ fun Test.configureAsExperimentTask() {
     
     doLast {
         println("\n✓ Experiment complete.")
-        
+
         // Check which directories received new files during this run
         val specsFile = file(specsDir)
         val explorationsFile = file(explorationsDir)
-        
+        val optimizationsFile = file(optimizationsDir)
+
         val specsUpdated = specsFile.exists() && specsFile.walkTopDown()
             .filter { it.isFile && it.lastModified() >= startTime }
             .any()
         val explorationsUpdated = explorationsFile.exists() && explorationsFile.walkTopDown()
             .filter { it.isFile && it.lastModified() >= startTime }
             .any()
-        
+        val optimizationsUpdated = optimizationsFile.exists() && optimizationsFile.walkTopDown()
+            .filter { it.isFile && it.lastModified() >= startTime }
+            .any()
+
         if (specsUpdated) {
             println("  MEASURE specs written to: $specsDir/")
         }
         if (explorationsUpdated) {
             println("  EXPLORE results written to: $explorationsDir/")
         }
-        if (!specsUpdated && !explorationsUpdated) {
+        if (optimizationsUpdated) {
+            println("  OPTIMIZE results written to: $optimizationsDir/")
+        }
+        if (!specsUpdated && !explorationsUpdated && !optimizationsUpdated) {
             println("  No output files were written.")
         }
     }

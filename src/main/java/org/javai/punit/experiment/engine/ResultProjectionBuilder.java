@@ -4,9 +4,12 @@ import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.javai.punit.api.DiffableContentProvider;
+import org.javai.punit.contract.PostconditionResult;
 import org.javai.punit.contract.UseCaseOutcome;
 import org.javai.punit.experiment.model.ResultProjection;
 
@@ -86,11 +89,15 @@ public class ResultProjectionBuilder {
     public ResultProjection build(int sampleIndex, UseCaseOutcome<?> outcome) {
         Objects.requireNonNull(outcome, "outcome must not be null");
 
+        String input = extractInput(outcome.metadata());
+        Map<String, String> postconditions = extractPostconditions(outcome);
         List<String> rawLines = getDiffableLinesFromOutcome(outcome);
         List<String> normalizedLines = normalizeLineCount(rawLines);
 
         return new ResultProjection(
             sampleIndex,
+            input != null ? truncate(input) : null,
+            postconditions,
             outcome.executionTime().toMillis(),
             normalizedLines
         );
@@ -100,20 +107,30 @@ public class ResultProjectionBuilder {
      * Builds a projection for an error case.
      *
      * @param sampleIndex the sample index (0-based)
+     * @param input the input that was being processed when the error occurred (may be null)
      * @param executionTimeMs execution time in milliseconds
      * @param error the error that occurred
      * @return the projection
      */
-    public ResultProjection buildError(int sampleIndex, long executionTimeMs, Throwable error) {
+    public ResultProjection buildError(int sampleIndex, String input, long executionTimeMs, Throwable error) {
         Objects.requireNonNull(error, "error must not be null");
-        
+
         List<String> lines = new ArrayList<>();
         lines.add(truncate("error: " + error.getClass().getSimpleName()));
         lines.add(truncate("message: " + firstLine(error.getMessage())));
 
         List<String> normalizedLines = normalizeLineCount(lines);
 
-        return new ResultProjection(sampleIndex, executionTimeMs, normalizedLines);
+        // Error case: mark execution as failed
+        Map<String, String> postconditions = Map.of("Execution completed", ResultProjection.FAILED);
+
+        return new ResultProjection(
+            sampleIndex,
+            input != null ? truncate(input) : null,
+            postconditions,
+            executionTimeMs,
+            normalizedLines
+        );
     }
 
     /**
@@ -216,6 +233,54 @@ public class ResultProjectionBuilder {
         }
         int newline = text.indexOf('\n');
         return newline > 0 ? text.substring(0, newline) : text;
+    }
+
+    /**
+     * Extracts postcondition results as a map of description to status.
+     *
+     * <p>Status values are defined as constants in {@link ResultProjection}:
+     * {@code passed}, {@code failed}, or {@code skipped}.
+     *
+     * @param outcome the use case outcome
+     * @return ordered map of postcondition descriptions to their status
+     */
+    private Map<String, String> extractPostconditions(UseCaseOutcome<?> outcome) {
+        List<PostconditionResult> results = outcome.evaluatePostconditions();
+        Map<String, String> postconditions = new LinkedHashMap<>();
+
+        for (PostconditionResult result : results) {
+            String status = result.passed() ? ResultProjection.PASSED : ResultProjection.FAILED;
+            postconditions.put(result.description(), status);
+        }
+
+        return postconditions;
+    }
+
+    /**
+     * Extracts the input representation from outcome metadata.
+     *
+     * <p>Looks for common input keys in order of preference:
+     * "input", "instruction", "query", "request", "prompt".
+     *
+     * @param metadata the outcome metadata
+     * @return the input string, or null if not found
+     */
+    private String extractInput(Map<String, Object> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return null;
+        }
+
+        // Common keys for input values, in order of preference
+        List<String> inputKeys = List.of("input", "instruction", "query", "request", "prompt");
+
+        for (String key : inputKeys) {
+            Object value = metadata.get(key);
+            if (value != null) {
+                return normalizeValue(value.toString());
+            }
+        }
+
+        return null;
     }
 }
 

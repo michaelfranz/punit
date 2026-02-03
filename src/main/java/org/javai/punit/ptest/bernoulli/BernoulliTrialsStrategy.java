@@ -2,16 +2,21 @@ package org.javai.punit.ptest.bernoulli;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.javai.punit.api.BudgetExhaustedBehavior;
+import org.javai.punit.api.Factor;
 import org.javai.punit.api.FactorSource;
 import org.javai.punit.api.HashableFactorSource;
+import org.javai.punit.api.InputSource;
+import org.javai.punit.api.OutcomeCaptor;
 import org.javai.punit.api.ProbabilisticTest;
 import org.javai.punit.api.TokenChargeRecorder;
+import org.javai.punit.experiment.engine.input.InputSourceResolver;
 import org.javai.punit.controls.budget.BudgetOrchestrator;
 import org.javai.punit.controls.budget.CostBudgetMonitor;
 import org.javai.punit.controls.budget.DefaultTokenChargeRecorder;
@@ -149,12 +154,87 @@ public class BernoulliTrialsStrategy implements ProbabilisticTestStrategy {
         // Get token recorder if present
         DefaultTokenChargeRecorder tokenRecorder = store.get("tokenRecorder", DefaultTokenChargeRecorder.class);
 
+        // Check for @InputSource annotation
+        Method testMethod = context.getRequiredTestMethod();
+        InputSource inputSource = testMethod.getAnnotation(InputSource.class);
+
+        if (inputSource != null) {
+            return provideWithInputsInvocationContexts(
+                    testMethod, inputSource, context.getRequiredTestClass(),
+                    samples, store, terminated, tokenRecorder);
+        }
+
         AtomicBoolean terminatedFinal = terminated;
         return Stream.iterate(1, i -> i + 1)
                 .limit(samples)
                 .takeWhile(i -> !terminatedFinal.get())
                 .map(sampleIndex -> new ProbabilisticTestInvocationContext(
                         sampleIndex, samples, tokenRecorder));
+    }
+
+    private Stream<TestTemplateInvocationContext> provideWithInputsInvocationContexts(
+            Method testMethod,
+            InputSource inputSource,
+            Class<?> testClass,
+            int samples,
+            ExtensionContext.Store store,
+            AtomicBoolean terminated,
+            DefaultTokenChargeRecorder tokenRecorder) {
+
+        // Determine input type from method parameters
+        Class<?> inputType = findInputParameterType(testMethod);
+
+        // Resolve inputs
+        InputSourceResolver resolver = new InputSourceResolver();
+        List<Object> inputs = resolver.resolve(inputSource, testClass, inputType);
+
+        if (inputs.isEmpty()) {
+            throw new org.junit.jupiter.api.extension.ExtensionConfigurationException(
+                    "@InputSource resolved to empty list");
+        }
+
+        store.put("inputs", inputs);
+        store.put("inputType", inputType);
+
+        // Generate sample stream with cycling inputs
+        int totalInputs = inputs.size();
+        return Stream.iterate(1, i -> i + 1)
+                .limit(samples)
+                .takeWhile(i -> !terminated.get())
+                .map(i -> {
+                    int inputIndex = (i - 1) % totalInputs;
+                    Object inputValue = inputs.get(inputIndex);
+                    return new ProbabilisticTestWithInputsInvocationContext(
+                            i, samples, tokenRecorder, inputValue, inputType, inputIndex, totalInputs);
+                });
+    }
+
+    /**
+     * Finds the input parameter type from method parameters.
+     */
+    private Class<?> findInputParameterType(Method method) {
+        for (Parameter param : method.getParameters()) {
+            Class<?> type = param.getType();
+            if (type == OutcomeCaptor.class) {
+                continue;
+            }
+            if (param.isAnnotationPresent(Factor.class)) {
+                continue;
+            }
+            // Skip use case types - they are resolved by UseCaseProvider
+            if (type.getPackageName().contains("usecase") ||
+                type.getSimpleName().endsWith("UseCase")) {
+                continue;
+            }
+            // Skip TokenChargeRecorder
+            if (TokenChargeRecorder.class.isAssignableFrom(type)) {
+                continue;
+            }
+            return type;
+        }
+        throw new org.junit.jupiter.api.extension.ExtensionConfigurationException(
+                "@InputSource requires a method parameter to inject the input value. " +
+                "The parameter must not be OutcomeCaptor, UseCase, TokenChargeRecorder, or @Factor-annotated.");
     }
 
     @Override

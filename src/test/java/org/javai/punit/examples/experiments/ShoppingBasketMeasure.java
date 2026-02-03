@@ -1,7 +1,7 @@
 package org.javai.punit.examples.experiments;
 
-import org.javai.punit.api.Factor;
-import org.javai.punit.api.FactorSource;
+import java.util.stream.Stream;
+import org.javai.punit.api.InputSource;
 import org.javai.punit.api.MeasureExperiment;
 import org.javai.punit.api.OutcomeCaptor;
 import org.javai.punit.api.UseCaseProvider;
@@ -19,13 +19,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <h2>One Baseline Per Use Case</h2>
  * <p>A use case should have ONE measure experiment that represents production traffic.
- * The factor provider determines which inputs are cycled through during measurement.
- * The probabilistic test then uses the <b>same factor provider</b>, ensuring the
+ * The input source determines which inputs are cycled through during measurement.
+ * The probabilistic test then uses the <b>same input source</b>, ensuring the
  * test exercises the same input distribution as the baseline.
  *
- * <h2>How Cycling Works</h2>
- * <p>The factor provider {@link ShoppingBasketUseCase#multipleBasketInstructions()}
- * returns 10 instructions. With 1000 samples, each instruction is tested 100 times:
+ * <h2>How Input Cycling Works</h2>
+ * <p>The input source {@link #basketInstructions()} returns 10 instructions. With 1000
+ * samples, each instruction is tested 100 times:
  * <pre>
  * Sample 1    → "Add 2 apples"
  * Sample 2    → "Remove the milk"
@@ -36,7 +36,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * Sample 1000 → (10th instruction)
  * </pre>
  *
- * <p>The probabilistic test uses the same factor provider but with fewer samples
+ * <p>The probabilistic test uses the same input source but with fewer samples
  * (e.g., 100). It still cycles through all 10 instructions, just fewer times each.
  *
  * <h2>Output</h2>
@@ -48,7 +48,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * }</pre>
  *
  * @see ShoppingBasketUseCase
- * @see ShoppingBasketUseCase#multipleBasketInstructions()
+ * @see #basketInstructions()
  * @see org.javai.punit.examples.tests.ShoppingBasketTest
  */
 @Disabled("Example experiment - run with ./gradlew exp -Prun=ShoppingBasketMeasure")
@@ -93,12 +93,89 @@ public class ShoppingBasketMeasure {
             useCase = ShoppingBasketUseCase.class,
             experimentId = "baseline-v1"
     )
-    @FactorSource(value = "multipleBasketInstructions", factors = {"instruction"})
+    @InputSource("basketInstructions")
     void measureBaseline(
             ShoppingBasketUseCase useCase,
-            @Factor("instruction") String instruction,
+            String instruction,
             OutcomeCaptor captor
     ) {
         captor.record(useCase.translateInstruction(instruction));
+    }
+
+    /**
+     * Establishes a baseline with instance conformance checking.
+     *
+     * <p>This experiment demonstrates using a golden dataset (JSON file) that includes
+     * expected responses. Each input contains both the instruction and the expected
+     * JSON response, enabling instance conformance checking.
+     *
+     * <p>The {@link TranslationInput} record captures both fields, and the use case's
+     * {@link ShoppingBasketUseCase#translateInstruction(String, String)} method
+     * accepts the expected value for conformance checking.
+     *
+     * @param useCase the use case instance
+     * @param input the input with instruction and expected response
+     * @param captor records outcomes for aggregation
+     */
+    @TestTemplate
+    @MeasureExperiment(
+            useCase = ShoppingBasketUseCase.class,
+            experimentId = "baseline-with-golden-v1"
+    )
+    @InputSource(file = "golden/shopping-instructions.json")
+    void measureBaselineWithGolden(
+            ShoppingBasketUseCase useCase,
+            TranslationInput input,
+            OutcomeCaptor captor
+    ) {
+        captor.record(useCase.translateInstruction(input.instruction(), input.expected()));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // INPUT TYPES - Records for structured test inputs
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Input record for golden dataset testing with expected values.
+     *
+     * <p>This record is automatically deserialized from the JSON file by Jackson.
+     * The field names must match the JSON keys.
+     *
+     * @param instruction the natural language instruction
+     * @param expected the expected JSON response
+     */
+    public record TranslationInput(String instruction, String expected) {}
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // INPUT SOURCES - Test input data for experiments
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Representative basket instructions for baseline measurement.
+     *
+     * <p>These 10 instructions cover the main operation types:
+     * <ul>
+     *   <li>Single-item add/remove</li>
+     *   <li>Multi-item operations</li>
+     *   <li>Quantity specifications</li>
+     *   <li>Clear operations</li>
+     *   <li>Natural language variations</li>
+     * </ul>
+     *
+     * @return stream of instruction strings
+     */
+    static Stream<String> basketInstructions() {
+        return Stream.of(
+                "Add 2 apples",
+                "Remove the milk",
+                "Add 1 loaf of bread",
+                "Add 3 oranges and 2 bananas",
+                "Add 5 tomatoes and remove the cheese",
+                "Clear the basket",
+                "Clear everything",
+                "Remove 2 eggs from the basket",
+                "Add a dozen eggs",
+                "I'd like to remove all the vegetables"
+        );
     }
 }

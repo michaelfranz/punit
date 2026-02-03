@@ -31,7 +31,9 @@ class OptimizationOrchestratorTest {
                 Duration.ofMillis(50),
                 Instant.now(),
                 Map.of("tokensUsed", 100L),
-                new TestPostconditionEvaluator(success)
+                new TestPostconditionEvaluator(success),
+                null,
+                null
         );
     }
 

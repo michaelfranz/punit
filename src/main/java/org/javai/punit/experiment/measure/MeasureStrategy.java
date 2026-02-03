@@ -1,13 +1,16 @@
 package org.javai.punit.experiment.measure;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.javai.punit.api.ExperimentMode;
+import org.javai.punit.api.Factor;
 import org.javai.punit.api.FactorArguments;
 import org.javai.punit.api.FactorSource;
+import org.javai.punit.api.InputSource;
 import org.javai.punit.api.MeasureExperiment;
 import org.javai.punit.api.OutcomeCaptor;
 import org.javai.punit.api.UseCaseProvider;
@@ -15,6 +18,7 @@ import org.javai.punit.experiment.engine.ExperimentConfig;
 import org.javai.punit.experiment.engine.ExperimentModeStrategy;
 import org.javai.punit.experiment.engine.ExperimentProgressReporter;
 import org.javai.punit.experiment.engine.ExperimentResultAggregator;
+import org.javai.punit.experiment.engine.input.InputSourceResolver;
 import org.javai.punit.experiment.engine.shared.FactorInfo;
 import org.javai.punit.experiment.engine.shared.FactorResolver;
 import org.javai.punit.experiment.engine.shared.ResultRecorder;
@@ -83,21 +87,92 @@ public class MeasureStrategy implements ExperimentModeStrategy {
         store.put("currentSample", currentSample);
         store.put("mode", ExperimentMode.MEASURE);
 
-        // Check for @FactorSource annotation
         Method testMethod = context.getRequiredTestMethod();
-        FactorSource factorSource = testMethod.getAnnotation(FactorSource.class);
 
+        // Check for @InputSource annotation (preferred)
+        InputSource inputSource = testMethod.getAnnotation(InputSource.class);
+        if (inputSource != null) {
+            return provideWithInputsInvocationContexts(
+                    testMethod, inputSource, context.getRequiredTestClass(),
+                    samples, useCaseId, store, terminated);
+        }
+
+        // Check for @FactorSource annotation (legacy)
+        FactorSource factorSource = testMethod.getAnnotation(FactorSource.class);
         if (factorSource != null) {
             return provideWithFactorsInvocationContexts(
                     testMethod, factorSource, measureConfig.useCaseClass(),
                     samples, useCaseId, store, terminated);
         }
 
-        // No factor source - simple sample stream
+        // No input or factor source - simple sample stream
         return Stream.iterate(1, i -> i + 1)
                 .limit(samples)
                 .takeWhile(i -> !terminated.get())
                 .map(i -> new MeasureInvocationContext(i, samples, useCaseId, new OutcomeCaptor()));
+    }
+
+    private Stream<TestTemplateInvocationContext> provideWithInputsInvocationContexts(
+            Method testMethod,
+            InputSource inputSource,
+            Class<?> testClass,
+            int samples,
+            String useCaseId,
+            ExtensionContext.Store store,
+            AtomicBoolean terminated) {
+
+        // Determine input type from method parameters
+        Class<?> inputType = findInputParameterType(testMethod);
+
+        // Resolve inputs
+        InputSourceResolver resolver = new InputSourceResolver();
+        List<Object> inputs = resolver.resolve(inputSource, testClass, inputType);
+
+        if (inputs.isEmpty()) {
+            throw new ExtensionConfigurationException(
+                    "@InputSource resolved to empty list");
+        }
+
+        store.put("inputs", inputs);
+        store.put("inputType", inputType);
+
+        // Generate sample stream with cycling inputs
+        int totalInputs = inputs.size();
+        return Stream.iterate(1, i -> i + 1)
+                .limit(samples)
+                .takeWhile(i -> !terminated.get())
+                .map(i -> {
+                    int inputIndex = (i - 1) % totalInputs;
+                    Object inputValue = inputs.get(inputIndex);
+                    return new MeasureWithInputsInvocationContext(
+                            i, samples, useCaseId, new OutcomeCaptor(),
+                            inputValue, inputType, inputIndex, totalInputs);
+                });
+    }
+
+    /**
+     * Finds the input parameter type from method parameters.
+     *
+     * <p>The input parameter is the first parameter that is:
+     * <ul>
+     *   <li>Not OutcomeCaptor</li>
+     *   <li>Not annotated with @Factor</li>
+     * </ul>
+     */
+    private Class<?> findInputParameterType(Method method) {
+        for (Parameter param : method.getParameters()) {
+            Class<?> type = param.getType();
+            if (type == OutcomeCaptor.class) {
+                continue;
+            }
+            if (param.isAnnotationPresent(Factor.class)) {
+                continue;
+            }
+            return type;
+        }
+        throw new ExtensionConfigurationException(
+                "@InputSource requires a method parameter to inject the input value. " +
+                "The parameter must not be OutcomeCaptor or @Factor-annotated.");
     }
 
     @SuppressWarnings("unchecked")

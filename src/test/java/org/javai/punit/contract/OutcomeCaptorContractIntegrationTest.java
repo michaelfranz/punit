@@ -41,7 +41,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(150),
                     Instant.now(),
                     Map.of("tokensUsed", 42),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             captor.record(outcome);
@@ -65,7 +67,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             captor.record(outcome);
@@ -92,7 +96,9 @@ class OutcomeCaptorContractIntegrationTest {
                     executionTime,
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             captor.record(outcome);
@@ -112,7 +118,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of("tokensUsed", 150, "model", "gpt-4"),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             captor.record(outcome);
@@ -133,7 +141,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             captor.record(outcome);
@@ -156,7 +166,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             captor.record(outcome);
@@ -186,7 +198,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract1
+                    contract1,
+                    null,
+                    null
             );
 
             UseCaseOutcome<String> outcome2 = new UseCaseOutcome<>(
@@ -194,7 +208,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(200),
                     Instant.now(),
                     Map.of(),
-                    contract2
+                    contract2,
+                    null,
+                    null
             );
 
             captor.record(outcome1);
@@ -219,7 +235,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             UseCaseOutcome<String> returned = captor.record(outcome);
@@ -254,7 +272,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             captor.record(outcome);
@@ -286,7 +306,9 @@ class OutcomeCaptorContractIntegrationTest {
                     Duration.ofMillis(100),
                     Instant.now(),
                     Map.of(),
-                    contract
+                    contract,
+                    null,
+                    null
             );
 
             captor.record(outcome);

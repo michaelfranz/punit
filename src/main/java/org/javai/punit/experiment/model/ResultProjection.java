@@ -1,6 +1,8 @@
 package org.javai.punit.experiment.model;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.javai.punit.experiment.engine.ResultProjectionBuilder;
 
 /**
@@ -27,9 +29,28 @@ import org.javai.punit.experiment.engine.ResultProjectionBuilder;
  */
 public record ResultProjection(
     int sampleIndex,
+    String input,
+    Map<String, String> postconditions,
     long executionTimeMs,
     List<String> diffableLines
 ) {
+    /** Status value for postconditions that passed. */
+    public static final String PASSED = "passed";
+
+    /** Status value for postconditions that failed. */
+    public static final String FAILED = "failed";
+
+    /** Status value for postconditions that were not evaluated. */
+    public static final String SKIPPED = "skipped";
+
+    /**
+     * Returns whether all postconditions passed.
+     *
+     * @return true if no postconditions failed
+     */
+    public boolean success() {
+        return postconditions.values().stream().noneMatch(FAILED::equals);
+    }
     /**
      * Placeholder for values that don't exist in this result
      * but are expected based on maxDiffableLines configuration.
@@ -43,6 +64,8 @@ public record ResultProjection(
         if (sampleIndex < 0) {
             throw new IllegalArgumentException("sampleIndex must be non-negative");
         }
+        // Preserve insertion order with defensive copy
+        postconditions = Map.copyOf(new LinkedHashMap<>(postconditions));
         diffableLines = List.copyOf(diffableLines);
     }
 }

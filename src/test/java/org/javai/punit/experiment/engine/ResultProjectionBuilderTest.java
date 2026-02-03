@@ -47,7 +47,9 @@ class ResultProjectionBuilderTest {
             executionTime,
             Instant.now(),
             Map.of(),
-            alwaysPassing()
+            alwaysPassing(),
+            null,
+            null
         );
     }
 
@@ -149,7 +151,9 @@ class ResultProjectionBuilderTest {
                 Duration.ZERO,
                 Instant.now(),
                 Map.of(),
-                alwaysPassing()
+                alwaysPassing(),
+                null,
+                null
             );
 
             ResultProjection projection = builder.build(0, outcome);
@@ -189,6 +193,7 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                "test input",
                 100,
                 new IllegalArgumentException("test message")
             );
@@ -204,6 +209,7 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                "test input",
                 100,
                 new IllegalArgumentException("test message")
             );
@@ -219,6 +225,7 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                null,
                 100,
                 new RuntimeException("error")
             );
@@ -235,6 +242,7 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                "test input",
                 100,
                 new RuntimeException("first line\nsecond line\nthird line")
             );
@@ -251,12 +259,29 @@ class ResultProjectionBuilderTest {
 
             ResultProjection projection = builder.buildError(
                 0,
+                null,
                 100,
                 new RuntimeException((String) null)
             );
 
             assertThat(projection.diffableLines().get(1))
                 .isEqualTo("message: null");
+        }
+
+        @Test
+        @DisplayName("captures input in error projection")
+        void capturesInputInErrorProjection() {
+            ResultProjectionBuilder builder = new ResultProjectionBuilder(5, 60);
+
+            ResultProjection projection = builder.buildError(
+                0,
+                "Add 2 apples",
+                100,
+                new RuntimeException("error")
+            );
+
+            assertThat(projection.input()).isEqualTo("Add 2 apples");
+            assertThat(projection.success()).isFalse();
         }
     }
 
@@ -323,12 +348,102 @@ class ResultProjectionBuilderTest {
                 Duration.ZERO,
                 Instant.now(),
                 Map.of(),
-                alwaysPassing()
+                alwaysPassing(),
+                null,
+                null
             );
 
             ResultProjection projection = builder.build(0, outcome);
 
             assertThat(projection.diffableLines().get(0)).isEqualTo("result: null");
+        }
+    }
+
+    @Nested
+    @DisplayName("postconditions extraction")
+    class PostconditionsExtraction {
+
+        @Test
+        @DisplayName("extracts postcondition results as map")
+        void extractsPostconditionResultsAsMap() {
+            PostconditionEvaluator<TestResult> evaluator = new PostconditionEvaluator<>() {
+                @Override
+                public List<PostconditionResult> evaluate(TestResult result) {
+                    return List.of(
+                        PostconditionResult.passed("Response not empty"),
+                        PostconditionResult.failed("Valid JSON", "Parse error")
+                    );
+                }
+
+                @Override
+                public int postconditionCount() {
+                    return 2;
+                }
+            };
+
+            ResultProjectionBuilder builder = new ResultProjectionBuilder(5, 60);
+            UseCaseOutcome<TestResult> outcome = new UseCaseOutcome<>(
+                new TestResult("key", "value"),
+                Duration.ZERO,
+                Instant.now(),
+                Map.of(),
+                evaluator,
+                null,
+                null
+            );
+
+            ResultProjection projection = builder.build(0, outcome);
+
+            assertThat(projection.postconditions())
+                .containsEntry("Response not empty", ResultProjection.PASSED)
+                .containsEntry("Valid JSON", ResultProjection.FAILED);
+            assertThat(projection.success()).isFalse();
+        }
+
+        @Test
+        @DisplayName("success is true when all postconditions pass")
+        void successIsTrueWhenAllPass() {
+            PostconditionEvaluator<TestResult> evaluator = new PostconditionEvaluator<>() {
+                @Override
+                public List<PostconditionResult> evaluate(TestResult result) {
+                    return List.of(
+                        PostconditionResult.passed("Check 1"),
+                        PostconditionResult.passed("Check 2")
+                    );
+                }
+
+                @Override
+                public int postconditionCount() {
+                    return 2;
+                }
+            };
+
+            ResultProjectionBuilder builder = new ResultProjectionBuilder(5, 60);
+            UseCaseOutcome<TestResult> outcome = new UseCaseOutcome<>(
+                new TestResult("key", "value"),
+                Duration.ZERO,
+                Instant.now(),
+                Map.of(),
+                evaluator,
+                null,
+                null
+            );
+
+            ResultProjection projection = builder.build(0, outcome);
+
+            assertThat(projection.success()).isTrue();
+        }
+
+        @Test
+        @DisplayName("error projection has execution completed failed")
+        void errorProjectionHasExecutionCompletedFailed() {
+            ResultProjectionBuilder builder = new ResultProjectionBuilder(5, 60);
+
+            ResultProjection projection = builder.buildError(0, null, 100, new RuntimeException("error"));
+
+            assertThat(projection.postconditions())
+                .containsEntry("Execution completed", ResultProjection.FAILED);
+            assertThat(projection.success()).isFalse();
         }
     }
 }

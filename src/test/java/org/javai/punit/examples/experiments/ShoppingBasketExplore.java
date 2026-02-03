@@ -84,7 +84,7 @@ public class ShoppingBasketExplore {
             OutcomeCaptor captor
     ) {
         useCase.setModel(model);
-        useCase.setTemperature(0.3);  // Fixed temperature for fair comparison
+        useCase.setTemperature(0.1);  // Fixed temperature for fair comparison
         captor.record(useCase.translateInstruction(SIMPLE_INSTRUCTION));
     }
 
@@ -103,7 +103,6 @@ public class ShoppingBasketExplore {
      * </ul>
      *
      * @param useCase the use case instance
-     * @param model the model identifier
      * @param temperature the temperature setting
      * @param captor records outcomes
      */
@@ -113,14 +112,13 @@ public class ShoppingBasketExplore {
             samplesPerConfig = 20,
             experimentId = "model-temperature-matrix-v1"
     )
-    @FactorSource(value = "modelTemperatureMatrix", factors = {"model", "temperature"})
+    @FactorSource(value = "temperatureConfigurations", factors = {"model", "temperature"})
     void compareModelsAcrossTemperatures(
             ShoppingBasketUseCase useCase,
-            @Factor("model") String model,
             @Factor("temperature") Double temperature,
             OutcomeCaptor captor
     ) {
-        useCase.setModel(model);
+        useCase.setModel("gpt-4o-mini");
         useCase.setTemperature(temperature);
         captor.record(useCase.translateInstruction(SIMPLE_INSTRUCTION));
     }
@@ -132,43 +130,35 @@ public class ShoppingBasketExplore {
     /**
      * Models to compare.
      *
-     * <p>In a real application, replace these with actual model identifiers.
+     * <p>These are actual model identifiers recognized by the routing LLM.
+     * In mock mode, any model name works. In real mode, these route to
+     * the appropriate provider (OpenAI or Anthropic).
      */
     public static Stream<FactorArguments> modelConfigurations() {
         return FactorArguments.configurations()
                 .names("model")
                 .values("gpt-4o-mini")
                 .values("gpt-4o")
-                .values("claude-3-5-haiku")
-                .values("claude-3-5-sonnet")
+                .values("claude-haiku-4-5-20251001")
+                .values("claude-sonnet-4-5-20250929")
                 .stream();
     }
 
     /**
      * Model × temperature combinations to explore.
      *
-     * <p>Creates a matrix to understand how each model behaves at different
+     * <p>Creates a matrix to understand how a model behaves at different
      * temperature settings.
      */
-    public static Stream<FactorArguments> modelTemperatureMatrix() {
+    public static Stream<FactorArguments> temperatureConfigurations() {
         return FactorArguments.configurations()
-                .names("model", "temperature")
-                // GPT-4o-mini across temperatures
-                .values("gpt-4o-mini", 0.0)
-                .values("gpt-4o-mini", 0.5)
-                .values("gpt-4o-mini", 1.0)
-                // GPT-4o across temperatures
-                .values("gpt-4o", 0.0)
-                .values("gpt-4o", 0.5)
-                .values("gpt-4o", 1.0)
-                // Claude Haiku across temperatures
-                .values("claude-3-5-haiku", 0.0)
-                .values("claude-3-5-haiku", 0.5)
-                .values("claude-3-5-haiku", 1.0)
-                // Claude Sonnet across temperatures
-                .values("claude-3-5-sonnet", 0.0)
-                .values("claude-3-5-sonnet", 0.5)
-                .values("claude-3-5-sonnet", 1.0)
+                .names("temperature")
+                .values(0.0)
+                .values(0.2)
+                .values(0.4)
+                .values(0.6)
+                .values(0.8)
+                .values(1.0)
                 .stream();
     }
 }
