@@ -103,7 +103,7 @@ public final class AnthropicChatLlm implements ChatLlm {
                 .build();
         this.boundary = Boundary.of(new HttpFailureClassifier(), logReporter());
         this.retrier = Retrier.builder()
-                .policy(RetryPolicy.exponentialBackoff(MAX_RETRY_ATTEMPTS, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY))
+                .policy(RetryPolicy.backoff(MAX_RETRY_ATTEMPTS, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY))
                 .build();
         this.totalTokensUsed = 0;
     }
