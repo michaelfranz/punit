@@ -4,10 +4,22 @@
   <component name="GradleSettings">
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
+        <compositeConfiguration>
+          <compositeBuild compositeDefinitionSource="SCRIPT">
+            <builds>
+              <build path="$PROJECT_DIR$/../outcome" name="outcome">
+                <projects>
+                  <project path="$PROJECT_DIR$/../outcome" />
+                </projects>
+              </build>
+            </builds>
+          </compositeBuild>
+        </compositeConfiguration>
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="gradleHome" value="" />
         <option name="modules">
           <set>
+            <option value="$PROJECT_DIR$/../outcome" />
             <option value="$PROJECT_DIR$" />
           </set>
         </option>
