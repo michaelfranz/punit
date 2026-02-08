@@ -2,6 +2,7 @@ package org.javai.punit.statistics.transparent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
+import org.javai.punit.statistics.SlaVerificationSizer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -175,6 +176,121 @@ class StatisticalExplanationBuilderTest {
             
             assertThat(explanation.verdict().caveats())
                     .anyMatch(c -> c.toLowerCase().contains("inline threshold"));
+        }
+    }
+
+    @Nested
+    @DisplayName("SLA verification sizing caveat")
+    class SlaVerificationSizingTests {
+
+        @Test
+        @DisplayName("SLA origin with undersized N=200 includes exact sizing note via build()")
+        void slaUndersizedWithBaselineIncludesNote() {
+            BaselineData baseline = createBaseline(1000, 999);
+
+            StatisticalExplanation explanation = builder.build(
+                    "testSla", 200, 200, baseline, 0.9999, true, 0.95,
+                    "SLA", "Payment SLA v2.3"
+            );
+
+            assertThat(explanation.verdict().caveats())
+                    .anyMatch(c -> c.contains(SlaVerificationSizer.SIZING_NOTE));
+        }
+
+        @Test
+        @DisplayName("SLA origin with undersized N=500 includes exact sizing note via buildWithInlineThreshold()")
+        void slaUndersizedInlineIncludesNote() {
+            StatisticalExplanation explanation = builder.buildWithInlineThreshold(
+                    "testSla", 500, 500, 0.9999, true, "SLA", "Payment SLA v2.3"
+            );
+
+            assertThat(explanation.verdict().caveats())
+                    .anyMatch(c -> c.contains(SlaVerificationSizer.SIZING_NOTE));
+        }
+
+        @Test
+        @DisplayName("SLA origin with N=10000 and target 0.9999 is still undersized")
+        void slaUndersizedAt10000() {
+            // With α=0.001, even n=10,000 is insufficient for p₀=0.9999
+            StatisticalExplanation explanation = builder.buildWithInlineThreshold(
+                    "testSla", 10000, 10000, 0.9999, true, "SLA", ""
+            );
+
+            assertThat(explanation.verdict().caveats())
+                    .anyMatch(c -> c.contains(SlaVerificationSizer.SIZING_NOTE));
+        }
+
+        @Test
+        @DisplayName("non-SLA origin without contract ref does NOT include sizing note")
+        void nonSlaDoesNotIncludeNote() {
+            StatisticalExplanation explanation = builder.buildWithInlineThreshold(
+                    "testGeneric", 200, 200, 0.9999, true, "UNSPECIFIED", ""
+            );
+
+            assertThat(explanation.verdict().caveats())
+                    .noneMatch(c -> c.contains(SlaVerificationSizer.SIZING_NOTE));
+        }
+
+        @Test
+        @DisplayName("EMPIRICAL origin without contract ref does NOT include sizing note")
+        void empiricalDoesNotIncludeNote() {
+            BaselineData baseline = createBaseline(1000, 999);
+
+            StatisticalExplanation explanation = builder.build(
+                    "testEmpirical", 200, 200, baseline, 0.9999, true, 0.95,
+                    "EMPIRICAL", ""
+            );
+
+            assertThat(explanation.verdict().caveats())
+                    .noneMatch(c -> c.contains(SlaVerificationSizer.SIZING_NOTE));
+        }
+
+        @Test
+        @DisplayName("non-SLA origin WITH contract ref includes sizing note")
+        void contractRefTriggersNote() {
+            StatisticalExplanation explanation = builder.buildWithInlineThreshold(
+                    "testSlo", 200, 200, 0.9999, true, "SLO", "Internal SLO Doc"
+            );
+
+            assertThat(explanation.verdict().caveats())
+                    .anyMatch(c -> c.contains(SlaVerificationSizer.SIZING_NOTE));
+        }
+
+        @Test
+        @DisplayName("SLA-anchored test with sufficient samples does NOT include sizing note")
+        void slaSufficientSamplesNoNote() {
+            StatisticalExplanation explanation = builder.buildWithInlineThreshold(
+                    "testSla", 100000, 100000, 0.9999, true, "SLA", "Payment SLA v2.3"
+            );
+
+            assertThat(explanation.verdict().caveats())
+                    .noneMatch(c -> c.contains(SlaVerificationSizer.SIZING_NOTE));
+        }
+
+        @Test
+        @DisplayName("sizing note appears regardless of FAIL verdict")
+        void noteAppearsOnFailVerdict() {
+            StatisticalExplanation explanation = builder.buildWithInlineThreshold(
+                    "testSla", 200, 190, 0.9999, false, "SLA", "Payment SLA v2.3"
+            );
+
+            assertThat(explanation.verdict().caveats())
+                    .anyMatch(c -> c.contains(SlaVerificationSizer.SIZING_NOTE));
+        }
+
+        @Test
+        @DisplayName("sizing note includes PASS/FAIL asymmetry guidance")
+        void noteIncludesAsymmetryGuidance() {
+            StatisticalExplanation explanation = builder.buildWithInlineThreshold(
+                    "testSla", 200, 200, 0.9999, true, "SLA", ""
+            );
+
+            String sizingCaveat = explanation.verdict().caveats().stream()
+                    .filter(c -> c.contains(SlaVerificationSizer.SIZING_NOTE))
+                    .findFirst()
+                    .orElseThrow();
+
+            assertThat(sizingCaveat).contains("FAIL verdict remains a reliable indication");
         }
     }
 

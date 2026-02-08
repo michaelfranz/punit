@@ -89,6 +89,18 @@ tasks.test {
     // Exclude test subject classes from direct discovery
     // They are executed via TestKit in integration tests
     exclude("**/testsubjects/**")
+
+    // Support simplified syntax: ./gradlew test -Prun=TestName.testMethod
+    val runFilter = project.findProperty("run") as String?
+    if (runFilter != null) {
+        filter {
+            if (runFilter.contains(".")) {
+                includeTestsMatching("*$runFilter")
+            } else {
+                includeTestsMatching("*$runFilter*")
+            }
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

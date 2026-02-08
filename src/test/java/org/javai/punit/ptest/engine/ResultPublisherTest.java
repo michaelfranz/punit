@@ -11,6 +11,7 @@ import org.javai.punit.controls.budget.SharedBudgetMonitor;
 import org.javai.punit.model.TerminationReason;
 import org.javai.punit.ptest.engine.ResultPublisher.PublishContext;
 import org.javai.punit.reporting.PUnitReporter;
+import org.javai.punit.statistics.SlaVerificationSizer;
 import org.javai.punit.statistics.transparent.BaselineData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -321,6 +322,78 @@ class ResultPublisherTest {
             publisher.appendProvenance(sb, ctx);
 
             assertThat(sb.toString()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("appendSlaVerificationNote")
+    class AppendSlaVerificationNote {
+
+        @Test
+        @DisplayName("appends sizing note for SLA-anchored undersized test")
+        void appendsNoteForSlaUndersized() {
+            PublishContext ctx = createSlaContext(200, 0.9999, ThresholdOrigin.SLA, "SLA v2.3");
+            StringBuilder sb = new StringBuilder();
+
+            publisher.appendSlaVerificationNote(sb, ctx);
+
+            assertThat(sb.toString()).contains(SlaVerificationSizer.SIZING_NOTE);
+        }
+
+        @Test
+        @DisplayName("appends sizing note for contract-ref-anchored undersized test")
+        void appendsNoteForContractRefUndersized() {
+            PublishContext ctx = createSlaContext(200, 0.9999, ThresholdOrigin.SLO, "Internal SLO");
+            StringBuilder sb = new StringBuilder();
+
+            publisher.appendSlaVerificationNote(sb, ctx);
+
+            assertThat(sb.toString()).contains(SlaVerificationSizer.SIZING_NOTE);
+        }
+
+        @Test
+        @DisplayName("does NOT append note for non-SLA test without contract ref")
+        void doesNotAppendForNonSla() {
+            PublishContext ctx = createSlaContext(200, 0.9999, ThresholdOrigin.UNSPECIFIED, null);
+            StringBuilder sb = new StringBuilder();
+
+            publisher.appendSlaVerificationNote(sb, ctx);
+
+            assertThat(sb.toString()).doesNotContain(SlaVerificationSizer.SIZING_NOTE);
+        }
+
+        @Test
+        @DisplayName("does NOT append note when sample size is sufficient")
+        void doesNotAppendWhenSufficient() {
+            PublishContext ctx = createSlaContext(100000, 0.9999, ThresholdOrigin.SLA, "");
+            StringBuilder sb = new StringBuilder();
+
+            publisher.appendSlaVerificationNote(sb, ctx);
+
+            assertThat(sb.toString()).doesNotContain(SlaVerificationSizer.SIZING_NOTE);
+        }
+
+        @Test
+        @DisplayName("does NOT append note for moderate threshold with adequate samples")
+        void doesNotAppendForModerateThreshold() {
+            PublishContext ctx = createSlaContext(200, 0.95, ThresholdOrigin.SLA, "");
+            StringBuilder sb = new StringBuilder();
+
+            publisher.appendSlaVerificationNote(sb, ctx);
+
+            assertThat(sb.toString()).doesNotContain(SlaVerificationSizer.SIZING_NOTE);
+        }
+
+        private PublishContext createSlaContext(int samples, double minPassRate,
+                ThresholdOrigin origin, String contractRef) {
+            return new PublishContext(
+                    "testSla", samples, samples, samples, 0,
+                    minPassRate, 1.0, true,
+                    Optional.empty(), null, 1000, false, 1.0, 0, 0, 0,
+                    CostBudgetMonitor.TokenMode.NONE, null, null, null, null,
+                    origin, contractRef, null,
+                    BaselineData.empty(), List.of(), null
+            );
         }
     }
 }

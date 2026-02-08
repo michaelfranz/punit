@@ -325,8 +325,9 @@ public class ProbabilisticTestExtension implements
 			finalizeProbabilisticTest(extensionContext, aggregator, config, budgetMonitor,
 					classBudgetMonitor, suiteBudgetMonitor);
 		} else {
-			// Continue - rethrow sample failures so they appear as ❌ in the IDE
-			if (result.hasSampleFailure()) {
+			// Continue - rethrow sample failures so they appear as ❌ in the IDE/CLI
+			// Only rethrow up to maxExampleFailures to avoid drowning output with noise
+			if (result.hasSampleFailure() && aggregator.getFailures() <= strategyConfig.maxExampleFailures()) {
 				rethrowSampleFailure(result.sampleFailure(), aggregator, config);
 			}
 		}

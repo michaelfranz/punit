@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import org.javai.punit.statistics.BinomialProportionEstimator;
 import org.javai.punit.statistics.ProportionEstimate;
+import org.javai.punit.statistics.SlaVerificationSizer;
 
 /**
  * Builds statistical explanations from test execution context.
@@ -131,14 +132,16 @@ public class StatisticalExplanationBuilder {
         );
         List<CovariateMisalignment> effectiveMisalignments = misalignments != null ? misalignments : Collections.emptyList();
         
+        String effectiveContractRef = contractRef != null ? contractRef : "";
+
         return new StatisticalExplanation(
                 testName,
                 buildHypothesis(threshold, thresholdOriginName),
                 buildObservedData(samples, successes),
                 buildBaselineReference(effectiveBaseline, threshold, confidenceLevel),
                 buildInference(samples, successes, confidenceLevel),
-                buildVerdict(passed, samples, successes, threshold, effectiveBaseline, confidenceLevel, 
-                        thresholdOriginName, effectiveMisalignments),
+                buildVerdict(passed, samples, successes, threshold, effectiveBaseline, confidenceLevel,
+                        thresholdOriginName, effectiveContractRef, effectiveMisalignments),
                 provenance
         );
     }
@@ -184,18 +187,20 @@ public class StatisticalExplanationBuilder {
             String contractRef) {
 
         double confidenceLevel = 0.95; // Default confidence for legacy mode
+        String effectiveContractRef = contractRef != null ? contractRef : "";
         StatisticalExplanation.Provenance provenance = new StatisticalExplanation.Provenance(
                 thresholdOriginName != null ? thresholdOriginName : "UNSPECIFIED",
-                contractRef != null ? contractRef : ""
+                effectiveContractRef
         );
-        
+
         return new StatisticalExplanation(
                 testName,
                 buildHypothesis(threshold, thresholdOriginName),
                 buildObservedData(samples, successes),
                 buildInlineThresholdBaselineReference(threshold),
                 buildInference(samples, successes, confidenceLevel),
-                buildInlineThresholdVerdict(passed, samples, successes, threshold, thresholdOriginName),
+                buildInlineThresholdVerdict(passed, samples, successes, threshold,
+                        thresholdOriginName, effectiveContractRef),
                 provenance
         );
     }
@@ -361,19 +366,8 @@ public class StatisticalExplanationBuilder {
             double threshold,
             BaselineData baseline,
             double confidenceLevel,
-            String thresholdOriginName) {
-        return buildVerdict(passed, samples, successes, threshold, baseline, confidenceLevel,
-                thresholdOriginName, Collections.emptyList());
-    }
-
-    private StatisticalExplanation.VerdictInterpretation buildVerdict(
-            boolean passed,
-            int samples,
-            int successes,
-            double threshold,
-            BaselineData baseline,
-            double confidenceLevel,
             String thresholdOriginName,
+            String contractRef,
             List<CovariateMisalignment> misalignments) {
 
         double observedRate = samples > 0 ? (double) successes / samples : 0.0;
@@ -407,6 +401,7 @@ public class StatisticalExplanationBuilder {
         }
 
         List<String> caveats = buildCaveats(samples, observedRate, threshold, misalignments);
+        appendSlaVerificationCaveat(caveats, samples, threshold, thresholdOriginName, contractRef);
 
         return new StatisticalExplanation.VerdictInterpretation(
                 passed,
@@ -421,7 +416,8 @@ public class StatisticalExplanationBuilder {
             int samples,
             int successes,
             double threshold,
-            String thresholdOriginName) {
+            String thresholdOriginName,
+            String contractRef) {
 
         double observedRate = samples > 0 ? (double) successes / samples : 0.0;
         String technicalResult = passed ? "PASS" : "FAIL";
@@ -444,13 +440,15 @@ public class StatisticalExplanationBuilder {
 
         List<String> caveats = buildCaveats(samples, observedRate, threshold);
         caveats = new ArrayList<>(caveats);
-        
+
         // Add caveat about inline threshold if not using SLA/SLO/POLICY source
-        if (thresholdOriginName == null || thresholdOriginName.equalsIgnoreCase("UNSPECIFIED") 
+        if (thresholdOriginName == null || thresholdOriginName.equalsIgnoreCase("UNSPECIFIED")
                 || thresholdOriginName.equalsIgnoreCase("EMPIRICAL")) {
             caveats.add("Using inline threshold (no baseline spec). For statistically-derived " +
                     "thresholds with confidence intervals, run a MEASURE experiment first.");
         }
+
+        appendSlaVerificationCaveat(caveats, samples, threshold, thresholdOriginName, contractRef);
 
         return new StatisticalExplanation.VerdictInterpretation(
                 passed,
@@ -547,5 +545,37 @@ public class StatisticalExplanationBuilder {
         }
 
         return caveats;
+    }
+
+    /**
+     * Appends an SLA verification sizing caveat if the test is SLA-anchored
+     * and the sample size is insufficient for verification-grade evidence.
+     *
+     * <p>For high-reliability SLA targets (e.g. 99.99%), a PASS verdict at small N
+     * is not reliable evidence of conformance — it is a smoke test. However, a FAIL
+     * verdict IS reliable evidence of non-conformance, since observed failures directly
+     * demonstrate the system is not meeting the target.
+     *
+     * @param caveats the mutable caveats list to append to
+     * @param samples the number of test samples
+     * @param threshold the SLA target pass rate
+     * @param thresholdOriginName the threshold origin (e.g. "SLA")
+     * @param contractRef the contract reference (may be null or empty)
+     */
+    private void appendSlaVerificationCaveat(List<String> caveats, int samples,
+            double threshold, String thresholdOriginName, String contractRef) {
+        if (!SlaVerificationSizer.isSlaAnchored(thresholdOriginName, contractRef)) {
+            return;
+        }
+        if (!SlaVerificationSizer.isUndersized(samples, threshold)) {
+            return;
+        }
+        caveats.add(String.format(
+                "Warning: %s. With n=%d and SLA target of %.2f%%, even zero failures would " +
+                "not provide sufficient statistical evidence of compliance (\u03b1=%.3f). " +
+                "A PASS at this sample size is a smoke-test-level observation, not a compliance " +
+                "determination. Note: a FAIL verdict remains a reliable indication of non-conformance.",
+                SlaVerificationSizer.SIZING_NOTE, samples, threshold * 100,
+                SlaVerificationSizer.DEFAULT_ALPHA));
     }
 }

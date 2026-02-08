@@ -14,6 +14,7 @@ import org.javai.punit.spec.expiration.ExpirationReportPublisher;
 import org.javai.punit.spec.expiration.ExpirationWarningRenderer;
 import org.javai.punit.spec.expiration.WarningLevel;
 import org.javai.punit.spec.model.ExecutionSpecification;
+import org.javai.punit.statistics.SlaVerificationSizer;
 import org.javai.punit.statistics.transparent.BaselineData;
 import org.javai.punit.statistics.transparent.ConsoleExplanationRenderer;
 import org.javai.punit.statistics.transparent.StatisticalExplanation;
@@ -219,6 +220,9 @@ class ResultPublisher {
         // Append provenance if configured
         appendProvenance(sb, ctx);
 
+        // Append SLA verification sizing note if applicable
+        appendSlaVerificationNote(sb, ctx);
+
         ctx.terminationReason()
                 .filter(r -> r != TerminationReason.COMPLETED)
                 .ifPresent(r -> {
@@ -278,6 +282,25 @@ class ResultPublisher {
         if (ctx.hasContractRef()) {
             sb.append(String.format("  Contract ref: %s%n", ctx.contractRef()));
         }
+    }
+
+    /**
+     * Appends an SLA verification sizing note if the test is SLA-anchored
+     * and the sample size is insufficient for verification-grade evidence.
+     *
+     * <p>This note appears in legacy (non-transparent-stats) mode. In transparent
+     * stats mode, the equivalent information appears as a caveat in the
+     * statistical explanation.
+     */
+    void appendSlaVerificationNote(StringBuilder sb, PublishContext ctx) {
+        String originName = ctx.thresholdOrigin() != null ? ctx.thresholdOrigin().name() : null;
+        if (!SlaVerificationSizer.isSlaAnchored(originName, ctx.contractRef())) {
+            return;
+        }
+        if (!SlaVerificationSizer.isUndersized(ctx.samplesExecuted(), ctx.minPassRate())) {
+            return;
+        }
+        sb.append(String.format("%nNote: %s", SlaVerificationSizer.SIZING_NOTE));
     }
 
     /**
