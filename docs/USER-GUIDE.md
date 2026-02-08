@@ -156,12 +156,10 @@ private static final ServiceContract<Request, Response> CONTRACT =
 
 ```java
 public UseCaseOutcome<Response> callService(Request request) {
-    Response response = client.call(request);
-
     return UseCaseOutcome
             .withContract(CONTRACT)
             .input(request)
-            .execute(() -> response)
+            .execute(req -> client.call(req))
             .build();
 }
 ```
@@ -346,12 +344,10 @@ The `UseCaseOutcome` is a statement detailing how well a service performed again
 
 ```java
 public UseCaseOutcome<ChatResponse> translateInstruction(String instruction) {
-    ChatResponse response = llm.chat(systemPrompt, instruction, model, temperature);
-
     return UseCaseOutcome
             .withContract(CONTRACT)
             .input(new ServiceInput(systemPrompt, instruction, model, temperature))
-            .execute(() -> response)
+            .execute(in -> llm.chat(in.prompt(), in.instruction(), in.model(), in.temperature()))
             .build();
 }
 ```
@@ -371,12 +367,10 @@ Beyond postconditions, use cases can validate against **expected values**—spec
 
 ```java
 public UseCaseOutcome<ChatResponse> translateInstruction(String instruction, String expectedJson) {
-    ChatResponse response = llm.chat(systemPrompt, instruction, model, temperature);
-
     return UseCaseOutcome
             .withContract(CONTRACT)
             .input(new ServiceInput(systemPrompt, instruction, model, temperature))
-            .execute(() -> response)
+            .execute(in -> llm.chat(in.prompt(), in.instruction(), in.model(), in.temperature()))
             .expecting(expectedJson, ChatResponse::content, JsonMatcher.semanticEquality())
             .build();
 }

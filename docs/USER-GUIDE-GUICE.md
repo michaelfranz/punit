@@ -2,7 +2,7 @@
 
 This guide explains how to use PUnit in applications that use Google Guice for dependency injection.
 
-> **Note:** PUnit has no dependency on Guice. This guide shows how to integrate PUnit with your Guice injector.
+> **Note:** PUnit has no dependency on Guice. This guide shows how to register Guice-managed use cases with PUnit's `UseCaseProvider`.
 
 ---
 
@@ -12,67 +12,43 @@ In Guice applications, use cases are typically managed by the injector with thei
 - Invoke use case functionality during experiments and tests
 - Call `@CovariateSource` methods to resolve covariate values
 
+The integration is straightforward: register a factory with PUnit's `UseCaseProvider` that delegates instance creation to your Guice injector.
+
 ---
 
-## Setting Up the UseCaseProvider
+## Registering Guice-Managed Use Cases
 
-### 1. Create a Guice-Aware Provider
-
-```java
-import com.google.inject.Injector;
-import org.javai.punit.api.UseCaseProvider;
-
-public class GuiceUseCaseProvider implements UseCaseProvider {
-    
-    private final Injector injector;
-    
-    public GuiceUseCaseProvider(Injector injector) {
-        this.injector = injector;
-    }
-    
-    @Override
-    public <T> T getInstance(Class<T> useCaseClass) {
-        return injector.getInstance(useCaseClass);
-    }
-    
-    @Override
-    public boolean supports(Class<?> useCaseClass) {
-        try {
-            injector.getBinding(useCaseClass);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-}
-```
-
-### 2. Register with PUnit
-
-In your test setup:
+### Basic Setup
 
 ```java
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import org.junit.jupiter.api.BeforeAll;
-import org.javai.punit.api.PUnit;
-import org.javai.punit.api.UseCaseRegistry;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.javai.punit.api.UseCaseProvider;
 
 public abstract class BasePUnitTest {
-    
+
     protected static Injector injector;
-    
+
+    @RegisterExtension
+    UseCaseProvider provider = new UseCaseProvider();
+
     @BeforeAll
-    static void setupPUnit() {
+    static void createInjector() {
         injector = Guice.createInjector(new AppModule(), new TestModule());
-        
-        PUnit.setUseCaseRegistry(
-            UseCaseRegistry.withDefaults()
-                .register(new GuiceUseCaseProvider(injector))
-        );
+    }
+
+    @BeforeEach
+    void registerUseCases() {
+        provider.register(ProductSearchUseCase.class,
+                () -> injector.getInstance(ProductSearchUseCase.class));
     }
 }
 ```
+
+The `UseCaseProvider` is registered via JUnit 5's `@RegisterExtension`. In `@BeforeEach`, you register a factory that delegates to your Guice injector. PUnit calls this factory whenever it needs an instance of the use case.
 
 ---
 
@@ -87,19 +63,31 @@ import org.javai.punit.api.UseCase;
 import org.javai.punit.api.CovariateSource;
 import org.javai.punit.api.StandardCovariate;
 import org.javai.punit.api.CovariateCategory;
+import org.javai.punit.api.Covariate;
+import org.javai.punit.contract.ServiceContract;
+import org.javai.punit.contract.UseCaseOutcome;
+import org.javai.outcome.Outcome;
 
 @UseCase(
     value = "ProductSearch",
     covariates = { StandardCovariate.TIME_OF_DAY },
-    customCovariates = {
+    categorizedCovariates = {
         @Covariate(key = "llm_model", category = CovariateCategory.CONFIGURATION)
     }
 )
 public class ProductSearchUseCase {
-    
+
+    private static final ServiceContract<String, SearchResult> CONTRACT =
+            ServiceContract.<String, SearchResult>define()
+                    .ensure("Result is relevant", result ->
+                            result.isRelevant()
+                                    ? Outcome.ok()
+                                    : Outcome.fail("relevance", "Result not relevant"))
+                    .build();
+
     private final LlmClient llmClient;
     private final String modelName;
-    
+
     @Inject
     public ProductSearchUseCase(
             LlmClient llmClient,
@@ -107,17 +95,23 @@ public class ProductSearchUseCase {
         this.llmClient = llmClient;
         this.modelName = modelName;
     }
-    
+
     @CovariateSource("llm_model")
     public String getLlmModel() {
         return modelName;
     }
-    
-    public SearchResult search(String query) {
-        return llmClient.search(query);
+
+    public UseCaseOutcome<SearchResult> search(String query) {
+        return UseCaseOutcome
+                .withContract(CONTRACT)
+                .input(query)
+                .execute(q -> llmClient.search(q))
+                .build();
     }
 }
 ```
+
+The `ServiceContract` defines what "success" means. The `search` method returns a `UseCaseOutcome` that evaluates the contract's postconditions. This same outcome is used by both experiments and tests, ensuring they measure and verify the same criteria. See [Part 1 of the User Guide](USER-GUIDE.md#part-1-the-shopping-basket-domain) for a full discussion of service contracts.
 
 ### The Guice Module
 
@@ -126,13 +120,13 @@ import com.google.inject.AbstractModule;
 import com.google.inject.name.Names;
 
 public class AppModule extends AbstractModule {
-    
+
     @Override
     protected void configure() {
         bind(String.class)
             .annotatedWith(Names.named("llm.model"))
-            .toInstance(System.getProperty("llm.model", "gpt-4.1-mini"));
-        
+            .toInstance(System.getProperty("llm.model", "gpt-4o-mini"));
+
         bind(LlmClient.class).to(OpenAiClient.class);
     }
 }
@@ -141,15 +135,14 @@ public class AppModule extends AbstractModule {
 ### The Experiment
 
 ```java
-import org.javai.punit.api.Experiment;
-import org.javai.punit.api.ResultCaptor;
+import org.javai.punit.api.MeasureExperiment;
+import org.javai.punit.api.OutcomeCaptor;
 
 public class ProductSearchExperiment extends BasePUnitTest {
-    
-    @Experiment(useCase = ProductSearchUseCase.class)
-    void measureSearch(ProductSearchUseCase useCase, ResultCaptor captor) {
-        // 'useCase' is obtained from Guice, fully initialized
-        captor.capture(useCase.search("laptop"));
+
+    @MeasureExperiment(useCase = ProductSearchUseCase.class, samples = 100)
+    void measureSearch(ProductSearchUseCase useCase, OutcomeCaptor captor) {
+        captor.record(useCase.search("laptop"));
     }
 }
 ```
@@ -160,11 +153,14 @@ public class ProductSearchExperiment extends BasePUnitTest {
 import org.javai.punit.api.ProbabilisticTest;
 
 public class ProductSearchTest extends BasePUnitTest {
-    
-    @ProbabilisticTest(useCase = ProductSearchUseCase.class)
-    void testSearchQuality(ProductSearchUseCase useCase, StatisticalAssertions stats) {
-        SearchResult result = useCase.search("laptop");
-        stats.assertPassRate(result::isRelevant, 0.95);
+
+    @ProbabilisticTest(
+        useCase = ProductSearchUseCase.class,
+        samples = 100,
+        minPassRate = 0.95
+    )
+    void testSearchQuality(ProductSearchUseCase useCase) {
+        useCase.search("laptop").assertAll();
     }
 }
 ```
@@ -181,7 +177,7 @@ public class ProductionModule extends AbstractModule {
     protected void configure() {
         bind(String.class)
             .annotatedWith(Names.named("llm.model"))
-            .toInstance("gpt-4.1-mini");
+            .toInstance("gpt-4o-mini");
     }
 }
 
@@ -219,14 +215,16 @@ public class TestModule extends AbstractModule {
 
 ```java
 @BeforeAll
-static void setup() {
+static void createInjector() {
     injector = Guice.createInjector(
         Modules.override(new AppModule()).with(new TestModule())
     );
-    PUnit.setUseCaseRegistry(
-        UseCaseRegistry.withDefaults()
-            .register(new GuiceUseCaseProvider(injector))
-    );
+}
+
+@BeforeEach
+void registerUseCases() {
+    provider.register(ProductSearchUseCase.class,
+            () -> injector.getInstance(ProductSearchUseCase.class));
 }
 ```
 
@@ -254,12 +252,17 @@ Injector testInjector = parentInjector.createChildInjector(new TestOverrides());
 
 ## Troubleshooting
 
-### "No binding for use case class"
+### "No factory registered for use case"
 
-Ensure your use case class is bound in a Guice module, or has an `@Inject` constructor that Guice can satisfy.
+Ensure you have registered a factory for your use case class in `@BeforeEach`:
+
+```java
+provider.register(ProductSearchUseCase.class,
+        () -> injector.getInstance(ProductSearchUseCase.class));
+```
+
+Verify that the use case class is bound in a Guice module, or has an `@Inject` constructor that Guice can satisfy.
 
 ### Covariate values not resolving
 
-Verify that `@CovariateSource` methods are public and return `String` or `CovariateValue`.
-
-
+Verify that `@CovariateSource` methods are public, take no parameters, and return `String` or `CovariateValue`.
