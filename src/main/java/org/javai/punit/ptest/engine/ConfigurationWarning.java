@@ -10,6 +10,8 @@ package org.javai.punit.ptest.engine;
  * @param type the category of warning
  * @param message the formatted warning message
  */
+import org.javai.punit.reporting.RateFormat;
+
 public record ConfigurationWarning(Type type, String message) {
 
     /**
@@ -42,8 +44,8 @@ public record ConfigurationWarning(Type type, String message) {
             ⚠️  WARNING: Statistically Unsound Configuration
             ────────────────────────────────────────────────────────────────────────────
             Test: %s
-            Threshold: %.1f%% (from minPassRate)
-            Baseline rate: %.1f%%
+            Threshold: %s (from minPassRate)
+            Baseline rate: %s
             Implied confidence: %.1f%%
 
             The threshold equals or exceeds the baseline rate. This results in a very
@@ -56,8 +58,8 @@ public record ConfigurationWarning(Type type, String message) {
             ────────────────────────────────────────────────────────────────────────────
             """,
                 useCaseId,
-                threshold * 100,
-                baselineRate * 100,
+                RateFormat.format(threshold),
+                RateFormat.format(baselineRate),
                 impliedConfidence * 100,
                 (1 - impliedConfidence) * 100);
 

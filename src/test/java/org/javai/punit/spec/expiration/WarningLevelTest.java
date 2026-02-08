@@ -3,6 +3,7 @@ package org.javai.punit.spec.expiration;
 import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import org.javai.punit.model.ExpirationStatus;
+import org.javai.punit.statistics.transparent.TransparentStatsConfig.DetailLevel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -63,24 +64,24 @@ class WarningLevelTest {
     class ShouldShowTests {
 
         @Test
-        @DisplayName("ALWAYS should show regardless of verbose setting")
-        void alwaysShouldShowRegardlessOfVerbose() {
-            assertThat(WarningLevel.ALWAYS.shouldShow(false)).isTrue();
-            assertThat(WarningLevel.ALWAYS.shouldShow(true)).isTrue();
+        @DisplayName("ALWAYS should show at any detail level")
+        void alwaysShouldShowAtAnyDetailLevel() {
+            assertThat(WarningLevel.ALWAYS.shouldShow(DetailLevel.SUMMARY)).isTrue();
+            assertThat(WarningLevel.ALWAYS.shouldShow(DetailLevel.VERBOSE)).isTrue();
         }
 
         @Test
-        @DisplayName("NORMAL should show regardless of verbose setting")
-        void normalShouldShowRegardlessOfVerbose() {
-            assertThat(WarningLevel.NORMAL.shouldShow(false)).isTrue();
-            assertThat(WarningLevel.NORMAL.shouldShow(true)).isTrue();
+        @DisplayName("NORMAL should show at any detail level")
+        void normalShouldShowAtAnyDetailLevel() {
+            assertThat(WarningLevel.NORMAL.shouldShow(DetailLevel.SUMMARY)).isTrue();
+            assertThat(WarningLevel.NORMAL.shouldShow(DetailLevel.VERBOSE)).isTrue();
         }
 
         @Test
-        @DisplayName("VERBOSE should only show when verbose is true")
-        void verboseShouldOnlyShowWhenVerboseTrue() {
-            assertThat(WarningLevel.VERBOSE.shouldShow(false)).isFalse();
-            assertThat(WarningLevel.VERBOSE.shouldShow(true)).isTrue();
+        @DisplayName("VERBOSE should only show at VERBOSE detail level")
+        void verboseShouldOnlyShowAtVerboseDetailLevel() {
+            assertThat(WarningLevel.VERBOSE.shouldShow(DetailLevel.SUMMARY)).isFalse();
+            assertThat(WarningLevel.VERBOSE.shouldShow(DetailLevel.VERBOSE)).isTrue();
         }
     }
 }

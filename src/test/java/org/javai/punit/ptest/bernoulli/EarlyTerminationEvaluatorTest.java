@@ -197,7 +197,7 @@ class EarlyTerminationEvaluatorTest {
         assertThat(explanation)
                 .contains("8 samples")
                 .contains("8 successes")
-                .contains("100.0%")  // pass rate
+                .contains("1.0000")  // pass rate
                 .contains("2 remaining"); // skipped samples
     }
 

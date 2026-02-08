@@ -33,10 +33,10 @@ class BernoulliFailureMessagesTest {
                 .contains("PUnit FAILED")
                 .contains("95.0% confidence")
                 .contains("alpha=0.050")
-                .contains("87.0%")
+                .contains("0.8700")
                 .contains("(87/100)")
-                .contains("min pass rate=91.6%")
-                .contains("Baseline=95.1%")
+                .contains("min pass rate=0.9160")
+                .contains("Baseline=0.9510")
                 .contains("N=1000")
                 .contains("spec=json.generation:v3");
     }
@@ -62,8 +62,8 @@ class BernoulliFailureMessagesTest {
         // Then - verify exact format
         assertThat(message).isEqualTo(
                 "PUnit FAILED with 95.0% confidence (alpha=0.050). " +
-                "Observed pass rate=87.0% (87/100) < min pass rate=91.6%. " +
-                "Baseline=95.1% (N=1000), spec=json.generation:v3"
+                "Observed pass rate=0.8700 (87/100) < min pass rate=0.9160. " +
+                "Baseline=0.9510 (N=1000), spec=json.generation:v3"
         );
     }
 
@@ -81,9 +81,9 @@ class BernoulliFailureMessagesTest {
         // Then
         assertThat(message)
                 .contains("PUnit FAILED")
-                .contains("87.0%")
+                .contains("0.8700")
                 .contains("(87/100)")
-                .contains("min pass rate=90.0%")
+                .contains("min pass rate=0.9000")
                 .doesNotContain("confidence")
                 .doesNotContain("Baseline");
     }
@@ -113,12 +113,12 @@ class BernoulliFailureMessagesTest {
                 .contains("PUnit LATENCY FAILED")
                 .contains("95.0% confidence")
                 .contains("alpha=0.050")
-                .contains("12.1%")
+                .contains("0.1210")
                 .contains("(12/99)")
-                .contains("max allowed=8.0%")
+                .contains("max allowed=0.0800")
                 .contains("45.20ms")
                 .contains("baseline p95")
-                .contains("baseline exceedance=5.0%")
+                .contains("baseline exceedance=0.0500")
                 .contains("N=999")
                 .contains("spec=checkout.service:v1");
     }
@@ -206,9 +206,9 @@ class BernoulliFailureMessagesTest {
 
         // Then
         assertThat(message)
-                .contains("100.0%")
+                .contains("1.0000")
                 .contains("(100/100)")
-                .contains("min pass rate=100.0%");
+                .contains("min pass rate=1.0000");
     }
 }
 

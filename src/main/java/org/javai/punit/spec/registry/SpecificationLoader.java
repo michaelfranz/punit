@@ -116,6 +116,9 @@ public final class SpecificationLoader {
 		boolean inFailureDistribution = false;
 		boolean inExpiration = false;
 		boolean inCovariates = false;
+		boolean inExecution = false;
+		boolean inStatistics = false;
+		boolean inStatisticsFailureDistribution = false;
 
 		// Requirements fields
 		double minPassRate = 1.0;
@@ -167,6 +170,9 @@ public final class SpecificationLoader {
 				inFailureDistribution = false;
 				inExpiration = false;
 				inCovariates = false;
+				inExecution = false;
+				inStatistics = false;
+				inStatisticsFailureDistribution = false;
 
 				if (line.startsWith("specId:") || line.startsWith("useCaseId:")) {
 					// Both specId (legacy) and useCaseId map to useCaseId
@@ -185,8 +191,12 @@ public final class SpecificationLoader {
 					inContext = true;
 				} else if (line.startsWith("requirements:")) {
 					inRequirements = true;
-				} else if (line.startsWith("costEnvelope:")) {
+				} else if (line.startsWith("costEnvelope:") || line.startsWith("cost:")) {
 					inCostEnvelope = true;
+				} else if (line.startsWith("execution:")) {
+					inExecution = true;
+				} else if (line.startsWith("statistics:")) {
+					inStatistics = true;
 				} else if (line.startsWith("sourceBaselines:")) {
 					inSourceBaselines = true;
 				} else if (line.startsWith("baselineData:")) {
@@ -291,6 +301,35 @@ public final class SpecificationLoader {
 					// Try to parse as TimeWindowValue, fall back to StringValue
 					CovariateValue covValue = parseCovariateValue(value);
 					covariateProfileBuilder.put(key, covValue);
+				}
+			} else if (inExecution) {
+				// MEASURE output: execution.samplesExecuted → empirical basis samples
+				if (trimmed.startsWith("samplesExecuted:")) {
+					int execSamples = Integer.parseInt(extractValue(trimmed));
+					if (samples == 0) {
+						samples = execSamples;
+					}
+				}
+			} else if (inStatistics) {
+				// MEASURE output: statistics section → empirical basis + extended stats
+				if (trimmed.startsWith("failureDistribution:")) {
+					inStatisticsFailureDistribution = true;
+				} else if (inStatisticsFailureDistribution) {
+					Matcher m = YAML_KEY_VALUE.matcher(trimmed);
+					if (m.matches()) {
+						try {
+							failureDistribution.put(m.group(1), Integer.parseInt(m.group(2).trim()));
+						} catch (NumberFormatException e) {
+							// Skip non-integer values
+						}
+					}
+				} else if (trimmed.startsWith("successes:")) {
+					int statSuccesses = Integer.parseInt(extractValue(trimmed));
+					if (successes == 0) {
+						successes = statSuccesses;
+					}
+				} else if (trimmed.startsWith("standardError:")) {
+					standardError = Double.parseDouble(extractValue(trimmed));
 				}
 			}
 		}

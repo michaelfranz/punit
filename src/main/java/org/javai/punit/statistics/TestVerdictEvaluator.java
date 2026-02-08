@@ -1,5 +1,7 @@
 package org.javai.punit.statistics;
 
+import org.javai.punit.reporting.RateFormat;
+
 /**
  * Evaluates test results against a threshold and produces qualified verdicts.
  * 
@@ -78,22 +80,22 @@ public class TestVerdictEvaluator {
         
         if (passed) {
             return String.format(
-                "Observed %.1f%% ≥ %.1f%% threshold. No evidence of degradation from baseline.",
-                observedRate * 100,
-                thresholdValue * 100
+                "Observed %s ≥ %s threshold. No evidence of degradation from baseline.",
+                RateFormat.format(observedRate),
+                RateFormat.format(thresholdValue)
             );
         } else {
             double shortfall = thresholdValue - observedRate;
             double falsePositivePercent = (1.0 - confidence) * 100;
-            
+
             return String.format(
-                "Observed %.1f%% < %.1f%% min pass rate (shortfall: %.1f%%). " +
+                "Observed %s < %s min pass rate (shortfall: %s). " +
                 "This indicates DEGRADATION from the baseline with %.0f%% confidence. " +
                 "There is a %.1f%% probability this failure is due to sampling variance " +
                 "rather than actual system degradation.",
-                observedRate * 100,
-                thresholdValue * 100,
-                shortfall * 100,
+                RateFormat.format(observedRate),
+                RateFormat.format(thresholdValue),
+                RateFormat.format(shortfall),
                 confidence * 100,
                 falsePositivePercent
             );

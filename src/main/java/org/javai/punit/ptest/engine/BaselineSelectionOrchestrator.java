@@ -245,25 +245,35 @@ class BaselineSelectionOrchestrator {
     /**
      * Finds a UseCaseProvider from the test instance or class.
      *
+     * <p>Walks enclosing class instances for {@code @Nested} test classes,
+     * since the provider is typically declared on the outermost test class.
+     *
      * @param testInstance the test instance (may be null)
      * @param testClass the test class (may be null)
      * @return the UseCaseProvider if found
      */
     Optional<UseCaseProvider> findUseCaseProvider(Object testInstance, Class<?> testClass) {
-        // Prefer instance fields (test instance exists during lazy selection)
+        // Search instance fields, walking enclosing instances for @Nested classes
         if (testInstance != null) {
-            for (Field field : testInstance.getClass().getDeclaredFields()) {
-                if (UseCaseProvider.class.isAssignableFrom(field.getType())) {
-                    field.setAccessible(true);
-                    try {
-                        UseCaseProvider provider = (UseCaseProvider) field.get(testInstance);
-                        if (provider != null) {
-                            return Optional.of(provider);
+            Object current = testInstance;
+            while (current != null) {
+                for (Field field : current.getClass().getDeclaredFields()) {
+                    if (field.isSynthetic()) {
+                        continue;
+                    }
+                    if (UseCaseProvider.class.isAssignableFrom(field.getType())) {
+                        field.setAccessible(true);
+                        try {
+                            UseCaseProvider provider = (UseCaseProvider) field.get(current);
+                            if (provider != null) {
+                                return Optional.of(provider);
+                            }
+                        } catch (IllegalAccessException e) {
+                            // Continue searching
                         }
-                    } catch (IllegalAccessException e) {
-                        // Continue searching
                     }
                 }
+                current = getEnclosingInstance(current);
             }
         }
 
@@ -286,6 +296,35 @@ class BaselineSelectionOrchestrator {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Navigates to the enclosing instance of a {@code @Nested} test class.
+     *
+     * <p>JUnit 5 {@code @Nested} classes are non-static inner classes with a
+     * synthetic {@code this$0} field referencing the enclosing instance.
+     *
+     * <p><strong>Java 21 note:</strong> The compiler only generates the
+     * {@code this$0} field when the inner class actually references the
+     * enclosing instance (e.g. accesses a field or method). For typical
+     * {@code @Nested} test classes that reference a {@code UseCaseProvider}
+     * from the outer class, this field will be present.
+     *
+     * @param instance the current instance
+     * @return the enclosing instance, or null if none exists
+     */
+    private Object getEnclosingInstance(Object instance) {
+        for (Field field : instance.getClass().getDeclaredFields()) {
+            if (field.isSynthetic() && field.getName().startsWith("this$")) {
+                field.setAccessible(true);
+                try {
+                    return field.get(instance);
+                } catch (IllegalAccessException e) {
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     /**

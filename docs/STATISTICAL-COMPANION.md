@@ -1467,11 +1467,10 @@ Configuration follows precedence (highest to lowest):
 
 ### 10.8 Detail Levels
 
-| Level      | Description                   | Use Case            |
-|------------|-------------------------------|---------------------|
-| `SUMMARY`  | Verdict + key numbers         | Quick reference     |
-| `STANDARD` | Full explanation              | Normal audit/review |
-| `VERBOSE`  | + power analysis, sensitivity | Deep investigation  |
+| Level     | Description                                        | Use Case            |
+|-----------|-----------------------------------------------------|---------------------|
+| `SUMMARY` | Verdict + key numbers (skips z-test section)        | Quick reference     |
+| `VERBOSE` | Full explanation including z-test (default)          | Audit/review        |
 
 ### 10.9 Validation by Statisticians
 

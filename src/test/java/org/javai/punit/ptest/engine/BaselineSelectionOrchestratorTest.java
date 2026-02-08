@@ -183,6 +183,33 @@ class BaselineSelectionOrchestratorTest {
             assertThat(result.get()).isNotNull();
         }
 
+        @Test
+        @DisplayName("finds provider from enclosing instance for @Nested classes")
+        void findsProviderFromEnclosingInstance() {
+            OuterClassWithProvider outer = new OuterClassWithProvider();
+            Object nestedInstance = outer.new NestedInner();
+
+            Optional<UseCaseProvider> result = orchestrator.findUseCaseProvider(
+                    nestedInstance, nestedInstance.getClass());
+
+            assertThat(result).isPresent();
+            assertThat(result.get()).isSameAs(outer.provider);
+        }
+
+        @Test
+        @DisplayName("finds provider from deeply nested enclosing instance")
+        void findsProviderFromDeeplyNestedInstance() {
+            OuterClassWithProvider outer = new OuterClassWithProvider();
+            OuterClassWithProvider.NestedInner middle = outer.new NestedInner();
+            Object deepNested = middle.new DeeplyNested();
+
+            Optional<UseCaseProvider> result = orchestrator.findUseCaseProvider(
+                    deepNested, deepNested.getClass());
+
+            assertThat(result).isPresent();
+            assertThat(result.get()).isSameAs(outer.provider);
+        }
+
         // Test helper classes
         static class TestClassWithInstanceProvider {
             UseCaseProvider provider = new UseCaseProvider();
@@ -196,6 +223,28 @@ class BaselineSelectionOrchestratorTest {
         static class TestClassWithBothProviders {
             static UseCaseProvider staticProvider = new UseCaseProvider();
             UseCaseProvider instanceProvider = new UseCaseProvider();
+        }
+    }
+
+    /**
+     * Non-static inner class hierarchy to test enclosing instance traversal.
+     * Simulates JUnit 5 {@code @Nested} test classes.
+     *
+     * <p>Note: Inner classes must reference the outer instance (e.g. via a field access)
+     * for the compiler to generate the synthetic {@code this$0} field. Without such a
+     * reference, Java 21 optimizes away the enclosing reference.
+     */
+    static class OuterClassWithProvider {
+        UseCaseProvider provider = new UseCaseProvider();
+
+        class NestedInner {
+            // Reference outer field to ensure this$0 is generated
+            UseCaseProvider getProvider() { return provider; }
+
+            class DeeplyNested {
+                // Reference middle class to ensure this$0 chain is generated
+                UseCaseProvider getProviderViaMiddle() { return getProvider(); }
+            }
         }
     }
 

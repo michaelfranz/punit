@@ -337,10 +337,10 @@ class TestVerdictEvaluatorTest {
             // Interpretation should be qualified
             assertThat(verdict.interpretation())
                 .as("Interpretation should include qualification")
-                .containsPattern("90\\.0% < 9[34]\\.\\d%")  // observed < threshold
-                .contains("95%")                            // confidence level
-                .contains("5.0%")                           // false positive probability
-                .contains("sampling variance");             // statistical caveat
+                .containsPattern("0\\.9000 < 0\\.9[34]\\d+")  // observed < threshold
+                .contains("95%")                               // confidence level
+                .contains("5.0%")                              // false positive probability
+                .contains("sampling variance");                // statistical caveat
         }
     }
 }

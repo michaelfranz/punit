@@ -13,6 +13,8 @@ package org.javai.punit.ptest.bernoulli;
  *
  * <p>Failure messages include pass rate comparisons, confidence levels, and baseline context.
  */
+import org.javai.punit.reporting.RateFormat;
+
 public final class BernoulliFailureMessages {
 
     private BernoulliFailureMessages() {
@@ -33,15 +35,15 @@ public final class BernoulliFailureMessages {
     public static String probabilisticTestFailure(StatisticalContext context) {
         return String.format(
                 "PUnit FAILED with %.1f%% confidence (alpha=%.3f). " +
-                        "Observed pass rate=%.1f%% (%d/%d) < min pass rate=%.1f%%. " +
-                        "Baseline=%.1f%% (N=%d), spec=%s",
+                        "Observed pass rate=%s (%d/%d) < min pass rate=%s. " +
+                        "Baseline=%s (N=%d), spec=%s",
                 context.confidence() * 100.0,
                 1.0 - context.confidence(),
-                context.observedRate() * 100.0,
+                RateFormat.format(context.observedRate()),
                 context.successes(),
                 context.samples(),
-                context.threshold() * 100.0,
-                context.baselineRate() * 100.0,
+                RateFormat.format(context.threshold()),
+                RateFormat.format(context.baselineRate()),
                 context.baselineSamples(),
                 context.specId()
         );
@@ -67,11 +69,11 @@ public final class BernoulliFailureMessages {
             int samples,
             double threshold) {
         return String.format(
-                "PUnit FAILED. Observed pass rate=%.1f%% (%d/%d) < min pass rate=%.1f%%.",
-                observedRate * 100.0,
+                "PUnit FAILED. Observed pass rate=%s (%d/%d) < min pass rate=%s.",
+                RateFormat.format(observedRate),
                 successes,
                 samples,
-                threshold * 100.0
+                RateFormat.format(threshold)
         );
     }
 
@@ -89,17 +91,17 @@ public final class BernoulliFailureMessages {
     public static String latencyRegressionFailure(LatencyStatisticalContext context) {
         return String.format(
                 "PUnit LATENCY FAILED with %.1f%% confidence (alpha=%.3f). " +
-                        "Observed exceedance rate=%.1f%% (%d/%d) > max allowed=%.1f%%. " +
-                        "Threshold=%.2fms (baseline p%.0f), baseline exceedance=%.1f%% (N=%d), spec=%s",
+                        "Observed exceedance rate=%s (%d/%d) > max allowed=%s. " +
+                        "Threshold=%.2fms (baseline p%.0f), baseline exceedance=%s (N=%d), spec=%s",
                 context.confidence() * 100.0,
                 1.0 - context.confidence(),
-                context.observedExceedanceRate() * 100.0,
+                RateFormat.format(context.observedExceedanceRate()),
                 context.exceedances(),
                 context.effectiveSamples(),
-                context.maxAllowedExceedanceRate() * 100.0,
+                RateFormat.format(context.maxAllowedExceedanceRate()),
                 context.thresholdMs(),
                 context.thresholdQuantile() * 100.0,
-                context.baselineExceedanceRate() * 100.0,
+                RateFormat.format(context.baselineExceedanceRate()),
                 context.baselineEffectiveSamples(),
                 context.specId()
         );

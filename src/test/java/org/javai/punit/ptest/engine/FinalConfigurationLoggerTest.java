@@ -145,7 +145,7 @@ class FinalConfigurationLoggerTest {
             String formatted = logger.format(config);
 
             assertThat(formatted).contains("Threshold:");
-            assertThat(formatted).contains("95.0% (SLA)");
+            assertThat(formatted).contains("0.9500 (SLA)");
         }
 
         @Test
@@ -161,7 +161,7 @@ class FinalConfigurationLoggerTest {
 
             String formatted = logger.format(config);
 
-            assertThat(formatted).contains("92.3% (derived from baseline)");
+            assertThat(formatted).contains("0.9230 (derived from baseline)");
         }
 
         @Test
@@ -177,7 +177,7 @@ class FinalConfigurationLoggerTest {
 
             String formatted = logger.format(config);
 
-            assertThat(formatted).contains("85.0% (EMPIRICAL)");
+            assertThat(formatted).contains("0.8500 (EMPIRICAL)");
         }
 
         @Test
@@ -193,7 +193,7 @@ class FinalConfigurationLoggerTest {
 
             String formatted = logger.format(config);
 
-            assertThat(formatted).contains("80.0%");
+            assertThat(formatted).contains("0.8000");
             assertThat(formatted).doesNotContain("(UNSPECIFIED)");
         }
     }

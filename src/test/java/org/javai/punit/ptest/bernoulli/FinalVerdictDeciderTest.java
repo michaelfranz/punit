@@ -98,8 +98,8 @@ class FinalVerdictDeciderTest {
         String message = decider.buildSuccessMessage(aggregator, 0.95);
         
         assertThat(message)
-                .contains("98.00%")
-                .contains("95.00%")
+                .contains("0.9800")
+                .contains("0.9500")
                 .contains("98/100");
     }
 
@@ -129,10 +129,10 @@ class FinalVerdictDeciderTest {
         assertThat(message)
                 .contains("PUnit FAILED with 95.0% confidence")
                 .contains("alpha=0.050")
-                .contains("87.0%")
+                .contains("0.8700")
                 .contains("(87/100)")
-                .contains("min pass rate=91.6%")
-                .contains("Baseline=95.1%")
+                .contains("min pass rate=0.9160")
+                .contains("Baseline=0.9510")
                 .contains("N=1000")
                 .contains("spec=json.generation:v3")
                 .contains("Samples executed:")

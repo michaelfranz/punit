@@ -9,6 +9,7 @@ import org.javai.punit.controls.budget.SharedBudgetMonitor;
 import org.javai.punit.model.ExpirationStatus;
 import org.javai.punit.model.TerminationReason;
 import org.javai.punit.reporting.PUnitReporter;
+import org.javai.punit.reporting.RateFormat;
 import org.javai.punit.spec.expiration.ExpirationEvaluator;
 import org.javai.punit.spec.expiration.ExpirationReportPublisher;
 import org.javai.punit.spec.expiration.ExpirationWarningRenderer;
@@ -195,26 +196,26 @@ class ResultPublisher {
         sb.append(ctx.testName()).append("\n");
 
         if (ctx.passed()) {
-            sb.append(String.format("Observed pass rate: %.1f%% (%d/%d) >= min pass rate: %.1f%%",
-                    ctx.observedPassRate() * 100,
+            sb.append(String.format("Observed pass rate: %s (%d/%d) >= min pass rate: %s",
+                    RateFormat.format(ctx.observedPassRate()),
                     ctx.successes(),
                     ctx.samplesExecuted(),
-                    ctx.minPassRate() * 100));
+                    RateFormat.format(ctx.minPassRate())));
         } else if (isBudgetExhausted) {
             sb.append(String.format("Samples executed: %d of %d (budget exhausted before completion)%n",
                     ctx.samplesExecuted(),
                     ctx.plannedSamples()));
-            sb.append(String.format("Pass rate at termination: %.1f%% (%d/%d), required: %.1f%%",
-                    ctx.observedPassRate() * 100,
+            sb.append(String.format("Pass rate at termination: %s (%d/%d), required: %s",
+                    RateFormat.format(ctx.observedPassRate()),
                     ctx.successes(),
                     ctx.samplesExecuted(),
-                    ctx.minPassRate() * 100));
+                    RateFormat.format(ctx.minPassRate())));
         } else {
-            sb.append(String.format("Observed pass rate: %.1f%% (%d/%d) < min pass rate: %.1f%%",
-                    ctx.observedPassRate() * 100,
+            sb.append(String.format("Observed pass rate: %s (%d/%d) < min pass rate: %s",
+                    RateFormat.format(ctx.observedPassRate()),
                     ctx.successes(),
                     ctx.samplesExecuted(),
-                    ctx.minPassRate() * 100));
+                    RateFormat.format(ctx.minPassRate())));
         }
 
         // Append provenance if configured
@@ -244,14 +245,20 @@ class ResultPublisher {
         sb.append(String.format("%nElapsed: %dms", ctx.elapsedMs()));
         reporter.reportInfo(title, sb.toString());
 
-        // Print expiration warning if applicable
-        printExpirationWarning(ctx.spec(), ctx.hasTransparentStats());
+        // Print expiration warning if applicable (legacy mode defaults to VERBOSE)
+        TransparentStatsConfig.DetailLevel detailLevel = ctx.transparentStats() != null
+                ? ctx.transparentStats().detailLevel()
+                : TransparentStatsConfig.DetailLevel.VERBOSE;
+        printExpirationWarning(ctx.spec(), detailLevel);
     }
 
     /**
      * Prints an expiration warning if the baseline is expired or expiring.
+     *
+     * @param spec the execution specification (may be null)
+     * @param detailLevel the detail level controlling which warnings are shown
      */
-    void printExpirationWarning(ExecutionSpecification spec, boolean verbose) {
+    void printExpirationWarning(ExecutionSpecification spec, TransparentStatsConfig.DetailLevel detailLevel) {
         if (spec == null) {
             return;
         }
@@ -262,7 +269,7 @@ class ResultPublisher {
         }
 
         WarningLevel level = WarningLevel.forStatus(status);
-        if (level == null || !level.shouldShow(verbose)) {
+        if (level == null || !level.shouldShow(detailLevel)) {
             return;
         }
 
@@ -349,8 +356,8 @@ class ResultPublisher {
         var rendered = renderer.renderForReporter(explanation);
         reporter.reportInfo(rendered.title(), rendered.body());
 
-        // Print expiration warning (verbose=true for transparent stats mode)
-        printExpirationWarning(ctx.spec(), true);
+        // Print expiration warning respecting the configured detail level
+        printExpirationWarning(ctx.spec(), ctx.transparentStats().detailLevel());
     }
 }
 

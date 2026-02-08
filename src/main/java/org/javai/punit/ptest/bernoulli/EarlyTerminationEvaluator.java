@@ -2,6 +2,7 @@ package org.javai.punit.ptest.bernoulli;
 
 import java.util.Optional;
 import org.javai.punit.model.TerminationReason;
+import org.javai.punit.reporting.RateFormat;
 
 /**
  * Evaluates whether a probabilistic test should terminate early.
@@ -159,9 +160,9 @@ public class EarlyTerminationEvaluator {
         double observedPassRate = (double) successesSoFar / samplesExecuted;
         
         return String.format(
-            "After %d samples with %d successes (%.1f%%), required min pass rate (%d successes) " +
+            "After %d samples with %d successes (%s), required min pass rate (%d successes) " +
             "already met. Skipping %d remaining samples.",
-            samplesExecuted, successesSoFar, observedPassRate * 100,
+            samplesExecuted, successesSoFar, RateFormat.format(observedPassRate),
             requiredSuccesses, remainingSamples);
     }
 

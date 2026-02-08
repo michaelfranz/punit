@@ -1,6 +1,7 @@
 package org.javai.punit.spec.expiration;
 
 import org.javai.punit.model.ExpirationStatus;
+import org.javai.punit.statistics.transparent.TransparentStatsConfig.DetailLevel;
 
 /**
  * Verbosity level at which expiration warnings should be displayed.
@@ -10,7 +11,7 @@ import org.javai.punit.model.ExpirationStatus;
  * <ul>
  *   <li>{@link #ALWAYS}: Always shown (expired baselines)</li>
  *   <li>{@link #NORMAL}: Shown at normal and verbose levels (imminent expiration)</li>
- *   <li>{@link #VERBOSE}: Shown only at verbose level (expiring soon)</li>
+ *   <li>{@link #VERBOSE}: Shown only at verbose detail level (expiring soon)</li>
  * </ul>
  */
 public enum WarningLevel {
@@ -51,16 +52,20 @@ public enum WarningLevel {
     
     /**
      * Returns true if a warning with this level should be shown given
-     * the specified verbosity setting.
+     * the specified detail level.
      *
-     * @param verbose whether verbose mode is enabled
+     * <p>At {@link DetailLevel#VERBOSE}, all warnings are shown including
+     * "expiring soon" (≤25% remaining). At {@link DetailLevel#SUMMARY},
+     * only expired and imminently expiring warnings are shown.
+     *
+     * @param detailLevel the detail level in effect
      * @return true if the warning should be shown
      */
-    public boolean shouldShow(boolean verbose) {
+    public boolean shouldShow(DetailLevel detailLevel) {
         return switch (this) {
             case ALWAYS -> true;
-            case NORMAL -> true;  // Shown at both normal and verbose
-            case VERBOSE -> verbose;  // Only shown when verbose
+            case NORMAL -> true;
+            case VERBOSE -> detailLevel == DetailLevel.VERBOSE;
         };
     }
 }

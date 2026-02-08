@@ -59,8 +59,8 @@ class SampleFailureFormatter {
      */
     String formatVerdictHint(int successes, int executed, int planned, double threshold) {
         return String.format(
-                "[PUnit sample %d/%d: %d successes so far, need %.0f%% - see console for final verdict]",
-                executed, planned, successes, threshold * 100);
+                "[PUnit sample %d/%d: %d successes so far, need %s - see console for final verdict]",
+                executed, planned, successes, org.javai.punit.reporting.RateFormat.format(threshold));
     }
 
     /**

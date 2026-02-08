@@ -3,6 +3,7 @@ plugins {
     id("maven-publish")
     id("jacoco")
     idea
+    kotlin("jvm") version "2.0.21"
 }
 
 // Configure IDEA to download sources and javadoc
@@ -80,6 +81,19 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SCRIPTS source set — Kotlin utility scripts (e.g. verdict catalogue generator)
+// ═══════════════════════════════════════════════════════════════════════════
+sourceSets {
+    create("scripts") {
+        kotlin.srcDir("src/scripts/kotlin")
+    }
+}
+
+dependencies {
+    "scriptsImplementation"(kotlin("stdlib"))
+}
+
 tasks.test {
     useJUnitPlatform()
     testLogging {
@@ -89,6 +103,12 @@ tasks.test {
     // Exclude test subject classes from direct discovery
     // They are executed via TestKit in integration tests
     exclude("**/testsubjects/**")
+
+    // Forward punit.* system properties to the test JVM
+    // Enables e.g. -Dpunit.stats.detailLevel=SUMMARY from the command line
+    System.getProperties()
+        .filter { (k, _) -> k.toString().startsWith("punit.") }
+        .forEach { (k, v) -> systemProperty(k.toString(), v.toString()) }
 
     // Support simplified syntax: ./gradlew test -Prun=TestName.testMethod
     val runFilter = project.findProperty("run") as String?
@@ -233,6 +253,62 @@ val experiment by tasks.registering(Test::class) {
 val exp by tasks.registering(Test::class) {
     description = "Shorthand for 'experiment' task"
     configureAsExperimentTask()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VERDICT CATALOGUE generation — run VerdictCatalogueTest at both detail
+// levels, then assemble docs/VERDICT-CATALOG.md via a Kotlin script.
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Usage:
+//   ./gradlew generateVerdictCatalog
+//
+
+fun Test.configureAsVerdictCatalogueTask(detailLevel: String) {
+    group = "documentation"
+    description = "Runs VerdictCatalogueTest with punit.stats.detailLevel=$detailLevel"
+
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+
+    useJUnitPlatform()
+
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
+    }
+
+    // Deactivate @Disabled so the catalogue test can run
+    systemProperty("junit.jupiter.conditions.deactivate", "org.junit.*DisabledCondition")
+    systemProperty("punit.stats.detailLevel", detailLevel)
+
+    filter { includeTestsMatching("*VerdictCatalogueTest*") }
+
+    // Some scenarios intentionally fail
+    ignoreFailures = true
+
+    exclude("**/testsubjects/**")
+
+    dependsOn("compileTestJava", "processTestResources")
+}
+
+val verdictCatalogueSummary by tasks.registering(Test::class) {
+    configureAsVerdictCatalogueTask("SUMMARY")
+}
+
+val verdictCatalogueVerbose by tasks.registering(Test::class) {
+    configureAsVerdictCatalogueTask("VERBOSE")
+}
+
+val generateVerdictCatalog by tasks.registering(JavaExec::class) {
+    group = "documentation"
+    description = "Generates docs/VERDICT-CATALOG.md from VerdictCatalogueTest output"
+
+    classpath = sourceSets["scripts"].runtimeClasspath
+    mainClass.set("org.javai.punit.scripts.GenerateVerdictCatalogKt")
+    workingDir = projectDir
+
+    dependsOn(verdictCatalogueSummary, verdictCatalogueVerbose)
 }
 
 tasks.javadoc {

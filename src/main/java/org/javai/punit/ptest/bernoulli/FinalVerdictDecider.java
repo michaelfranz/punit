@@ -1,6 +1,7 @@
 package org.javai.punit.ptest.bernoulli;
 
 import org.javai.punit.reporting.PUnitReporter;
+import org.javai.punit.reporting.RateFormat;
 
 /**
  * Determines the final pass/fail verdict for a probabilistic test
@@ -124,9 +125,9 @@ public class FinalVerdictDecider {
 	 */
 	public String buildSuccessMessage(SampleResultAggregator aggregator, double minPassRate) {
 		return String.format(
-				"Probabilistic test passed: %.2f%% >= %.2f%% (%d/%d samples succeeded)",
-				aggregator.getObservedPassRate() * 100,
-				minPassRate * 100,
+				"Probabilistic test passed: %s >= %s (%d/%d samples succeeded)",
+				RateFormat.format(aggregator.getObservedPassRate()),
+				RateFormat.format(minPassRate),
 				aggregator.getSuccesses(),
 				aggregator.getSamplesExecuted());
 	}

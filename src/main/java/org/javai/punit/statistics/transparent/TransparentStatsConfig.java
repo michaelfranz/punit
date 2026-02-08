@@ -66,17 +66,15 @@ public record TransparentStatsConfig(
      */
     public enum DetailLevel {
         /**
-         * Verdict and key numbers only.
+         * Verdict and key numbers only — skips hypothesis test
+         * and statistical inference (standard error, confidence interval,
+         * z-test, p-value) sections.
          */
         SUMMARY,
 
         /**
-         * Full explanation (default when enabled).
-         */
-        STANDARD,
-
-        /**
-         * Includes power analysis and sensitivity discussion.
+         * Full explanation including hypothesis test and statistical
+         * inference sections (default when enabled).
          */
         VERBOSE
     }
@@ -177,7 +175,7 @@ public record TransparentStatsConfig(
         }
 
         // 3. Default
-        return DetailLevel.STANDARD;
+        return DetailLevel.VERBOSE;
     }
 
     /**
@@ -229,7 +227,7 @@ public record TransparentStatsConfig(
      * @return a disabled configuration
      */
     public static TransparentStatsConfig disabled() {
-        return new TransparentStatsConfig(false, DetailLevel.STANDARD, OutputFormat.CONSOLE);
+        return new TransparentStatsConfig(false, DetailLevel.VERBOSE, OutputFormat.CONSOLE);
     }
 
     /**

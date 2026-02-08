@@ -3,9 +3,10 @@ package org.javai.punit.statistics.transparent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.javai.punit.reporting.RateFormat;
 import org.javai.punit.statistics.BinomialProportionEstimator;
-import org.javai.punit.statistics.ProportionEstimate;
 import org.javai.punit.statistics.ComplianceEvidenceEvaluator;
+import org.javai.punit.statistics.ProportionEstimate;
 
 /**
  * Builds statistical explanations from test execution context.
@@ -214,12 +215,12 @@ public class StatisticalExplanationBuilder {
         HypothesisFraming framing = getHypothesisFraming(thresholdOriginName);
         
         String nullHypothesis = String.format(
-                "True success rate %s %s %.2f (%s)",
-                StatisticalVocabulary.PI, StatisticalVocabulary.GEQ, threshold, framing.h0Text);
-        
+                "True success rate %s %s %s (%s)",
+                StatisticalVocabulary.PI, StatisticalVocabulary.GEQ, RateFormat.format(threshold), framing.h0Text);
+
         String alternativeHypothesis = String.format(
-                "True success rate %s < %.2f (%s)",
-                StatisticalVocabulary.PI, threshold, framing.h1Text);
+                "True success rate %s < %s (%s)",
+                StatisticalVocabulary.PI, RateFormat.format(threshold), framing.h1Text);
         
         return new StatisticalExplanation.HypothesisStatement(
                 nullHypothesis,
@@ -324,8 +325,8 @@ public class StatisticalExplanationBuilder {
         int confidencePercent = (int) (confidenceLevel * 100);
         
         return String.format(
-                "Lower bound of %d%% CI = %.1f%%, min pass rate = %.0f%%",
-                confidencePercent, lowerBound * 100, threshold * 100);
+                "Lower bound of %d%% CI = %s, min pass rate = %s",
+                confidencePercent, RateFormat.format(lowerBound), RateFormat.format(threshold));
     }
 
     private StatisticalExplanation.StatisticalInference buildInference(
@@ -379,24 +380,24 @@ public class StatisticalExplanationBuilder {
             if (baseline != null && baseline.hasEmpiricalData()) {
                 // Have empirical baseline data - can reference baseline expectation
                 plainEnglish = String.format(
-                        "The observed success rate of %.1f%% is consistent with the baseline expectation of %.1f%%. " +
+                        "The observed success rate of %s is consistent with the baseline expectation of %s. " +
                         "%s",
-                        observedRate * 100,
-                        baseline.baselineRate() * 100,
+                        RateFormat.format(observedRate),
+                        RateFormat.format(baseline.baselineRate()),
                         framing.passText);
             } else {
                 // No empirical data (inline threshold or baseline without empirical basis)
                 plainEnglish = String.format(
-                        "The observed success rate of %.1f%% meets the required threshold of %.1f%%. %s",
-                        observedRate * 100,
-                        threshold * 100,
+                        "The observed success rate of %s meets the required threshold of %s. %s",
+                        RateFormat.format(observedRate),
+                        RateFormat.format(threshold),
                         framing.passText);
             }
         } else {
             plainEnglish = String.format(
-                    "The observed success rate of %.1f%% falls below the required threshold of %.1f%%. %s",
-                    observedRate * 100,
-                    threshold * 100,
+                    "The observed success rate of %s falls below the required threshold of %s. %s",
+                    RateFormat.format(observedRate),
+                    RateFormat.format(threshold),
                     framing.failText);
         }
 
@@ -426,15 +427,15 @@ public class StatisticalExplanationBuilder {
         String plainEnglish;
         if (passed) {
             plainEnglish = String.format(
-                    "The observed success rate of %.1f%% meets the required threshold of %.1f%%. %s",
-                    observedRate * 100,
-                    threshold * 100,
+                    "The observed success rate of %s meets the required threshold of %s. %s",
+                    RateFormat.format(observedRate),
+                    RateFormat.format(threshold),
                     framing.passText);
         } else {
             plainEnglish = String.format(
-                    "The observed success rate of %.1f%% falls below the required threshold of %.1f%%. %s",
-                    observedRate * 100,
-                    threshold * 100,
+                    "The observed success rate of %s falls below the required threshold of %s. %s",
+                    RateFormat.format(observedRate),
+                    RateFormat.format(threshold),
                     framing.failText);
         }
 
@@ -529,9 +530,9 @@ public class StatisticalExplanationBuilder {
             double margin = observedRate - threshold;
             if (margin > 0 && margin < 0.05) {
                 caveats.add(String.format(
-                        "The observed rate (%.1f%%) is close to the min pass rate (%.1f%%). " +
+                        "The observed rate (%s) is close to the min pass rate (%s). " +
                         "Small fluctuations in future runs may cause different verdicts.",
-                        observedRate * 100, threshold * 100));
+                        RateFormat.format(observedRate), RateFormat.format(threshold)));
             }
         }
 
@@ -571,11 +572,11 @@ public class StatisticalExplanationBuilder {
             return;
         }
         caveats.add(String.format(
-                "Warning: %s. With n=%d and target of %.2f%%, even zero failures would " +
+                "Warning: %s. With n=%d and target of %s, even zero failures would " +
                 "not provide sufficient statistical evidence of compliance (\u03b1=%.3f). " +
                 "A PASS at this sample size is a smoke-test-level observation, not a compliance " +
                 "determination. Note: a FAIL verdict remains a reliable indication of non-conformance.",
-                ComplianceEvidenceEvaluator.SIZING_NOTE, samples, threshold * 100,
+                ComplianceEvidenceEvaluator.SIZING_NOTE, samples, RateFormat.format(threshold),
                 ComplianceEvidenceEvaluator.DEFAULT_ALPHA));
     }
 }

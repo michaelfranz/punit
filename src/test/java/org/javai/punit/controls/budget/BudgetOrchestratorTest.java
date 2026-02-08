@@ -428,9 +428,9 @@ class BudgetOrchestratorTest {
                     7, 20, 0.571, 4, 0.9, 2500);
 
             assertThat(message).contains("Samples executed: 7 of 20");
-            assertThat(message).contains("Pass rate at termination: 57.1%");
+            assertThat(message).contains("Pass rate at termination: 0.5710");
             assertThat(message).contains("4/7");
-            assertThat(message).contains("Required pass rate: 90.0%");
+            assertThat(message).contains("Required pass rate: 0.9000");
             assertThat(message).contains("Elapsed: 2500ms");
         }
 

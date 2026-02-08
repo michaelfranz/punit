@@ -18,7 +18,7 @@ class ConsoleExplanationRendererTest {
     @BeforeEach
     void setUp() {
         // Use Unicode for consistent test output
-        renderer = new ConsoleExplanationRenderer(true, TransparentStatsConfig.DetailLevel.STANDARD);
+        renderer = new ConsoleExplanationRenderer(true, TransparentStatsConfig.DetailLevel.VERBOSE);
     }
 
     @Nested
@@ -150,6 +150,50 @@ class ConsoleExplanationRendererTest {
     }
 
     @Nested
+    @DisplayName("SUMMARY detail level")
+    class SummaryDetailLevelTests {
+
+        private final ConsoleExplanationRenderer summaryRenderer =
+                new ConsoleExplanationRenderer(true, TransparentStatsConfig.DetailLevel.SUMMARY);
+
+        @Test
+        @DisplayName("omits hypothesis section")
+        void omitsHypothesisSection() {
+            StatisticalExplanation explanation = createExplanation("test", true);
+
+            String output = summaryRenderer.render(explanation);
+
+            assertThat(output).doesNotContain("HYPOTHESIS TEST");
+        }
+
+        @Test
+        @DisplayName("omits statistical inference section")
+        void omitsStatisticalInferenceSection() {
+            StatisticalExplanation explanation = createExplanation("test", true);
+
+            String output = summaryRenderer.render(explanation);
+
+            assertThat(output).doesNotContain("STATISTICAL INFERENCE");
+            assertThat(output).doesNotContain("Standard error:");
+            assertThat(output).doesNotContain("Confidence interval:");
+            assertThat(output).doesNotContain("Test statistic:");
+            assertThat(output).doesNotContain("p-value:");
+        }
+
+        @Test
+        @DisplayName("still includes observed data and verdict")
+        void includesObservedDataAndVerdict() {
+            StatisticalExplanation explanation = createExplanation("test", true);
+
+            String output = summaryRenderer.render(explanation);
+
+            assertThat(output).contains("OBSERVED DATA");
+            assertThat(output).contains("VERDICT");
+            assertThat(output).contains("BASELINE REFERENCE");
+        }
+    }
+
+    @Nested
     @DisplayName("ASCII fallback")
     class AsciiFallbackTests {
 
@@ -157,7 +201,7 @@ class ConsoleExplanationRendererTest {
         @DisplayName("uses ASCII symbols when Unicode is disabled")
         void usesAsciiSymbols() {
             ConsoleExplanationRenderer asciiRenderer = 
-                    new ConsoleExplanationRenderer(false, TransparentStatsConfig.DetailLevel.STANDARD);
+                    new ConsoleExplanationRenderer(false, TransparentStatsConfig.DetailLevel.VERBOSE);
             StatisticalExplanation explanation = createExplanation("test", true);
             
             String output = asciiRenderer.render(explanation);

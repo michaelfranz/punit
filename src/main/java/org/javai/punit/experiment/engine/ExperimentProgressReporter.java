@@ -77,6 +77,6 @@ public final class ExperimentProgressReporter {
      * @return formatted percentage string (e.g., "95.50%")
      */
     public static String formatSuccessRate(double rate) {
-        return String.format("%.2f%%", rate * 100);
+        return org.javai.punit.reporting.RateFormat.format(rate);
     }
 }

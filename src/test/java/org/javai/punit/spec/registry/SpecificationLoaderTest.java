@@ -442,6 +442,144 @@ class SpecificationLoaderTest {
     }
 
     @Nested
+    @DisplayName("parseYaml - raw MEASURE output sections")
+    class ParseYamlMeasureOutput {
+
+        @Test
+        @DisplayName("populates empirical basis from execution and statistics sections")
+        void populatesEmpiricalBasisFromExecutionAndStatistics() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("schemaVersion: punit-spec-2\n");
+            sb.append("specId: TestCase\n");
+            sb.append("useCaseId: TestCase\n");
+            sb.append("generatedAt: 2026-01-09T10:00:00Z\n");
+            sb.append("execution:\n");
+            sb.append("  samplesPlanned: 1000\n");
+            sb.append("  samplesExecuted: 1000\n");
+            sb.append("  terminationReason: COMPLETED\n");
+            sb.append("statistics:\n");
+            sb.append("  successRate:\n");
+            sb.append("    observed: 0.85\n");
+            sb.append("    standardError: 0.0113\n");
+            sb.append("  successes: 850\n");
+            sb.append("  failures: 150\n");
+            sb.append("requirements:\n");
+            sb.append("  minPassRate: 0.80\n");
+            String content = sb.toString();
+            sb.append("contentFingerprint: ").append(computeFingerprint(content)).append("\n");
+
+            ExecutionSpecification spec = SpecificationLoader.parseYaml(sb.toString());
+
+            assertThat(spec.hasEmpiricalBasis()).isTrue();
+            assertThat(spec.getEmpiricalBasis().samples()).isEqualTo(1000);
+            assertThat(spec.getEmpiricalBasis().successes()).isEqualTo(850);
+            assertThat(spec.getObservedRate()).isEqualTo(0.85);
+        }
+
+        @Test
+        @DisplayName("does not override empiricalBasis when already provided")
+        void doesNotOverrideExplicitEmpiricalBasis() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("schemaVersion: punit-spec-2\n");
+            sb.append("specId: TestCase\n");
+            sb.append("useCaseId: TestCase\n");
+            sb.append("empiricalBasis:\n");
+            sb.append("  samples: 500\n");
+            sb.append("  successes: 475\n");
+            sb.append("  generatedAt: 2026-01-09T10:00:00Z\n");
+            sb.append("execution:\n");
+            sb.append("  samplesExecuted: 1000\n");
+            sb.append("statistics:\n");
+            sb.append("  successes: 850\n");
+            sb.append("requirements:\n");
+            sb.append("  minPassRate: 0.80\n");
+            String content = sb.toString();
+            sb.append("contentFingerprint: ").append(computeFingerprint(content)).append("\n");
+
+            ExecutionSpecification spec = SpecificationLoader.parseYaml(sb.toString());
+
+            assertThat(spec.getEmpiricalBasis().samples()).isEqualTo(500);
+            assertThat(spec.getEmpiricalBasis().successes()).isEqualTo(475);
+        }
+
+        @Test
+        @DisplayName("parses cost section as alias for costEnvelope")
+        void parsesCostSectionAlias() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("schemaVersion: punit-spec-2\n");
+            sb.append("specId: TestCase\n");
+            sb.append("useCaseId: TestCase\n");
+            sb.append("cost:\n");
+            sb.append("  totalTokenBudget: 50000\n");
+            sb.append("  maxTimePerSampleMs: 200\n");
+            sb.append("  maxTokensPerSample: 800\n");
+            sb.append("requirements:\n");
+            sb.append("  minPassRate: 0.90\n");
+            String content = sb.toString();
+            sb.append("contentFingerprint: ").append(computeFingerprint(content)).append("\n");
+
+            ExecutionSpecification spec = SpecificationLoader.parseYaml(sb.toString());
+
+            assertThat(spec.getCostEnvelope()).isNotNull();
+            assertThat(spec.getCostEnvelope().totalTokenBudget()).isEqualTo(50000);
+            assertThat(spec.getCostEnvelope().maxTimePerSampleMs()).isEqualTo(200);
+            assertThat(spec.getCostEnvelope().maxTokensPerSample()).isEqualTo(800);
+        }
+
+        @Test
+        @DisplayName("parses failure distribution from statistics section")
+        void parsesFailureDistributionFromStatistics() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("schemaVersion: punit-spec-2\n");
+            sb.append("specId: TestCase\n");
+            sb.append("useCaseId: TestCase\n");
+            sb.append("execution:\n");
+            sb.append("  samplesExecuted: 100\n");
+            sb.append("statistics:\n");
+            sb.append("  successes: 90\n");
+            sb.append("  standardError: 0.03\n");
+            sb.append("  failureDistribution:\n");
+            sb.append("    invalid_format: 6\n");
+            sb.append("    timeout: 4\n");
+            sb.append("requirements:\n");
+            sb.append("  minPassRate: 0.85\n");
+            String content = sb.toString();
+            sb.append("contentFingerprint: ").append(computeFingerprint(content)).append("\n");
+
+            ExecutionSpecification spec = SpecificationLoader.parseYaml(sb.toString());
+
+            assertThat(spec.getExtendedStatistics()).isNotNull();
+            assertThat(spec.getExtendedStatistics().standardError()).isEqualTo(0.03);
+            assertThat(spec.getExtendedStatistics().failureDistribution())
+                    .containsEntry("invalid_format", 6)
+                    .containsEntry("timeout", 4);
+        }
+
+        @Test
+        @DisplayName("parses standard error from statistics section")
+        void parsesStandardErrorFromStatistics() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("schemaVersion: punit-spec-2\n");
+            sb.append("specId: TestCase\n");
+            sb.append("useCaseId: TestCase\n");
+            sb.append("execution:\n");
+            sb.append("  samplesExecuted: 200\n");
+            sb.append("statistics:\n");
+            sb.append("  successes: 180\n");
+            sb.append("  standardError: 0.0283\n");
+            sb.append("requirements:\n");
+            sb.append("  minPassRate: 0.85\n");
+            String content = sb.toString();
+            sb.append("contentFingerprint: ").append(computeFingerprint(content)).append("\n");
+
+            ExecutionSpecification spec = SpecificationLoader.parseYaml(sb.toString());
+
+            assertThat(spec.getExtendedStatistics()).isNotNull();
+            assertThat(spec.getExtendedStatistics().standardError()).isEqualTo(0.0283);
+        }
+    }
+
+    @Nested
     @DisplayName("integrity validation")
     class IntegrityValidation {
 

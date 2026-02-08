@@ -3,6 +3,7 @@ package org.javai.punit.controls.budget;
 import java.util.Optional;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.model.TerminationReason;
+import org.javai.punit.reporting.RateFormat;
 
 /**
  * Coordinates budget checking across suite, class, and method scopes.
@@ -291,11 +292,11 @@ public class BudgetOrchestrator {
 
         sb.append(String.format("%n  Samples executed: %d of %d%n",
                 samplesExecuted, plannedSamples));
-        sb.append(String.format("  Pass rate at termination: %.1f%% (%d/%d)%n",
-                observedPassRate * 100.0,
+        sb.append(String.format("  Pass rate at termination: %s (%d/%d)%n",
+                RateFormat.format(observedPassRate),
                 successes,
                 samplesExecuted));
-        sb.append(String.format("  Required pass rate: %.1f%%%n", minPassRate * 100.0));
+        sb.append(String.format("  Required pass rate: %s%n", RateFormat.format(minPassRate)));
         sb.append(String.format("  Elapsed: %dms%n", elapsedMs));
 
         return sb.toString();

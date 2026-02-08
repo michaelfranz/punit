@@ -2,6 +2,7 @@ package org.javai.punit.ptest.engine;
 
 import org.javai.punit.api.ThresholdOrigin;
 import org.javai.punit.reporting.PUnitReporter;
+import org.javai.punit.reporting.RateFormat;
 
 /**
  * Formats and logs the test configuration block shown at test start.
@@ -105,7 +106,7 @@ class FinalConfigurationLogger {
                 sb.append(PUnitReporter.labelValueLn("Use Case:", config.specId()));
             }
             sb.append(PUnitReporter.labelValueLn("Threshold:",
-                    String.format("%.1f%% (%s)", config.minPassRate() * 100, config.thresholdOrigin().name())));
+                    String.format("%s (%s)", RateFormat.format(config.minPassRate()), config.thresholdOrigin().name())));
             if (config.hasContractRef()) {
                 sb.append(PUnitReporter.labelValueLn("Contract:", config.contractRef()));
             }
@@ -113,7 +114,7 @@ class FinalConfigurationLogger {
             sb.append(PUnitReporter.labelValueLn("Mode:", "SPEC-DRIVEN"));
             sb.append(PUnitReporter.labelValueLn("Spec:", config.specId()));
             sb.append(PUnitReporter.labelValueLn("Threshold:",
-                    String.format("%.1f%% (derived from baseline)", config.minPassRate() * 100)));
+                    String.format("%s (derived from baseline)", RateFormat.format(config.minPassRate()))));
         } else {
             sb.append(PUnitReporter.labelValueLn("Mode:", "EXPLICIT THRESHOLD"));
             String thresholdNote = "";
@@ -121,7 +122,7 @@ class FinalConfigurationLogger {
                 thresholdNote = " (" + config.thresholdOrigin().name() + ")";
             }
             sb.append(PUnitReporter.labelValueLn("Threshold:",
-                    String.format("%.1f%%%s", config.minPassRate() * 100, thresholdNote)));
+                    String.format("%s%s", RateFormat.format(config.minPassRate()), thresholdNote)));
         }
         sb.append(PUnitReporter.labelValue("Samples:", String.valueOf(config.samples())));
 

@@ -43,7 +43,7 @@ class SampleFailureFormatterTest {
         void includesThresholdPercentage() {
             String hint = formatter.formatVerdictHint(5, 10, 100, 0.95);
 
-            assertThat(hint).contains("need 95%");
+            assertThat(hint).contains("need 0.9500");
         }
 
         @Test
@@ -60,7 +60,7 @@ class SampleFailureFormatterTest {
             String hint = formatter.formatVerdictHint(3, 5, 20, 0.75);
 
             assertThat(hint).isEqualTo(
-                    "[PUnit sample 5/20: 3 successes so far, need 75% - see console for final verdict]");
+                    "[PUnit sample 5/20: 3 successes so far, need 0.7500 - see console for final verdict]");
         }
 
         @Test
@@ -76,7 +76,7 @@ class SampleFailureFormatterTest {
         void handles100PercentThreshold() {
             String hint = formatter.formatVerdictHint(5, 5, 10, 1.0);
 
-            assertThat(hint).contains("need 100%");
+            assertThat(hint).contains("need 1.0000");
         }
 
         @Test
@@ -85,7 +85,7 @@ class SampleFailureFormatterTest {
             // 0.955 should round to 96%
             String hint = formatter.formatVerdictHint(5, 10, 100, 0.955);
 
-            assertThat(hint).contains("need 96%");
+            assertThat(hint).contains("need 0.9550");
         }
     }
 
@@ -246,7 +246,7 @@ class SampleFailureFormatterTest {
             String formatted = formatter.formatSampleFailure(failure, 7, 8, 20, 0.90);
 
             assertThat(formatted).isEqualTo(
-                    "[PUnit sample 8/20: 7 successes so far, need 90% - see console for final verdict]\n" +
+                    "[PUnit sample 8/20: 7 successes so far, need 0.9000 - see console for final verdict]\n" +
                     "Expected valid JSON");
         }
     }

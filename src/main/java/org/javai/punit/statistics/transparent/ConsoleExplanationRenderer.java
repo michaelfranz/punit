@@ -3,6 +3,7 @@ package org.javai.punit.statistics.transparent;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import org.javai.punit.reporting.PUnitReporter;
+import org.javai.punit.reporting.RateFormat;
 
 /**
  * Renders statistical explanations for console output with box drawing characters.
@@ -24,10 +25,10 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
     private final TransparentStatsConfig.DetailLevel detailLevel;
 
     /**
-     * Creates a renderer with default settings (Unicode symbols, STANDARD detail).
+     * Creates a renderer with default settings (Unicode symbols, VERBOSE detail).
      */
     public ConsoleExplanationRenderer() {
-        this(TransparentStatsConfig.supportsUnicode(), TransparentStatsConfig.DetailLevel.STANDARD);
+        this(TransparentStatsConfig.supportsUnicode(), TransparentStatsConfig.DetailLevel.VERBOSE);
     }
 
     /**
@@ -66,10 +67,14 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
         StringBuilder sb = new StringBuilder();
 
         // Sections (no header/footer - PUnitReporter handles those)
-        renderHypothesisSection(sb, explanation.hypothesis());
+        if (detailLevel == TransparentStatsConfig.DetailLevel.VERBOSE) {
+            renderHypothesisSection(sb, explanation.hypothesis());
+        }
         renderObservedDataSection(sb, explanation.observed());
         renderBaselineReferenceSection(sb, explanation.baseline());
-        renderStatisticalInferenceSection(sb, explanation);
+        if (detailLevel == TransparentStatsConfig.DetailLevel.VERBOSE) {
+            renderStatisticalInferenceSection(sb, explanation);
+        }
         renderVerdictSection(sb, explanation.verdict());
         renderProvenanceSection(sb, explanation.provenance());
 
@@ -120,7 +125,7 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
         sb.append("OBSERVED DATA\n");
         sb.append(statLabel("Sample size (n):", String.valueOf(observed.sampleSize())));
         sb.append(statLabel("Successes (k):", String.valueOf(observed.successes())));
-        sb.append(statLabel("Observed rate (" + symbols.pHat() + "):", String.format("%.3f", observed.observedRate())));
+        sb.append(statLabel("Observed rate (" + symbols.pHat() + "):", RateFormat.format(observed.observedRate())));
         sb.append("\n");
     }
 
@@ -132,14 +137,14 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
                     ? DATE_FORMAT.format(baseline.generatedAt())
                     : "unknown";
             sb.append(statLabel("Source:", baseline.sourceFile() + " (generated " + dateStr + ")"));
-            sb.append(statLabel("Empirical basis:", 
-                    String.format("%d samples, %d successes (%.1f%%)",
-                            baseline.baselineSamples(), baseline.baselineSuccesses(), baseline.baselineRate() * 100)));
+            sb.append(statLabel("Empirical basis:",
+                    String.format("%d samples, %d successes (%s)",
+                            baseline.baselineSamples(), baseline.baselineSuccesses(), RateFormat.format(baseline.baselineRate()))));
             sb.append(statLabel("Threshold derivation:", baseline.thresholdDerivation()));
         } else {
             sb.append(statLabel("Source:", baseline.sourceFile()));
-            sb.append(statLabel("Threshold:", 
-                    String.format("%.1f%% (%s)", baseline.threshold() * 100, baseline.thresholdDerivation())));
+            sb.append(statLabel("Threshold:",
+                    String.format("%s (%s)", RateFormat.format(baseline.threshold()), baseline.thresholdDerivation())));
         }
         sb.append("\n");
     }
@@ -165,11 +170,7 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
                 inference.ciLower(),
                 inference.ciUpper()));
 
-        // Test statistic and p-value (if available and detail level warrants)
-        if (detailLevel == TransparentStatsConfig.DetailLevel.VERBOSE 
-                || detailLevel == TransparentStatsConfig.DetailLevel.STANDARD) {
-            renderZTestCalculation(sb, observed, baseline);
-        }
+        renderZTestCalculation(sb, observed, baseline);
 
         sb.append("\n");
     }

@@ -87,7 +87,7 @@ class TransparentStatsConfigTest {
         void defaultDetailLevel() {
             TransparentStatsConfig config = TransparentStatsConfig.resolve();
             
-            assertThat(config.detailLevel()).isEqualTo(TransparentStatsConfig.DetailLevel.STANDARD);
+            assertThat(config.detailLevel()).isEqualTo(TransparentStatsConfig.DetailLevel.VERBOSE);
         }
 
         @Test
@@ -139,7 +139,7 @@ class TransparentStatsConfigTest {
             TransparentStatsConfig config = TransparentStatsConfig.disabled();
             
             assertThat(config.enabled()).isFalse();
-            assertThat(config.detailLevel()).isEqualTo(TransparentStatsConfig.DetailLevel.STANDARD);
+            assertThat(config.detailLevel()).isEqualTo(TransparentStatsConfig.DetailLevel.VERBOSE);
             assertThat(config.format()).isEqualTo(TransparentStatsConfig.OutputFormat.CONSOLE);
         }
 
