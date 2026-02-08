@@ -163,7 +163,15 @@ PUnit makes these trade-offs **explicit and computable** rather than leaving the
 
 ### Stage 1: Define a Use Case
 
-A **use case** is a reusable function that invokes your production code and captures observations:
+PUnit recognizes that **experiments and tests must refer to the same objects**.
+
+In traditional testing, we articulate correctness through a series of test assertions. This works for deterministic systems where we expect 100% success. However, for non-deterministic systems, a test assertion that aborts on failure is of zero use when we want to collect data about the service's behavior. We need to know *how often* it fails, not just that it *did* fail.
+
+We therefore define a **Use Case** and its associated **Service Contract**. The Service Contract is the shared expression of correctness:
+- **Experiments** use it as a source of correctness data (to measure behavior).
+- **Probabilistic Tests** use it as a correctness enforcer (to verify performance against a threshold).
+
+A Use Case is a reusable function that invokes your production code and captures observations:
 
 ```java
 @UseCase("usecase.json.generation")

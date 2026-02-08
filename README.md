@@ -766,9 +766,17 @@ punit.method.tokensConsumed=8500
 
 ### Reading PUnit Verdicts
 
-When any sample fails, the IDE shows the test as ❌ FAILED. **This is correct behavior** - even statistically insignificant failures deserve attention. The key is knowing *how much* attention.
+PUnit integrates natively with JUnit 5. While PUnit evaluates a statistical verdict, it's important to understand how individual sample outcomes affect the JUnit result.
 
-**Always read the console summary:**
+There are three possible outcomes of a probabilistic test:
+
+1.  **Test passed, verdict: passed** — If all samples pass, the test passes in JUnit.
+2.  **Test failed, verdict: passed** — Some samples failed, but the statistics indicate this is within the expected failure rate. **The test is flagged as FAILED in JUnit.**
+3.  **Test failed, verdict: failed** — Some samples failed, and the statistics indicate this is NOT within normal bounds. **The test is flagged as FAILED in JUnit.**
+
+**Crucially, both situations (2) and (3) are flagged as failed in JUnit.** This is by design: even statistically insignificant failures should not be ignored. They require at least a quick inspection to ensure nothing is fundamentally broken.
+
+**Always read the console summary to distinguish between them:**
 ```
 ═══════════════════════════════════════════════════════════════
 PUnit PASSED: sample()
@@ -777,20 +785,19 @@ PUnit PASSED: sample()
 ═══════════════════════════════════════════════════════════════
 ```
 
-**Interpreting Results:**
+By default, PUnit uses Log4j 2 for its output. You can channel these verdicts to your preferred destination using standard Log4j configuration methods.
 
-| IDE Shows | Console Says   | What To Do                                                                       |
-|-----------|----------------|----------------------------------------------------------------------------------|
-| ❌ FAILED  | `PUnit PASSED` | Take a quick look. Probably fine - rerun if concerned. Don't send investigators. |
-| ❌ FAILED  | `PUnit FAILED` | Statistically significant. You have data-informed justification to investigate.  |
-| ✅ PASSED  | `PUnit PASSED` | All samples passed. Move on.                                                     |
+### Interpreting Results
 
-**Why it works this way:**
+The combination of the JUnit status and the PUnit verdict informs your action:
 
-The red ❌(or whatever icon your IDE uses) ensures you don't ignore failures completely. The console verdict tells you
-how to *prioritize*:
-- **Statistically insignificant failure:** Glance at error messages, maybe rerun, stay cool
-- **Statistically significant failure:** Dig in - the data says something is wrong
+| JUnit Status | PUnit Verdict | What it means                            | Recommended response                     |
+|:-------------|:--------------|:-----------------------------------------|:-----------------------------------------|
+| ✅ **PASSED** | **PASSED**    | All samples passed.                      | Business as usual.                       |
+| ❌ **FAILED** | **PASSED**    | Failed, but statistically insignificant. | Quick inspection; likely random noise.   |
+| ❌ **FAILED** | **FAILED**    | Failed, and statistically significant.   | Deep investigation; likely a regression. |
+
+This is what PUnit is all about: **data-informed decisions about how to respond to test failure.** The red ❌ ensures you don't ignore failures, while the console verdict tells you how to prioritize your investigation.
 
 This is what PUnit is all about: **data-informed decisions about whether to act on test failure.** Without PUnit, you'd be flying blind, chasing false flags, or labeling failures as "flaky" and ignoring them.
 

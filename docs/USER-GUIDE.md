@@ -8,16 +8,18 @@
 
 - [Introduction](#introduction)
   - [What is PUnit?](#what-is-punit)
+  - [The PUnit Philosophy](#the-punit-philosophy)
+  - [Core Concepts in PUnit](#core-concepts-in-punit)
   - [Two Testing Scenarios: Compliance and Conformance](#two-testing-scenarios-compliance-and-conformance)
   - [Quick Start](#quick-start)
   - [Running the Examples](#running-the-examples)
 - [Part 1: The Shopping Basket Domain](#part-1-the-shopping-basket-domain)
+  - [Domain Overview](#domain-overview)
   - [Why Service Contracts?](#why-service-contracts)
   - [The Service Contract](#the-service-contract)
   - [The UseCaseOutcome](#the-usecaseoutcome)
   - [Instance Conformance](#instance-conformance)
   - [Duration Constraints](#duration-constraints)
-  - [Domain Overview](#domain-overview)
   - [The ShoppingBasketUseCase Implementation](#the-shoppingbasketusecase-implementation)
 - [Part 2: Compliance Testing](#part-2-compliance-testing)
   - [When to Use Compliance Testing](#when-to-use-compliance-testing)
@@ -32,11 +34,12 @@
 - [Part 4: Probabilistic Testing](#part-4-probabilistic-testing)
   - [The Parameter Triangle](#the-parameter-triangle)
   - [Threshold Approaches (No Baseline Required)](#threshold-approaches-no-baseline-required)
+  - [Understanding Test Results](#understanding-test-results)
   - [The UseCaseProvider Pattern](#the-usecaseprovider-pattern)
   - [Input Sources](#input-sources)
   - [Conformance Testing with Specs](#conformance-testing-with-specs)
+  - [Baseline Expiration](#baseline-expiration)
   - [Covariate-Aware Baseline Selection](#covariate-aware-baseline-selection)
-  - [Understanding Test Results](#understanding-test-results)
 - [Part 5: Resource Management](#part-5-resource-management)
   - [Budget Control](#budget-control)
   - [Pacing Constraints](#pacing-constraints)
@@ -47,7 +50,7 @@
   - [Further Reading](#further-reading)
 - [Appendices](#appendices)
   - [A: Configuration Reference](#a-configuration-reference)
-  - [B: Spec File Format](#b-spec-file-format)
+  - [B: Experiment Output Formats](#b-experiment-output-formats)
   - [C: Glossary](#c-glossary)
 
 ---
@@ -66,6 +69,39 @@ Traditional unit tests expect deterministic behavior—call a function, assert t
 - **Randomized algorithms** — By design, outputs differ across executions
 
 PUnit runs tests multiple times and determines pass/fail based on **statistical thresholds** rather than binary success/failure. Instead of asking "Did it work?" PUnit asks "Does it work reliably enough?"
+
+### The PUnit Philosophy
+
+PUnit recognizes that **experiments and tests must refer to the same objects**.
+
+In traditional testing, we articulate correctness through a series of test assertions. This works for deterministic systems where we expect 100% success. However, for non-deterministic systems (like LLM integrations), a test assertion that aborts on failure is of zero use when we want to collect data about the service's behavior. We need to know *how often* it fails, not just that it *did* fail.
+
+PUnit therefore encourages the creation of an artifact called a **Use Case**. A Use Case defines, among other things, a **Service Contract**.
+
+The Service Contract is the shared expression of correctness in PUnit-land:
+- **Experiments** use it as a source of correctness data (to measure behavior).
+- **Probabilistic Tests** use it as a correctness enforcer (to verify performance against a threshold).
+
+By using the same Use Case and Service Contract for both measurement and testing, you ensure that what you are testing is exactly what you have measured.
+
+### Core Concepts in PUnit
+
+PUnit has a few first-class artifacts. Understanding them up front makes the rest of the guide much easier to follow.
+
+**Sample**
+A single execution of the system under test. A probabilistic test runs many samples of the same test method and counts how many succeed.
+
+**ServiceContract**
+A formal definition of what "success" means for a use case. It contains postconditions (and optional timing constraints) that determine whether a sample should count as a success.
+
+**UseCaseOutcome**
+The object that combines the input, result, and contract evaluation for a single sample. Experiments and tests both use `UseCaseOutcome` so they measure and test the same criteria.
+
+**Spec**
+A baseline YAML file produced by a MEASURE experiment. It records observed success rate, sample count, covariates, and statistical metadata. Conformance tests use specs to derive thresholds.
+
+**Covariate and Factor**
+A covariate is an environmental condition that can affect behavior (model, time of day, region). A factor is an input or configuration you vary during experiments and tests.
 
 ### Two Testing Scenarios: Compliance and Conformance
 
@@ -93,6 +129,8 @@ PUnit supports two distinct testing scenarios. These are not alternative approac
 
 ### Quick Start
 
+Before diving into the code, remember the PUnit philosophy: we define a **Use Case** and its **Service Contract** once, then use it for both experiments and tests.
+
 **Dependency setup:**
 
 ```kotlin
@@ -102,19 +140,56 @@ dependencies {
 }
 ```
 
-**Simplest possible test (compliance):**
+**1) Define a contract for your use case:**
 
 ```java
+private static final ServiceContract<Request, Response> CONTRACT =
+        ServiceContract.<Request, Response>define()
+                .ensure("Response has content", response ->
+                        response.content() != null && !response.content().isBlank()
+                                ? Outcome.ok()
+                                : Outcome.fail("check", "content was null or blank"))
+                .build();
+```
+
+**2) Return a UseCaseOutcome from your use case method:**
+
+```java
+public UseCaseOutcome<Response> callService(Request request) {
+    Response response = client.call(request);
+
+    return UseCaseOutcome
+            .withContract(CONTRACT)
+            .input(request)
+            .execute(() -> response)
+            .build();
+}
+```
+
+**3) Register the use case and write a probabilistic test (compliance):**
+
+```java
+@RegisterExtension
+UseCaseProvider provider = new UseCaseProvider();
+
+@BeforeEach
+void setUp() {
+    provider.register(MyUseCase.class, MyUseCase::new);
+}
+
 @ProbabilisticTest(
+    useCase = MyUseCase.class,
     samples = 100,
     minPassRate = 0.95,
     thresholdOrigin = ThresholdOrigin.SLA,
     contractRef = "API SLA §3.1"
 )
-void apiMeetsSla() {
-    assertThat(apiClient.call().isSuccess()).isTrue();
+void apiMeetsSla(MyUseCase useCase) {
+    useCase.callService(new Request(...)).assertAll();
 }
 ```
+
+This test runs 100 samples. Each sample calls the use case, evaluates the contract, and counts toward the pass rate. The test passes when the observed rate meets the required threshold.
 
 ### Running the Examples
 
@@ -144,6 +219,52 @@ First, comment out the @Disabled in the test class. Then...
 ## Part 1: The Shopping Basket Domain
 
 This guide uses a running example: the **ShoppingBasketUseCase**. Understanding this domain will help you apply PUnit to your own systems.
+
+### Domain Overview
+
+The ShoppingBasketUseCase translates natural language shopping instructions into structured JSON actions:
+
+**Input:**
+```
+"Add 2 apples and remove the bread"
+```
+
+**Expected Output:**
+```json
+{
+  "actions": [
+    {
+      "context": "SHOP",
+      "name": "add",
+      "parameters": [
+        {"name": "item", "value": "apples"},
+        {"name": "quantity", "value": "2"}
+      ]
+    },
+    {
+      "context": "SHOP",
+      "name": "remove",
+      "parameters": [
+        {"name": "item", "value": "bread"}
+      ]
+    }
+  ]
+}
+```
+
+This task is inherently non-deterministic because it relies on an LLM. The model might:
+
+- Return invalid JSON
+- Omit required fields
+- Invent invalid actions like "purchase" instead of "add"
+- Use the wrong context or misspell action names
+
+The success criteria hierarchy catches these failures in order:
+
+1. Valid JSON (parseable)
+2. Has "actions" array with at least one action
+3. Each action has context, name, and parameters
+4. Actions are valid for the given context ("add", "remove", "clear" for SHOP)
 
 ### Why Service Contracts?
 
@@ -295,52 +416,6 @@ Sample 47: FAIL
 
 Duration constraints are useful when response time is part of the service contract (SLAs, user experience requirements) and you want timing tracked alongside correctness through experiments and tests.
 
-### Domain Overview
-
-The ShoppingBasketUseCase translates natural language shopping instructions into structured JSON actions:
-
-**Input:**
-```
-"Add 2 apples and remove the bread"
-```
-
-**Expected Output:**
-```json
-{
-  "actions": [
-    {
-      "context": "SHOP",
-      "name": "add",
-      "parameters": [
-        {"name": "item", "value": "apples"},
-        {"name": "quantity", "value": "2"}
-      ]
-    },
-    {
-      "context": "SHOP",
-      "name": "remove",
-      "parameters": [
-        {"name": "item", "value": "bread"}
-      ]
-    }
-  ]
-}
-```
-
-This task is inherently non-deterministic because it relies on an LLM. The model might:
-
-- Return invalid JSON
-- Omit required fields
-- Invent invalid actions like "purchase" instead of "add"
-- Use the wrong context or misspell action names
-
-The success criteria hierarchy catches these failures in order:
-
-1. Valid JSON (parseable)
-2. Has "actions" array with at least one action
-3. Each action has context, name, and parameters
-4. Actions are valid for the given context ("add", "remove", "clear" for SHOP)
-
 ### The ShoppingBasketUseCase Implementation
 
 The full implementation demonstrates key PUnit concepts:
@@ -427,11 +502,11 @@ Key elements:
 
 The `thresholdOrigin` attribute documents where the threshold came from:
 
-| Origin      | Use When                                               |
-|-------------|--------------------------------------------------------|
-| `SLA`       | External Service Level Agreement with customer         |
-| `SLO`       | Internal Service Level Objective                       |
-| `POLICY`    | Compliance or organizational policy                    |
+| Origin      | Use When                                                |
+|-------------|---------------------------------------------------------|
+| `SLA`       | External Service Level Agreement with customer          |
+| `SLO`       | Internal Service Level Objective                        |
+| `POLICY`    | Compliance or organizational policy                     |
 | `EMPIRICAL` | Derived from baseline measurement (conformance testing) |
 
 This information appears in the verdict output, providing an audit trail:
@@ -439,7 +514,7 @@ This information appears in the verdict output, providing an audit trail:
 ```
 ═══════════════════════════════════════════════════════════════
 PUnit PASSED: testSlaCompliance
-  Observed: 99.97% (9997/10000) >= min pass rate: 99.99%
+  Observed: 99.99% (9999/10000) >= min pass rate: 99.99%
   Threshold origin: SLA
   Contract ref: Payment Provider SLA v2.3, Section 4.1
 ═══════════════════════════════════════════════════════════════
@@ -506,11 +581,11 @@ See [Appendix A: Configuration Reference](#a-configuration-reference) for all LL
 
 > **Cost Warning**: Running experiments with real LLMs incurs API costs. A typical EXPLORE experiment with 4 models × 20 samples = 80 API calls. A MEASURE experiment with 1000 samples can cost several dollars depending on the model. Approximate costs per 1M tokens (as of Jan 2025):
 >
-> | Model | Input | Output |
-> |-------|-------|--------|
-> | `gpt-4o-mini` | $0.15 | $0.60 |
-> | `gpt-4o` | $2.50 | $10.00 |
-> | `claude-haiku-4-5-20251001` | $1.00 | $5.00 |
+> | Model                        | Input | Output |
+> |------------------------------|-------|--------|
+> | `gpt-4o-mini`                | $0.15 | $0.60  |
+> | `gpt-4o`                     | $2.50 | $10.00 |
+> | `claude-haiku-4-5-20251001`  | $1.00 | $5.00  |
 > | `claude-sonnet-4-5-20250929` | $3.00 | $15.00 |
 >
 > Use budget constraints (`tokenBudget`, `timeBudgetMs`) to cap costs. Start with mock mode or small sample sizes to verify your experiment works before running with real APIs.
@@ -588,7 +663,7 @@ public static Stream<FactorArguments> modelTemperatureMatrix() {
 
 **Output:**
 
-EXPLORE produces one spec file per configuration:
+EXPLORE produces one exploration file per configuration:
 
 ```
 src/test/resources/punit/explorations/ShoppingBasketUseCase/
@@ -885,6 +960,44 @@ void thresholdFirst(ShoppingBasketUseCase useCase, @Factor("instruction") String
 
 *Source: `org.javai.punit.examples.tests.ShoppingBasketThresholdApproachesTest`*
 
+### Understanding Test Results
+
+**How PUnit surfaces probabilistic results in JUnit**
+
+A probabilistic test has two layers of feedback:
+
+- **Sample-level failures**: individual sample failures are surfaced so you can inspect real examples of where the use case failed.
+- **Statistical verdict**: the overall PASS/FAIL is computed from the observed pass rate and the configured threshold.
+
+In other words: sample failures are expected and informative; the statistical verdict is the actual decision. PUnit's report is the authoritative view of the probabilistic outcome.
+
+**Reading the statistical report**
+
+Every probabilistic test produces a verdict with statistical context:
+
+```
+═══════════════════════════════════════════════════════════════
+PUnit PASSED: testInstructionTranslation
+  Observed: 94.0% (94/100) >= min pass rate: 91.9%
+  Baseline: 93.5% @ N=1000 (spec: ShoppingBasketUseCase.yaml)
+  Confidence: 95%
+═══════════════════════════════════════════════════════════════
+```
+
+**Responding to results**
+
+The statistical verdict informs how to respond:
+
+| Verdict    | What it means                             | Recommended response                  |
+|------------|-------------------------------------------|---------------------------------------|
+| **PASSED** | Observed rate is consistent with baseline | Low priority; likely no action needed |
+| **FAILED** | Observed rate is below expected threshold | Investigate; possible regression      |
+
+- **PASSED**: The system is behaving as expected based on historical data. Operators should probably not invest significant time investigating.
+- **FAILED**: The system may have regressed. A deeper investigation is worth considering—check recent changes, environmental factors, or upstream dependencies.
+
+The report provides the evidence; operators provide the judgment.
+
 ### The UseCaseProvider Pattern
 
 Use cases are registered and injected via `UseCaseProvider`:
@@ -1040,9 +1153,9 @@ PUnit loads the matching spec and derives the threshold from the baseline's empi
 
 *Source: `org.javai.punit.examples.tests.ShoppingBasketTest`*
 
-### Baseline Expiration ###
+### Baseline Expiration
 
-System usage and environmental changes mean that baseline data can become dated. Do guard against this, PUnit allows you to specify an expiration date for the generated baseline. 
+System usage and environmental changes mean that baseline data can become dated. To guard against this, PUnit allows you to specify an expiration date for the generated baseline. 
 
 ```java
 @MeasureExperiment(
@@ -1118,45 +1231,6 @@ public class ShoppingBasketUseCase { }
 
 *Source: `org.javai.punit.examples.tests.ShoppingBasketCovariateTest`*
 
-### Understanding Test Results
-
-**Why PUnit fails tests in JUnit (even when PUnit's verdict is PASSED)**
-
-A key design decision: PUnit marks all probabilistic tests as **failed** in JUnit terms, regardless of the statistical verdict. This is intentional.
-
-Why? Because probabilistic test results must not be ignored. Unlike deterministic tests where PASS means "nothing to see here," a probabilistic PASS still carries information that operators should consider. By failing in JUnit:
-
-- CI pipelines pause for human review
-- The statistical report gets attention
-- Operators make informed decisions rather than blindly proceeding
-
-**Reading the statistical report**
-
-Every probabilistic test produces a verdict with statistical context:
-
-```
-═══════════════════════════════════════════════════════════════
-PUnit PASSED: testInstructionTranslation
-  Observed: 94.0% (94/100) >= min pass rate: 91.9%
-  Baseline: 93.5% @ N=1000 (spec: ShoppingBasketUseCase.yaml)
-  Confidence: 95%
-═══════════════════════════════════════════════════════════════
-```
-
-**Responding to results**
-
-The statistical verdict informs how to respond:
-
-| Verdict    | What it means                             | Recommended response                  |
-|------------|-------------------------------------------|---------------------------------------|
-| **PASSED** | Observed rate is consistent with baseline | Low priority; likely no action needed |
-| **FAILED** | Observed rate is below expected threshold | Investigate; possible regression      |
-
-- **PASSED**: The system is behaving as expected based on historical data. Operators should probably not invest significant time investigating.
-- **FAILED**: The system may have regressed. A deeper investigation is worth considering—check recent changes, environmental factors, or upstream dependencies.
-
-The report provides the evidence; operators provide the judgment.
-
 ---
 
 ## Part 5: Resource Management
@@ -1203,9 +1277,9 @@ void tokenConstrainedTest(TokenChargeRecorder recorder) {
 
 **What happens when the budget runs out?** The `onBudgetExhausted` parameter controls this:
 
-| Behavior | Description |
-|----------|-------------|
-| `FAIL` | Immediately fail the test when budget is exhausted. This is the **default** and most conservative option—you asked for N samples but couldn't afford them. |
+| Behavior           | Description                                                                                                                                                                                                 |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FAIL`             | Immediately fail the test when budget is exhausted. This is the **default** and most conservative option—you asked for N samples but couldn't afford them.                                                  |
 | `EVALUATE_PARTIAL` | Evaluate results from the samples completed before budget exhaustion. The test passes if the observed pass rate meets `minPassRate`. Use with caution: a small sample may not be statistically significant. |
 
 ```java
@@ -1240,7 +1314,7 @@ void evaluateWhatWeHave(TokenChargeRecorder recorder) {
 
 ### Pacing Constraints
 
-Hitting APIs with tens, hundreds or thousands of calls must be done in a controlled manner. Many 3rd-party APIs limit calls per minute/hour.
+Hitting APIs with tens, hundreds or thousands of calls must be done in a controlled manner. Many third-party APIs limit calls per minute/hour.
 
 When testing rate-limited APIs, use `@Pacing` to stay within limits:
 
@@ -1298,7 +1372,7 @@ A brief look at the statistical engine that powers PUnit.
 
 ### Bernoulli Trials
 
-At its heart, PUnit models each sample as a **Bernoulli trial**—an experiment with exactly two outcomes: success or failure., with failure being defined as conformance to the use case's contract. When you run a probabilistic test:
+At its heart, PUnit models each sample as a **Bernoulli trial**—an experiment with exactly two outcomes: success or failure, with failure being defined as non-conformance to the use case's contract. When you run a probabilistic test:
 
 1. Each sample execution is a Bernoulli trial with unknown success probability *p*
 2. The baseline spec provides an estimate of *p* from prior measurement
@@ -1366,27 +1440,27 @@ For the mathematical foundations—confidence interval calculations, power analy
 
 PUnit configuration follows this resolution order: System property → Environment variable → Annotation value → Framework default.
 
-| Property                       | Environment Variable            | Description                   |
-|--------------------------------|---------------------------------|-------------------------------|
-| `punit.samples`                | `PUNIT_SAMPLES`                 | Override sample count         |
-| `punit.stats.transparent`      | `PUNIT_STATS_TRANSPARENT`       | Enable transparent statistics |
-| `punit.specs.outputDir`        | `PUNIT_SPECS_OUTPUT_DIR`        | Spec output directory         |
-| `punit.explorations.outputDir` | `PUNIT_EXPLORATIONS_OUTPUT_DIR` | Exploration output directory  |
-| `punit.optimizations.outputDir`| `PUNIT_OPTIMIZATIONS_OUTPUT_DIR`| Optimization output directory |
+| Property                        | Environment Variable             | Description                   |
+|---------------------------------|----------------------------------|-------------------------------|
+| `punit.samples`                 | `PUNIT_SAMPLES`                  | Override sample count         |
+| `punit.stats.transparent`       | `PUNIT_STATS_TRANSPARENT`        | Enable transparent statistics |
+| `punit.specs.outputDir`         | `PUNIT_SPECS_OUTPUT_DIR`         | Spec output directory         |
+| `punit.explorations.outputDir`  | `PUNIT_EXPLORATIONS_OUTPUT_DIR`  | Exploration output directory  |
+| `punit.optimizations.outputDir` | `PUNIT_OPTIMIZATIONS_OUTPUT_DIR` | Optimization output directory |
 
 #### LLM Provider Configuration
 
 The example infrastructure supports switching between mock and real LLM providers. This is useful for running experiments with actual LLM APIs.
 
-| Property                      | Environment Variable   | Default                        | Description                             |
-|-------------------------------|------------------------|--------------------------------|-----------------------------------------|
-| `punit.llm.mode`              | `PUNIT_LLM_MODE`       | `mock`                         | Mode: `mock` or `real`                  |
-| `punit.llm.openai.key`        | `OPENAI_API_KEY`       | —                              | OpenAI API key (required for OpenAI models) |
-| `punit.llm.anthropic.key`     | `ANTHROPIC_API_KEY`    | —                              | Anthropic API key (required for Anthropic models) |
-| `punit.llm.openai.baseUrl`    | `OPENAI_BASE_URL`      | `https://api.openai.com/v1`    | OpenAI API base URL                     |
-| `punit.llm.anthropic.baseUrl` | `ANTHROPIC_BASE_URL`   | `https://api.anthropic.com/v1` | Anthropic API base URL                  |
-| `punit.llm.timeout`           | `PUNIT_LLM_TIMEOUT`    | `30000`                        | Request timeout in milliseconds         |
-| `punit.llm.mutation.model`    | `PUNIT_LLM_MUTATION_MODEL` | `gpt-4o-mini`              | Model used for LLM-powered prompt mutations |
+| Property                      | Environment Variable       | Default                        | Description                                       |
+|-------------------------------|----------------------------|--------------------------------|---------------------------------------------------|
+| `punit.llm.mode`              | `PUNIT_LLM_MODE`           | `mock`                         | Mode: `mock` or `real`                            |
+| `punit.llm.openai.key`        | `OPENAI_API_KEY`           | —                              | OpenAI API key (required for OpenAI models)       |
+| `punit.llm.anthropic.key`     | `ANTHROPIC_API_KEY`        | —                              | Anthropic API key (required for Anthropic models) |
+| `punit.llm.openai.baseUrl`    | `OPENAI_BASE_URL`          | `https://api.openai.com/v1`    | OpenAI API base URL                               |
+| `punit.llm.anthropic.baseUrl` | `ANTHROPIC_BASE_URL`       | `https://api.anthropic.com/v1` | Anthropic API base URL                            |
+| `punit.llm.timeout`           | `PUNIT_LLM_TIMEOUT`        | `30000`                        | Request timeout in milliseconds                   |
+| `punit.llm.mutation.model`    | `PUNIT_LLM_MUTATION_MODEL` | `gpt-4o-mini`                  | Model used for LLM-powered prompt mutations       |
 
 **Mode switching:**
 
@@ -1397,10 +1471,10 @@ The example infrastructure supports switching between mock and real LLM provider
 
 In `real` mode, the model name determines which provider handles the request:
 
-| Model Pattern | Provider | Examples |
-|---------------|----------|----------|
-| `gpt-*`, `o1-*`, `o3-*`, `text-*`, `davinci*` | OpenAI | `gpt-4o`, `gpt-4o-mini`, `o1-preview` |
-| `claude-*` | Anthropic | `claude-haiku-4-5-20251001`, `claude-sonnet-4-5-20250929` |
+| Model Pattern                                 | Provider  | Examples                                                  |
+|-----------------------------------------------|-----------|-----------------------------------------------------------|
+| `gpt-*`, `o1-*`, `o3-*`, `text-*`, `davinci*` | OpenAI    | `gpt-4o`, `gpt-4o-mini`, `o1-preview`                     |
+| `claude-*`                                    | Anthropic | `claude-haiku-4-5-20251001`, `claude-sonnet-4-5-20250929` |
 
 **Example: Running experiments with real LLMs:**
 
@@ -1518,26 +1592,7 @@ bestIteration:
 
 ### C: Glossary
 
-| Term                    | Definition                                                                                                 |
-|-------------------------|------------------------------------------------------------------------------------------------------------|
-| **Baseline**            | Empirically measured success rate used as reference for regression testing                                 |
-| **Compliance testing**  | Verifying a system meets a mandated threshold (SLA, SLO, policy)                                           |
-| **confidence**          | Probability of a correct verdict; equals 1 minus the false positive rate. Part of the parameter triangle.  |
-| **Covariate**           | Environmental factor that may affect system behavior                                                       |
-| **Duration constraint** | Timing requirement specifying maximum allowed execution duration; evaluated independently from postconditions |
-| **Factor**              | Input or configuration that varies across test executions                                                  |
-| **Instance conformance**| Validation that actual results match expected values                                                        |
-| **Input**               | Annotation marking a parameter as the target for input injection from `@InputSource`                       |
-| **InputSource**         | Annotation providing test inputs from a method or file, distributed across samples                         |
-| **minDetectableEffect** | Smallest drop from baseline worth detecting; required for Confidence-First approach to compute sample size |
-| **minPassRate**         | The threshold pass rate the system must meet to pass the test. Part of the parameter triangle.             |
-| **power**               | Probability of catching a real degradation; equals 1 minus the false negative rate                         |
-| **Conformance testing** | Detecting when performance regresses below an established baseline                                         |
-| **Sample**              | A single execution of the system under test                                                                |
-| **samples**             | Number of test executions; controls cost and time. Part of the parameter triangle.                         |
-| **Spec**                | YAML file containing baseline measurements and metadata                                                    |
-| **thresholdConfidence** | Confidence level used for deriving `minPassRate` from observed results in Sample-Size-First approach       |
-| **Use case**            | A behavioral contract defining an operation and its success criteria                                       |
+For a complete list of terms and definitions used in PUnit, see the [PUnit Glossary](GLOSSARY.md).
 
 ---
 
