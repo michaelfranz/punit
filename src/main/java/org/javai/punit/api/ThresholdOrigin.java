@@ -42,35 +42,39 @@ package org.javai.punit.api;
  */
 public enum ThresholdOrigin {
 
-    /**
-     * No origin specified (default).
-     * The threshold is ad-hoc or its origin is not documented.
-     */
-    UNSPECIFIED,
+	SLA(true, "Externally agreed normative target (contract/SLA)."),
+	SLO(true, "Internally defined normative target (service objective)."),
+	POLICY(true, "Normative target derived from policy or governance rule."),
+	EMPIRICAL(false, "Empirical reference value derived from experiment/baseline spec."),
+	UNSPECIFIED(false, "Non-normative target used for exploratory or temporary checks.");
 
-    /**
-     * Threshold derived from a Service Level Agreement (SLA).
-     * SLAs are typically contractual commitments to external customers.
-     */
-    SLA,
+	private final boolean normative;
+	private final String description;
 
-    /**
-     * Threshold derived from a Service Level Objective (SLO).
-     * SLOs are internal targets that may be more stringent than SLAs.
-     */
-    SLO,
+	ThresholdOrigin(boolean normative, String description) {
+		this.normative = normative;
+		this.description = description;
+	}
 
-    /**
-     * Threshold derived from an organizational policy.
-     * Policies may include security requirements, compliance mandates, etc.
-     */
-    POLICY,
+	/**
+	 * Indicates whether this threshold origin represents a normative requirement
+	 * (i.e., a target that may be treated as 'verification-capable' only when the
+	 * configured statistical parameters are feasible).
+	 *
+	 * <p>If {@code true} and the test intent is {@code VERIFICATION}, PUnit must
+	 * fail fast as MISCONFIGURED when the sample size / confidence / power / MDE
+	 * configuration cannot support a statistically valid verification claim.
+	 *
+	 * <p>If {@code true} and the test intent is {@code SMOKE}, PUnit may execute
+	 * with undersized parameters but must label the result as SMOKE and emit an
+	 * explicit "sample not sized for verification" caveat to prevent
+	 * misinterpretation.
+	 */
+	public boolean isNormative() {
+		return normative;
+	}
 
-    /**
-     * Threshold derived from empirical measurement.
-     * This indicates the threshold was established through observation
-     * (e.g., baseline experiments) rather than contractual requirements.
-     */
-    EMPIRICAL
+	public String getDescription() {
+		return description;
+	}
 }
-
