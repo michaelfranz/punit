@@ -3,7 +3,7 @@ plugins {
     id("maven-publish")
     id("jacoco")
     idea
-    kotlin("jvm") version "2.0.21"
+    kotlin("jvm") version "2.3.10"
 }
 
 // Configure IDEA to download sources and javadoc
@@ -52,8 +52,8 @@ dependencies {
     implementation("org.yaml:snakeyaml:2.5")
 
     // Jackson - for JSON/CSV parsing in @InputSource
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.0")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.18.0")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.0")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.21.0")
 
     // Outcome - result types for contract postconditions
     // Note: outcome is a private repo. For CI builds, either:
