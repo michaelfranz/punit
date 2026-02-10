@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.internal.relocated.kotlin.metadata.internal.metadata.deserialization.VersionRequirementTable.Companion.create
+
 plugins {
     id("java-library")
     id("maven-publish")
@@ -33,7 +35,6 @@ tasks.withType<JavaCompile> {
 }
 
 repositories {
-    mavenLocal()  // Required for outcome library (private repo)
     mavenCentral()
     maven { url = uri("https://jitpack.io") }
 }
@@ -56,10 +57,8 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.21.0")
 
     // Outcome - result types for contract postconditions
-    // Note: outcome is a private repo. For CI builds, either:
-    // 1. Make michaelfranz/outcome public for JitPack access, or
-    // 2. Publish to a private artifact repository accessible by CI
-    api("org.javai:outcome:1.0-SNAPSHOT")
+    // Resolved locally via composite build (settings.gradle.kts), or from JitPack on CI
+    api("com.github.javai-org:outcome:main-SNAPSHOT")
 
     // Optional JSON matching support for instance conformance
     // Users who want JsonMatcher need to add this dependency to their project
