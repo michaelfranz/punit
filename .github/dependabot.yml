@@ -7,6 +7,10 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    ignore:
+      # Stay on JUnit 5 until ecosystem adoption of JUnit 6 matures
+      - dependency-name: "org.junit*"
+        update-types: ["version-update:semver-major"]
     groups:
       # Group JUnit updates together
       junit:
