@@ -36,9 +36,9 @@ Where the stochastic behavior resides is irrelevant to PUnit. The use case may i
 
 Experiments invoke use cases in one of two modes:
 
-| Mode | Purpose | When to Use |
-|------|---------|-------------|
-| **Exploration** | Traverse a matrix of configurations (Factors × Levels) to find one that satisfies requirements | When the optimal configuration is unknown |
+| Mode                    | Purpose                                                                                                      | When to Use                                     |
+|-------------------------|--------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
+| **Exploration**         | Traverse a matrix of configurations (Factors × Levels) to find one that satisfies requirements               | When the optimal configuration is unknown       |
 | **Baseline Derivation** | Run the use case many times (e.g., 1000×) with a fixed configuration to measure the empirical pass/fail rate | Always required before creating a specification |
 
 **Exploration is optional.** If the configuration is already known (e.g., the model, temperature, and system prompt are predetermined), skip directly to baseline derivation.
