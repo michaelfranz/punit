@@ -1,6 +1,8 @@
 # PUnit User Guide
 
-*Probabilistic testing for non-deterministic systems*
+*Probabilistic testing for systems characterized by uncertainty*
+
+All attribution licensing is ARL.
 
 ---
 
@@ -59,9 +61,9 @@
 
 ### What is PUnit?
 
-PUnit is a JUnit 5 extension framework for **probabilistic testing** of non-deterministic systems. It addresses a fundamental challenge: how do you write reliable tests for systems that don't produce the same output every time?
+PUnit is a JUnit 5 extension framework for **probabilistic testing** of systems characterized by uncertainty. It addresses a fundamental challenge: how do you write reliable tests for systems that don't produce the same output every time?
 
-Traditional unit tests expect deterministic behavior—call a function, assert the result. But many modern systems are inherently non-deterministic:
+Traditional unit tests expect deterministic behavior—call a function, assert the result. But many modern systems are characterized by inherent uncertainty:
 
 - **LLM integrations** — Model outputs vary with temperature, prompt phrasing, and even API load
 - **ML model inference** — Predictions may have confidence thresholds that occasionally miss
@@ -74,7 +76,7 @@ PUnit runs tests multiple times and determines pass/fail based on **statistical 
 
 PUnit recognizes that **experiments and tests must refer to the same objects**.
 
-In traditional testing, we articulate correctness through a series of test assertions. This works for deterministic systems where we expect 100% success. However, for non-deterministic systems (like LLM integrations), a test assertion that aborts on failure is of zero use when we want to collect data about the service's behavior. We need to know *how often* it fails, not just that it *did* fail.
+In traditional testing, we articulate correctness through a series of test assertions. This works for deterministic systems where we expect 100% success. However, for systems where uncertainty is a factor (like LLM integrations), a test assertion that aborts on failure is of zero use when we want to collect data about the service's behavior. We need to know *how often* it fails, not just that it *did* fail.
 
 PUnit therefore encourages the creation of an artifact called a **Use Case**. A Use Case defines, among other things, a **Service Contract**.
 
@@ -449,9 +451,9 @@ Key elements:
 
 ---
 
-## Part 2: Compliance Testing
+## Part 2: Compliance vs. Smoke Testing
 
-When you have a mandated threshold, you're verifying **compliance**—not detecting regression.
+When you have a mandated threshold, you're verifying **compliance**—not detecting regression. However, it is critical to distinguish between a full compliance audit and a lightweight smoke test.
 
 ### When to Use Compliance Testing
 
@@ -462,48 +464,34 @@ Use compliance testing when:
 - An internal SLO sets performance expectations
 - A quality policy mandates minimum thresholds
 
-You don't need to run experiments to discover the threshold—it's given to you.
+### Compliance, Smoke, and Sample Size
+
+For services that are inherently highly reliable (e.g., payment gateways with 99.99% targets), a true compliance test requires a **very large sample size** to be statistically valid.
+
+PUnit enforces this through the `intent` attribute of `@ProbabilisticTest`:
+
+1.  **`TestIntent.VERIFICATION`** (Default): PUnit treats the test as an evidential claim. If the `thresholdOrigin` is normative (SLA, SLO, or POLICY) and the sample size is too small to support the threshold, PUnit will **reject the test out of hand** with a configuration error.
+2.  **`TestIntent.SMOKE`**: PUnit treats the test as a lightweight early-warning check. It accepts undersized configurations but labels the result as a SMOKE verdict, indicating it is not a full verification.
 
 ### Testing Against SLAs, SLOs, and Policies
 
-The `PaymentGatewaySlaTest` demonstrates compliance testing:
+The `PaymentGatewaySlaTest` demonstrates these concepts:
 
 ```java
 @ProbabilisticTest(
     useCase = PaymentGatewayUseCase.class,
-    samples = 10000,
+    samples = 100,              // Small sample size
     minPassRate = 0.9999,
     thresholdOrigin = ThresholdOrigin.SLA,
+    intent = TestIntent.SMOKE,  // Must be SMOKE because 100 samples cannot verify 99.99%
     contractRef = "Payment Provider SLA v2.3, Section 4.1"
 )
-@FactorSource(value = "standardAmounts", factors = {"cardToken", "amountCents"})
-void testSlaCompliance(
-    PaymentGatewayUseCase useCase,
-    @Factor("cardToken") String cardToken,
-    @Factor("amountCents") Long amountCents
-) {
-    useCase.chargeCard(cardToken, amountCents).assertAll();
-}
+void testSlaSmokeCheck(...) { ... }
 ```
 
-Key elements:
+### Threshold Provenance (Normative Origins)
 
-- **`minPassRate = 0.9999`** — The mandated 99.99% threshold
-- **`thresholdOrigin = ThresholdOrigin.SLA`** — Documents where the threshold came from
-- **`contractRef`** — Reference to the specific contract clause
-
-### Threshold Provenance
-
-The `thresholdOrigin` attribute documents where the threshold came from:
-
-| Origin      | Use When                                                |
-|-------------|---------------------------------------------------------|
-| `SLA`       | External Service Level Agreement with customer          |
-| `SLO`       | Internal Service Level Objective                        |
-| `POLICY`    | Compliance or organizational policy                     |
-| `EMPIRICAL` | Derived from baseline measurement (conformance testing) |
-
-This information appears in the verdict output, providing an audit trail:
+The `thresholdOrigin` attribute documents where the threshold came from. Origins marked as **normative** (SLA, SLO, POLICY) trigger PUnit's strict sample-size enforcement for VERIFICATION tests.
 
 ```
 ═══════════════════════════════════════════════════════════════

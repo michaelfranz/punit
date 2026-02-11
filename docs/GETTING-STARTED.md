@@ -1,14 +1,16 @@
 # Getting Started with PUnit
 
-*Experimentation and statistical regression testing for non-deterministic systems*
+*Experimentation and statistical regression testing for systems under uncertainty*
 
 Get up and running with PUnit in minutes. This guide covers installation and your first steps with both **experimentation** and **testing**.
+
+All attribution licensing is ARL.
 
 ---
 
 ## What is PUnit?
 
-PUnit is a **dual-purpose platform** for non-deterministic systems:
+PUnit is a **dual-purpose platform** for systems characterized by uncertainty:
 
 | Capability          | What It Does                                           | When to Use                            |
 |---------------------|--------------------------------------------------------|----------------------------------------|
@@ -21,8 +23,8 @@ The two are connected: experiments generate the empirical data that powers **spe
 
 ## Prerequisites
 
-- **Java 17+** or **Kotlin 1.8+**
-- **Gradle 8.x** or **Maven 3.8+**
+- **Java 21+** or **Kotlin 1.9+**
+- **Gradle 9.3.1+** or **Maven 3.9+**
 - **JUnit 5.10+**
 
 ---
@@ -82,17 +84,22 @@ dependencies {
 
 ## Your First Probabilistic Test
 
-Create a test that passes if at least 80% of samples succeed:
+Create a test that passes if at least 80% of samples succeed. By default, PUnit assumes `intent = TestIntent.VERIFICATION`, which means it will enforce that your configuration is statistically sound. For quick early-warning checks, you can use `intent = TestIntent.SMOKE`.
 
 ```java
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.TestIntent;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MyFirstProbabilisticTest {
 
-    @ProbabilisticTest(samples = 20, minPassRate = 0.80)
+    @ProbabilisticTest(
+        samples = 20, 
+        minPassRate = 0.80,
+        intent = TestIntent.SMOKE
+    )
     void myServiceShouldUsuallyWork() {
-        // Call your non-deterministic code
+        // Call your code characterized by uncertainty
         String result = myService.generateResponse("Hello");
         
         // Assert what "success" means
@@ -242,10 +249,10 @@ export ANTHROPIC_API_KEY=sk-ant-...    # For claude-* models
 
 In real mode, the model name determines which provider handles the request:
 
-| Model Pattern | Provider | Examples |
-|---------------|----------|----------|
-| `gpt-*`, `o1-*`, `o3-*` | OpenAI | `gpt-4o-mini`, `gpt-4o`, `o1-preview` |
-| `claude-*` | Anthropic | `claude-haiku-4-5-20251001`, `claude-sonnet-4-5-20250929` |
+| Model Pattern           | Provider  | Examples                                                  |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `gpt-*`, `o1-*`, `o3-*` | OpenAI    | `gpt-4o-mini`, `gpt-4o`, `o1-preview`                     |
+| `claude-*`              | Anthropic | `claude-haiku-4-5-20251001`, `claude-sonnet-4-5-20250929` |
 
 ### Cost Awareness
 

@@ -1,19 +1,21 @@
-# Operational Flow: From Requirement to Confidence
+# Operational Flow: From Requirement to Certainty
 
-This document describes the end-to-end workflow for using **PUnit** to test non-deterministic systems—systems that don't always produce the same output for the same input.
+This document describes the end-to-end workflow for using **PUnit** to test systems characterized by uncertainty—systems that don't always produce the same output for the same input.
+
+All attribution licensing is ARL.
 
 ---
 
 ## Overview
 
-When a system behaves non-deterministically (LLMs, distributed systems, randomized algorithms), traditional pass/fail testing breaks down. A test might pass today and fail tomorrow—not because the system changed, but because of inherent randomness.
+When a system behaves with inherent uncertainty (LLMs, distributed systems, randomized algorithms), traditional pass/fail testing breaks down. A test might pass today and fail tomorrow—not because the system changed, but because of its nature.
 
 PUnit provides a disciplined workflow that:
 
-1. **Expresses** requirements as statistical thresholds (from SLAs or empirical data)
+1. **Expresses** requirements as statistical thresholds (from normative origins like SLAs or empirical data)
 2. **Executes** multiple samples to gather evidence
-3. **Evaluates** results with proper statistical context
-4. **Reports** qualified verdicts (not just PASS/FAIL, but with confidence)
+3. **Evaluates** results with proper statistical context and declared **intent**
+4. **Reports** qualified verdicts (categorized as VERIFICATION or SMOKE)
 
 ---
 
@@ -21,21 +23,28 @@ PUnit provides a disciplined workflow that:
 
 PUnit supports two complementary approaches to defining thresholds:
 
-### SLA-Driven Testing
+### SLA-Driven Testing (Compliance vs. Smoke)
 
-The threshold comes from an **external requirement**—a contract, policy, or SLO:
+The threshold comes from a **normative origin**—a contract, policy, or SLO. 
+
+However, we must distinguish between **compliance** and a **smoke test**. A true compliance test requires a sample size large enough to support an evidential claim (VERIFICATION). For highly reliable services like payment gateways, this sample size can be very large. 
+
+If you want an early-warning check without the cost of a full compliance audit, declare your intent as `SMOKE`.
 
 ```java
 @ProbabilisticTest(
     samples = 100,
-    minPassRate = 0.999,        // From SLA: "99.9% uptime"
+    minPassRate = 0.999,        // From SLA: "99.9% success rate"
     thresholdOrigin = ThresholdOrigin.SLA,
+    intent = TestIntent.SMOKE,  // Acknowledge this is a smoke test, not a full compliance audit
     contractRef = "Customer API SLA §3.1"
 )
 void apiMeetsSla() { ... }
 ```
 
-**Workflow:** Requirement → Test → Verify
+**Verification Enforcement:** If you use `intent = TestIntent.VERIFICATION` (the default) with a normative threshold origin like `SLA`, PUnit will reject the test configuration if the sample size is too low to provide a statistically sound result.
+
+**Workflow:** Requirement → Declare Intent → Test → Verify
 
 ### Spec-Driven Testing
 
@@ -165,7 +174,7 @@ PUnit makes these trade-offs **explicit and computable** rather than leaving the
 
 PUnit recognizes that **experiments and tests must refer to the same objects**.
 
-In traditional testing, we articulate correctness through a series of test assertions. This works for deterministic systems where we expect 100% success. However, for non-deterministic systems, a test assertion that aborts on failure is of zero use when we want to collect data about the service's behavior. We need to know *how often* it fails, not just that it *did* fail.
+In traditional testing, we articulate correctness through a series of test assertions. This works for deterministic systems where we expect 100% success. However, for systems with inherent uncertainty, a test assertion that aborts on failure is of zero use when we want to collect data about the service's behavior. We need to know *how often* it fails, not just that it *did* fail.
 
 We therefore define a **Use Case** and its associated **Service Contract**. The Service Contract is the shared expression of correctness:
 - **Experiments** use it as a source of correctness data (to measure behavior).
@@ -411,15 +420,15 @@ OPTIMIZE iteratively refines a **control factor** through mutation and evaluatio
 | Define use case | —                   | `@UseCase` class             |
 | Run experiment  | `./gradlew measure` | Spec file                    |
 | Commit spec     | `git commit`        | Version-controlled baseline  |
-| Run tests       | `./gradlew test`    | Qualified pass/fail verdicts |
+| Run tests       | `./gradlew test`    | Qualified verdicts (VERIFICATION/SMOKE) |
 
-**The key insight:** PUnit doesn't eliminate uncertainty—it quantifies it. Every verdict comes with statistical context, enabling informed decisions about whether to act on test results.
+**The key insight:** PUnit doesn't eliminate uncertainty—it quantifies it. Every verdict comes with statistical context and a clear statement of intent, enabling informed decisions about whether to act on test results.
 
 ---
 
 ## Production Readiness
 
-Taking a non-deterministic system from prototype to production involves two distinct phases:
+Taking a system characterized by uncertainty from prototype to production involves two distinct phases:
 
 ### Phase A: Prepartion
 

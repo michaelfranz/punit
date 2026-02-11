@@ -1,9 +1,14 @@
 # PUnit: The Probabilistic Unit Testing Framework
-*Experimentation and statistical regression testing for non-deterministic systems*
+*Experimentation and Unit Testing at Certainty's Boundary*
 
-[![Java 17+](https://img.shields.io/badge/Java-17%2B-blue.svg)](https://openjdk.org/)
+Some systems do not yield the same outcome on every run (networks, distributed services, ML/LLMs).
+In those cases, a “normal” unit test often *pretends* certainty: one run, one verdict.
+
+PUnit makes the boundary explicit: it turns repeated samples into evidence, and reports how strong that
+evidence is (confidence, feasibility, and intent-aware verdicts).
+
+[![Java 21+](https://img.shields.io/badge/Java-21%2B-blue.svg)](https://openjdk.org/)
 [![JUnit 5](https://img.shields.io/badge/JUnit-5.13%2B-green.svg)](https://junit.org/junit5/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 PUnit is a JUnit 5 extension for both experimenting with and testing non-deterministic systems. It runs tests multiple times and determines pass/fail based on statistical thresholds, making it ideal for testing LLMs, ML models, randomized algorithms, and other stochastic components.
 
@@ -70,14 +75,14 @@ Don't let the simplicity of this snippet fool you. Behind this clean API lies ri
 
 ### Testing
 
-| Feature                       | Description                                                        |
-|-------------------------------|--------------------------------------------------------------------|
-| 📋 **SLA-Driven Testing**     | Test against contractual thresholds with provenance tracking       |
-| 🎯 **Spec-Driven Thresholds** | Derive pass/fail thresholds from empirical data—not guesswork      |
-| ⚡ **Smart Early Termination** | Stop early when failure is inevitable OR success is guaranteed     |
-| 💰 **Budget Control**         | Time and token budgets at method, class, or suite level            |
-| 📈 **Dynamic Token Tracking** | Record actual API consumption per invocation                       |
-| 🚦 **Pacing Constraints**     | Declare API rate limits; framework computes optimal execution pace |
+| Feature                                    | Description                                                        |
+|--------------------------------------------|--------------------------------------------------------------------|
+| 📋 **Normative Thresholds SLA/SLO/POLICY** | Test against contractual thresholds with provenance tracking       |
+| 🎯 **Spec-Driven Thresholds**              | Derive pass/fail thresholds from empirical data—not guesswork      |
+| ⚡ **Smart Early Termination**              | Stop early when failure is inevitable OR success is guaranteed     |
+| 💰 **Budget Control**                      | Time and token budgets at method, class, or suite level            |
+| 📈 **Dynamic Token Tracking**              | Record actual API consumption per invocation                       |
+| 🚦 **Pacing Constraints**                  | Declare API rate limits; framework computes optimal execution pace |
 
 ### Operations
 

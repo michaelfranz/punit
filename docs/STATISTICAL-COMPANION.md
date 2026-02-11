@@ -2,32 +2,34 @@
 
 ## Formal Statistical Foundations for PUnit
 
+All attribution licensing is ARL.
+
 ---
 
-## Introduction: The Determinism Assumption in Software Testing
+## Introduction: The Assumption of Certainty in Software Testing
 
-For decades, the dominant paradigm in software testing has rested on an implicit assumption: **systems under test behave (more or less) deterministically**. Given the same input, a correctly functioning system produces the same output. This assumption has shaped our tools, our practices, and our intuitions about what "correct" means.
+For decades, the dominant paradigm in software testing has rested on an implicit assumption: **systems under test behave with certainty**. Given the same input, a correctly functioning system produces the same output. This assumption has shaped our tools, our practices, and our intuitions about what "correct" means.
 
 Under this paradigm, tests produce **binary outcomes**—pass or fail—and a single failure is definitive evidence of a defect. Test frameworks report success as a count of green checkmarks, and any red mark warrants investigation. The entire edifice of continuous integration, test-driven development, and quality gates is built on this foundation.
 
-Of course, non-determinism has always existed. Network timeouts, race conditions, clock skew, and resource contention introduce variability into even carefully designed systems. But the traditional response has been to **treat non-determinism as a defect to eliminate**—a source of "flaky tests" to be fixed, mocked away, or suppressed. The goal was to restore the deterministic ideal.
+Of course, uncertainty has always existed. Network timeouts, race conditions, clock skew, and resource contention introduce variability into even carefully designed systems. But the traditional response has been to **treat uncertainty as a defect to eliminate**—a source of "flaky tests" to be fixed, mocked away, or suppressed. The goal was to restore the deterministic ideal.
 
 ### The LLM Inflection Point
 
 As long as undesirable glitches or crashes occur sufficiently rarely, and their consequences remain relatively harmless, the sloppy handling of indeterminism may go unnoticed, be ignored, or be downplayed. Such phenomena are effectively normalized.
 
-However, this posture cannot possibly work in the context of Large Language Models, in which non-determinism is not a bug to fix but an **intrinsic characteristic of the technology**. Even with identical input parameters, a model will likely produce different outputs. This is the system working as designed. The same input genuinely produces different outputs, and the distribution of those outputs *is* the system's behavior.
+However, this posture cannot possibly work in the context of Large Language Models, in which uncertainty is not a bug to fix but an **intrinsic characteristic of the technology**. Even with identical input parameters, a model will likely produce different outputs. This is the system working as designed. The same input genuinely produces different outputs, and the distribution of those outputs *is* the system's behavior.
 
 This represents a qualitative shift in the testing challenge:
 
-| Traditional Non-Determinism | LLM Non-Determinism                |
-|-----------------------------|------------------------------------|
-| Accidental (bugs, races)    | Intentional (sampling, creativity) |
-| To be eliminated            | To be characterized                |
-| Failure is binary           | Failure is probabilistic           |
-| Single test is definitive   | Single test is a sample            |
+| Traditional Testing       | Testing Under Uncertainty |
+|---------------------------|---------------------------|
+| Accidental (bugs)         | Intentional (sampling)    |
+| To be eliminated          | To be characterized       |
+| Failure is binary         | Failure is probabilistic  |
+| Single test is definitive | Single test is a sample   |
 
-The average software developer has encountered non-determinism, but typically as an annoyance to work around. LLMs bring it into the foreground as a **permanent feature** of the systems we build. A customer service chatbot that "usually" gives correct answers is not buggy—it's behaving exactly as its underlying model does.
+The average software developer has encountered uncertainty, but typically as an annoyance to work around. LLMs bring it into the foreground as a **permanent feature** of the systems we build. A customer service chatbot that "usually" gives correct answers is not buggy—it's behaving exactly as its underlying model does.
 
 ### The Need for Statistical Rigor
 
@@ -38,15 +40,15 @@ This shift demands a corresponding evolution in testing methodology. We cannot s
 3. **Controlled error rates**: How do we balance false positives against false negatives?
 4. **Reproducible thresholds**: How do we set pass/fail criteria that are defensible?
 
-These are fundamentally **statistical questions**, and they deserve statistical answers. PUnit exists to bring the rigor of hypothesis testing, confidence intervals, and power analysis to the practical problem of testing non-deterministic systems.
+These are fundamentally **statistical questions**, and they deserve statistical answers. PUnit exists to bring the rigor of hypothesis testing, confidence intervals, and power analysis to the practical problem of testing systems characterized by uncertainty.
 
-This document provides the formal foundations for that approach. And while the hot topic of LLMs brings the reality of non-determinism into the foreground, the principles developed in this document and in the PUnit testing framework are applicable to any system that uses non-deterministic behavior.
+This document provides the formal foundations for that approach. And while the hot topic of LLMs brings the reality of uncertainty into the foreground, the principles developed in this document and in the PUnit testing framework are applicable to any system that exhibits uncertain behavior.
 
 ---
 
 ## Document Purpose and Audience
 
-This document provides a rigorous statistical treatment of the methods employed by PUnit for probabilistic testing of non-deterministic systems. It is intended for:
+This document provides a rigorous statistical treatment of the methods employed by PUnit for probabilistic testing of systems characterized by uncertainty. It is intended for:
 
 - **Professional statisticians** validating the mathematical foundations
 - **Quality engineers** with statistical training designing test strategies
@@ -105,10 +107,11 @@ PUnit supports two distinct testing scenarios. They share the same statistical f
 
 The threshold is a **normative claim**—a business or contractual requirement:
 
-- The threshold $p_{\text{SLA}}$ is given, not estimated
-- No baseline experiment is required
-- The test verifies conformance to an external standard
-- Failure means: "Evidence that the system does not meet the requirement"
+- The threshold $p_{\text{SLA}}$ is given, not estimated.
+- No baseline experiment is required.
+- The test verifies conformance to an external standard.
+- **Verification vs. Smoke**: PUnit enforces that for an evidential claim (VERIFICATION intent), the sample size must be sufficient to support the threshold. If not, the developer must explicitly declare the intent as SMOKE.
+- Failure means: "Evidence that the system does not meet the requirement" (in VERIFICATION) or "Potential regression detected" (in SMOKE).
 
 **When to use**: Third-party APIs with SLAs, internal services with SLOs, compliance requirements, contractual obligations.
 
