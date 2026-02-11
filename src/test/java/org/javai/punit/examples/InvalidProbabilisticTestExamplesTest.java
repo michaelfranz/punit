@@ -165,7 +165,9 @@ class InvalidProbabilisticTestExamplesTest {
 	/**
 	 * <b>Error:</b> {@code confidence = 1.0} is outside the valid range {@code (0, 1)}.
 	 *
-	 * <p><b>Why invalid:</b> α = 0 implies absolute certainty, which cannot be obtained from finite samples.</p>
+	 * <p><b>Why invalid:</b> α = 0 implies absolute certainty, which cannot be obtained from finite samples.
+	 * Unless the system under test is fully deterministic, in which case use a regular JUnit {@code @Test} and not a
+	 * {@code @ProbabilisticTest}</p>
 	 * <p><b>Caught by:</b> Confidence range validation.</p>
 	 * <p><b>Fix:</b> Use a value strictly between 0 and 1 (e.g. 0.95, 0.99).</p>
 	 *
