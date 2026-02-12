@@ -14,6 +14,7 @@ import org.javai.punit.contract.match.JsonMatcher;
 import org.javai.punit.examples.infrastructure.llm.ChatLlm;
 import org.javai.punit.examples.infrastructure.llm.ChatLlmProvider;
 import org.javai.punit.examples.infrastructure.llm.ChatResponse;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Use case for translating natural language shopping instructions to structured actions.
@@ -77,25 +78,30 @@ public class ShoppingBasketUseCase {
      */
     private static final ServiceContract<ServiceInput, ChatResponse> CONTRACT =
             ServiceContract.<ServiceInput, ChatResponse>define()
-                    .ensure("Response has content", response ->
-                            response.content() != null && !response.content().isBlank()
-                                    ? Outcome.ok()
-                                    : Outcome.fail("check", "content was null or blank"))
+                    .ensure("Response has content", ShoppingBasketUseCase::getResponseHasContentOutcome)
                     .derive("Valid shopping action", ShoppingActionValidator::validate)
-                    .ensure("Contains valid actions", result -> {
-                        if (result.actions().isEmpty()) {
-                            return Outcome.fail("check", "No actions in result");
-                        }
-                        for (ShoppingAction action : result.actions()) {
-                            if (!action.context().isValidAction(action.name())) {
-                                return Outcome.fail("check",
-                                        "Invalid action '%s' for context %s"
-                                                .formatted(action.name(), action.context()));
-                            }
-                        }
-                        return Outcome.ok();
-                    })
+                    .ensure("Contains valid actions", ShoppingBasketUseCase::getValidActionOutcome)
                     .build();
+
+    private static @NonNull Outcome<Void> getResponseHasContentOutcome(ChatResponse response) {
+        return response.content() != null && !response.content().isBlank()
+                ? Outcome.ok()
+                : Outcome.fail("check", "content was null or blank");
+    }
+
+    private static @NonNull Outcome<Void> getValidActionOutcome(ShoppingActionValidator.ValidationResult result) {
+        if (result.actions().isEmpty()) {
+            return Outcome.fail("check", "No actions in result");
+        }
+        for (ShoppingAction action : result.actions()) {
+            if (!action.context().isValidAction(action.name())) {
+                return Outcome.fail("check",
+                        "Invalid action '%s' for context %s"
+                                .formatted(action.name(), action.context()));
+            }
+        }
+        return Outcome.ok();
+    }
 
     private final ChatLlm llm;
     private String model = "gpt-4o-mini";
