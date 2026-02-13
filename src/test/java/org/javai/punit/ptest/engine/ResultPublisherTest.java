@@ -385,6 +385,44 @@ class ResultPublisherTest {
             assertThat(sb.toString()).doesNotContain(ComplianceEvidenceEvaluator.SIZING_NOTE);
         }
 
+        @Test
+        @DisplayName("does NOT append note for SMOKE with normative origin (deferred to smoke note)")
+        void doesNotAppendForSmokeWithNormativeOrigin() {
+            PublishContext ctx = new PublishContext(
+                    "testSla", 50, 50, 50, 0,
+                    0.9999, 1.0, true,
+                    Optional.empty(), null, 1000, false, 1.0, 0, 0, 0,
+                    CostBudgetMonitor.TokenMode.NONE, null, null, null, null,
+                    ThresholdOrigin.SLA, "SLA v2.3", null,
+                    BaselineData.empty(), List.of(), null,
+                    TestIntent.SMOKE, 0.95
+            );
+            StringBuilder sb = new StringBuilder();
+
+            publisher.appendComplianceEvidenceNote(sb, ctx);
+
+            assertThat(sb.toString()).doesNotContain(ComplianceEvidenceEvaluator.SIZING_NOTE);
+        }
+
+        @Test
+        @DisplayName("still appends note for SMOKE with contract ref only (no threshold origin)")
+        void appendsNoteForSmokeWithContractRefOnly() {
+            PublishContext ctx = new PublishContext(
+                    "testSla", 200, 200, 200, 0,
+                    0.9999, 1.0, true,
+                    Optional.empty(), null, 1000, false, 1.0, 0, 0, 0,
+                    CostBudgetMonitor.TokenMode.NONE, null, null, null, null,
+                    ThresholdOrigin.UNSPECIFIED, "Internal Policy DOC-001", null,
+                    BaselineData.empty(), List.of(), null,
+                    TestIntent.SMOKE, 0.95
+            );
+            StringBuilder sb = new StringBuilder();
+
+            publisher.appendComplianceEvidenceNote(sb, ctx);
+
+            assertThat(sb.toString()).contains(ComplianceEvidenceEvaluator.SIZING_NOTE);
+        }
+
         private PublishContext createSlaContext(int samples, double minPassRate,
                 ThresholdOrigin origin, String contractRef) {
             return new PublishContext(

@@ -72,11 +72,43 @@ public final class VerificationFeasibilityEvaluator {
      * Builds a human-readable infeasibility message for display when a VERIFICATION
      * test fails due to insufficient sample size (Req 14).
      *
+     * <p>When {@code verbose} is false, produces a concise message suited to
+     * non-statisticians. When true, includes the full statistical context
+     * (criterion, confidence, alpha, assumptions).
+     *
      * @param testName the name of the test method
      * @param result   the infeasible evaluation result
+     * @param verbose  true for full statistical detail, false for summary
      * @return a formatted message explaining why verification is impossible
      */
-    public static String buildInfeasibilityMessage(String testName, FeasibilityResult result) {
+    public static String buildInfeasibilityMessage(String testName, FeasibilityResult result, boolean verbose) {
+        return verbose
+                ? buildVerboseMessage(testName, result)
+                : buildSummaryMessage(testName, result);
+    }
+
+    private static String buildSummaryMessage(String testName, FeasibilityResult result) {
+        String targetPercent = formatTargetAsPercentage(result.target());
+        return String.format("""
+
+                INFEASIBLE VERIFICATION
+
+                  Test:       %s
+
+                  The configured sample size (%d) is too small to verify a %s
+                  pass rate. At least %d samples are required.
+
+                  To fix:
+                    - Increase samples to at least %d, or
+                    - Set intent = SMOKE to run as a sentinel test""",
+                testName,
+                result.configuredSamples(),
+                targetPercent,
+                result.minimumSamples(),
+                result.minimumSamples());
+    }
+
+    private static String buildVerboseMessage(String testName, FeasibilityResult result) {
         return String.format("""
 
                 INFEASIBLE VERIFICATION
@@ -109,6 +141,16 @@ public final class VerificationFeasibilityEvaluator {
                 result.minimumSamples(),
                 FeasibilityResult.ASSUMPTION,
                 result.minimumSamples());
+    }
+
+    private static String formatTargetAsPercentage(double target) {
+        double percent = target * 100.0;
+        if (percent == Math.floor(percent)) {
+            return String.format("%.0f%%", percent);
+        }
+        // Remove trailing zeros: 99.9900 → 99.99
+        String formatted = String.format("%.4f", percent).replaceAll("0+$", "").replaceAll("\\.$", "");
+        return formatted + "%";
     }
 
     /**

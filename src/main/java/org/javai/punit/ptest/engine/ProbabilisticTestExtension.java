@@ -764,7 +764,8 @@ public class ProbabilisticTestExtension implements
 					.orElse(context.getDisplayName());
 
 			throw new ExtensionConfigurationException(
-					VerificationFeasibilityEvaluator.buildInfeasibilityMessage(testName, result));
+					VerificationFeasibilityEvaluator.buildInfeasibilityMessage(
+							testName, result, config.hasTransparentStats()));
 		}
 	}
 

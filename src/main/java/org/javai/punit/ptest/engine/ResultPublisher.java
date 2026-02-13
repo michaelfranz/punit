@@ -324,10 +324,10 @@ class ResultPublisher {
      */
     void appendProvenance(StringBuilder sb, PublishContext ctx) {
         if (ctx.hasThresholdOrigin()) {
-            sb.append(String.format("  Threshold origin: %s%n", ctx.thresholdOrigin().name()));
+            sb.append(String.format("%n  Threshold origin: %s", ctx.thresholdOrigin().name()));
         }
         if (ctx.hasContractRef()) {
-            sb.append(String.format("  Contract ref: %s%n", ctx.contractRef()));
+            sb.append(String.format("%n  Contract ref: %s", ctx.contractRef()));
         }
     }
 
@@ -340,6 +340,11 @@ class ResultPublisher {
      * statistical explanation.
      */
     void appendComplianceEvidenceNote(StringBuilder sb, PublishContext ctx) {
+        // SMOKE tests with a normative origin get sizing feedback from appendSmokeIntentNote,
+        // which includes specific N, N_min, target, and confidence — skip the less detailed note.
+        if (ctx.isSmoke() && ctx.hasThresholdOrigin()) {
+            return;
+        }
         String originName = ctx.thresholdOrigin() != null ? ctx.thresholdOrigin().name() : null;
         if (!ComplianceEvidenceEvaluator.hasComplianceContext(originName, ctx.contractRef())) {
             return;
