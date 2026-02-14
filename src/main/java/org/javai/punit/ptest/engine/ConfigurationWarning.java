@@ -39,24 +39,11 @@ public record ConfigurationWarning(Type type, String message) {
             double baselineRate,
             double impliedConfidence) {
 
-        String message = String.format("""
-
-            ⚠️  WARNING: Statistically Unsound Configuration
-            ────────────────────────────────────────────────────────────────────────────
-            Test: %s
-            Threshold: %s (from minPassRate)
-            Baseline rate: %s
-            Implied confidence: %.1f%%
-
-            The threshold equals or exceeds the baseline rate. This results in a very
-            high false positive rate (%.1f%% of test runs will fail even when the
-            system is working correctly).
-
-            Consider:
-              • Using Sample-Size-First approach (let framework derive threshold)
-              • Lowering the threshold below the baseline rate
-            ────────────────────────────────────────────────────────────────────────────
-            """,
+        String message = String.format(
+                "Test '%s': threshold %s (from minPassRate) equals or exceeds baseline rate %s. "
+                + "Implied confidence: %.1f%%. "
+                + "This results in a %.1f%% false positive rate. "
+                + "Consider using Sample-Size-First approach or lowering the threshold.",
                 useCaseId,
                 RateFormat.format(threshold),
                 RateFormat.format(baselineRate),

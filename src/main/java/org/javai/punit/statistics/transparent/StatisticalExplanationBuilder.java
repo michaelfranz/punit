@@ -174,7 +174,7 @@ public class StatisticalExplanationBuilder {
                 buildHypothesis(threshold, thresholdOriginName, isSmoke),
                 buildObservedData(samples, successes),
                 buildBaselineReference(effectiveBaseline, threshold, confidenceLevel),
-                buildInference(samples, successes, confidenceLevel),
+                buildInference(samples, successes, confidenceLevel, threshold),
                 buildVerdict(passed, samples, successes, threshold, effectiveBaseline, confidenceLevel,
                         thresholdOriginName, effectiveContractRef, effectiveMisalignments, isSmoke),
                 provenance
@@ -259,7 +259,7 @@ public class StatisticalExplanationBuilder {
                 buildHypothesis(threshold, thresholdOriginName, isSmoke),
                 buildObservedData(samples, successes),
                 buildInlineThresholdBaselineReference(threshold),
-                buildInference(samples, successes, confidenceLevel),
+                buildInference(samples, successes, confidenceLevel, threshold),
                 buildInlineThresholdVerdict(passed, samples, successes, threshold,
                         thresholdOriginName, effectiveContractRef, isSmoke),
                 provenance
@@ -408,12 +408,13 @@ public class StatisticalExplanationBuilder {
     private StatisticalExplanation.StatisticalInference buildInference(
             int samples,
             int successes,
-            double confidenceLevel) {
+            double confidenceLevel,
+            double threshold) {
 
         double observedRate = samples > 0 ? (double) successes / samples : 0.0;
-        
+
         // Standard error: SE = √(p̂(1-p̂)/n)
-        double standardError = samples > 0 
+        double standardError = samples > 0
                 ? Math.sqrt(observedRate * (1 - observedRate) / samples)
                 : 0.0;
 
@@ -422,9 +423,13 @@ public class StatisticalExplanationBuilder {
                 ? estimator.estimate(successes, samples, confidenceLevel)
                 : new ProportionEstimate(0, 0, 0, 0, confidenceLevel);
 
-        // Test statistic and p-value (for completeness)
+        // Z-test statistic and p-value for the one-sided proportion test
         Double testStatistic = null;
         Double pValue = null;
+        if (samples > 0) {
+            testStatistic = estimator.zTestStatistic(observedRate, threshold, samples);
+            pValue = estimator.oneSidedPValue(testStatistic);
+        }
 
         return new StatisticalExplanation.StatisticalInference(
                 standardError,

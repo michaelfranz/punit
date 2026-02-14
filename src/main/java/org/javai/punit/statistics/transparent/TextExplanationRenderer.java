@@ -6,7 +6,7 @@ import org.javai.punit.reporting.PUnitReporter;
 import org.javai.punit.reporting.RateFormat;
 
 /**
- * Renders statistical explanations for console output with box drawing characters.
+ * Renders statistical explanations as formatted text with box drawing characters.
  *
  * <p>This renderer produces human-readable output with:
  * <ul>
@@ -14,11 +14,15 @@ import org.javai.punit.reporting.RateFormat;
  *   <li>Proper mathematical notation (Unicode with ASCII fallback)</li>
  *   <li>Dual-audience content: formulas for statisticians, plain English for everyone else</li>
  * </ul>
+ *
+ * <p>This class is a pure formatter — all statistical values (z-scores, p-values,
+ * confidence intervals) are pre-computed by {@link StatisticalExplanationBuilder}
+ * and stored in the {@link StatisticalExplanation} model.
  */
-public class ConsoleExplanationRenderer implements ExplanationRenderer {
+public class TextExplanationRenderer implements ExplanationRenderer {
 
     private static final int LINE_WIDTH = 78;
-    private static final DateTimeFormatter DATE_FORMAT = 
+    private static final DateTimeFormatter DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
 
     private final StatisticalVocabulary.Symbols symbols;
@@ -27,7 +31,7 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
     /**
      * Creates a renderer with default settings (Unicode symbols, VERBOSE detail).
      */
-    public ConsoleExplanationRenderer() {
+    public TextExplanationRenderer() {
         this(TransparentStatsConfig.supportsUnicode(), TransparentStatsConfig.DetailLevel.VERBOSE);
     }
 
@@ -37,7 +41,7 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
      * @param useUnicode whether to use Unicode symbols
      * @param detailLevel the level of detail to include
      */
-    public ConsoleExplanationRenderer(boolean useUnicode, TransparentStatsConfig.DetailLevel detailLevel) {
+    public TextExplanationRenderer(boolean useUnicode, TransparentStatsConfig.DetailLevel detailLevel) {
         this.symbols = StatisticalVocabulary.symbols(useUnicode);
         this.detailLevel = detailLevel;
     }
@@ -47,7 +51,7 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
      *
      * @param config the transparent stats configuration
      */
-    public ConsoleExplanationRenderer(TransparentStatsConfig config) {
+    public TextExplanationRenderer(TransparentStatsConfig config) {
         this(TransparentStatsConfig.supportsUnicode(), config.detailLevel());
     }
 
@@ -84,7 +88,6 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
     @Override
     public String render(StatisticalExplanation explanation) {
         RenderResult result = renderForReporter(explanation);
-        // For backwards compatibility, include a simple header
         StringBuilder sb = new StringBuilder();
         sb.append("\n");
         sb.append(symbols.singleLine(LINE_WIDTH)).append("\n");
@@ -99,10 +102,9 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
 
     @Override
     public String render(StatisticalExplanation explanation, TransparentStatsConfig config) {
-        // Use the config's detail level if different from constructor
         if (config.detailLevel() != this.detailLevel) {
-            return new ConsoleExplanationRenderer(
-                    TransparentStatsConfig.supportsUnicode(), 
+            return new TextExplanationRenderer(
+                    TransparentStatsConfig.supportsUnicode(),
                     config.detailLevel()
             ).render(explanation);
         }
@@ -131,9 +133,9 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
 
     private void renderBaselineReferenceSection(StringBuilder sb, StatisticalExplanation.BaselineReference baseline) {
         sb.append("BASELINE REFERENCE\n");
-        
+
         if (baseline.hasBaselineData()) {
-            String dateStr = baseline.generatedAt() != null 
+            String dateStr = baseline.generatedAt() != null
                     ? DATE_FORMAT.format(baseline.generatedAt())
                     : "unknown";
             sb.append(statLabel("Source:", baseline.sourceFile() + " (generated " + dateStr + ")"));
@@ -152,7 +154,6 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
     private void renderStatisticalInferenceSection(StringBuilder sb, StatisticalExplanation explanation) {
         StatisticalExplanation.StatisticalInference inference = explanation.inference();
         StatisticalExplanation.ObservedData observed = explanation.observed();
-        StatisticalExplanation.BaselineReference baseline = explanation.baseline();
 
         sb.append("STATISTICAL INFERENCE\n");
 
@@ -170,26 +171,24 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
                 String.format("%.0f%% [%.3f, %.3f]",
                         inference.confidencePercent(), inference.ciLower(), inference.ciUpper())));
 
-        renderZTestCalculation(sb, observed, baseline);
+        renderZTestCalculation(sb, explanation);
 
         sb.append("\n");
     }
 
-    private void renderZTestCalculation(StringBuilder sb,
-            StatisticalExplanation.ObservedData observed,
-            StatisticalExplanation.BaselineReference baseline) {
+    private void renderZTestCalculation(StringBuilder sb, StatisticalExplanation explanation) {
+        StatisticalExplanation.StatisticalInference inference = explanation.inference();
+        StatisticalExplanation.ObservedData observed = explanation.observed();
+        StatisticalExplanation.BaselineReference baseline = explanation.baseline();
 
-        if (observed.sampleSize() == 0) {
+        if (!inference.hasTestStatistic()) {
             return;
         }
 
         double pHat = observed.observedRate();
         double pi0 = baseline.threshold();
         int n = observed.sampleSize();
-
-        // Calculate z-score
-        double se = Math.sqrt(pi0 * (1 - pi0) / n);
-        double z = se > 0 ? (pHat - pi0) / se : 0;
+        double z = inference.testStatistic();
 
         String valueIndent = " ".repeat(PUnitReporter.DETAIL_LABEL_WIDTH);
         sb.append("\n");
@@ -202,11 +201,10 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
                 valueIndent, pHat, pi0, symbols.sqrt(), pi0, symbols.times(), (1 - pi0), n));
         sb.append(String.format("  %sz = %.2f%n", valueIndent, z));
 
-        // P-value (approximate using standard normal)
-        // For one-sided test: P(Z > z)
-        double pValue = 1 - normalCDF(z);
-        sb.append("\n");
-        sb.append(statLabel("p-value:", String.format("P(Z > %.2f) = %.3f", z, pValue)));
+        if (inference.hasPValue()) {
+            sb.append("\n");
+            sb.append(statLabel("p-value:", String.format("P(Z > %.2f) = %.3f", z, inference.pValue())));
+        }
     }
 
     private void renderVerdictSection(StringBuilder sb, StatisticalExplanation.VerdictInterpretation verdict) {
@@ -253,7 +251,6 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
     }
 
     private void renderProvenanceSection(StringBuilder sb, StatisticalExplanation.Provenance provenance) {
-        // Only render if provenance information is present
         if (provenance == null || !provenance.hasProvenance()) {
             return;
         }
@@ -273,38 +270,6 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Approximates the standard normal CDF using the error function approximation.
-     */
-    private static double normalCDF(double z) {
-        // Approximation using error function
-        return 0.5 * (1 + erf(z / Math.sqrt(2)));
-    }
-
-    /**
-     * Avoid numerical integration by approximating the error function using Horner's method.
-     * Widely documented as the Abramowitz and Stegun approximation 7.1.26
-     */
-    private static double erf(double x) {
-        // Constants
-        double a1 =  0.254829592;
-        double a2 = -0.284496736;
-        double a3 =  1.421413741;
-        double a4 = -1.453152027;
-        double a5 =  1.061405429;
-        double p  =  0.3275911;
-
-        // Save the sign of x
-        int sign = x < 0 ? -1 : 1;
-        x = Math.abs(x);
-
-        // Approximation
-        double t = 1.0 / (1.0 + p * x);
-        double y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-
-        return sign * y;
-    }
-
-    /**
      * Formats a label-value line for statistical analysis sections.
      *
      * <p>Uses {@link PUnitReporter#DETAIL_LABEL_WIDTH} for consistent alignment
@@ -318,4 +283,3 @@ public class ConsoleExplanationRenderer implements ExplanationRenderer {
         return "  " + PUnitReporter.labelValueLn(label, value, PUnitReporter.DETAIL_LABEL_WIDTH);
     }
 }
-

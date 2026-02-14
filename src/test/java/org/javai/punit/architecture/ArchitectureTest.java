@@ -176,6 +176,94 @@ class ArchitectureTest {
     }
 
     @Nested
+    @DisplayName("Abstraction Level Enforcement")
+    class AbstractionLevelEnforcement {
+
+        /**
+         * Evaluators, resolvers, and deciders are computation/decision classes.
+         * They must not depend on reporting infrastructure (formatting, rendering).
+         * Formatting belongs in dedicated formatter/renderer/messages classes.
+         */
+        @Test
+        @DisplayName("Evaluators, resolvers, and deciders must not depend on reporting")
+        void evaluatorsResolversDecidersMustNotDependOnReporting() {
+            ArchRule rule = noClasses()
+                    .that().haveSimpleNameEndingWith("Evaluator")
+                    .or().haveSimpleNameEndingWith("Resolver")
+                    .or().haveSimpleNameEndingWith("Decider")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("..reporting..")
+                    .because("evaluators/resolvers/deciders compute decisions; "
+                            + "formatting belongs in dedicated formatter/renderer classes");
+
+            rule.check(classes);
+        }
+
+        /**
+         * Strategy classes orchestrate test execution. They receive reporters
+         * via injection, not by instantiating them directly. This prevents
+         * strategies from being coupled to specific reporter implementations.
+         */
+        @Test
+        @DisplayName("Strategies must not instantiate PUnitReporter")
+        void strategiesMustNotInstantiatePUnitReporter() {
+            ArchRule rule = noClasses()
+                    .that().haveSimpleNameEndingWith("Strategy")
+                    .should().dependOnClassesThat()
+                    .haveSimpleName("PUnitReporter")
+                    .because("strategies receive reporters via injection, "
+                            + "not by instantiating them directly");
+
+            rule.check(classes);
+        }
+
+        /**
+         * Renderers format pre-computed data for display. They must not
+         * perform statistical computation themselves — that belongs in
+         * estimators and derivers.
+         */
+        @Test
+        @DisplayName("Renderers must not depend on statistical computation classes")
+        void renderersMustNotDependOnStatisticalComputation() {
+            ArchRule rule = noClasses()
+                    .that().haveSimpleNameEndingWith("Renderer")
+                    .should().dependOnClassesThat()
+                    .haveSimpleNameEndingWith("Estimator")
+                    .orShould().dependOnClassesThat()
+                    .haveSimpleNameEndingWith("Deriver")
+                    .because("renderers format pre-computed data; "
+                            + "statistical computation belongs in estimator/deriver classes");
+
+            rule.check(classes);
+        }
+
+        /**
+         * The util package contains general-purpose utilities (hashing, lazy evaluation).
+         * It must not depend on any framework-specific packages.
+         */
+        @Test
+        @DisplayName("util package must be self-contained")
+        void utilPackageMustBeSelfContained() {
+            ArchRule rule = noClasses()
+                    .that().resideInAPackage("..util..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "org.javai.punit.api..",
+                            "org.javai.punit.ptest..",
+                            "org.javai.punit.experiment..",
+                            "org.javai.punit.spec..",
+                            "org.javai.punit.statistics..",
+                            "org.javai.punit.model..",
+                            "org.javai.punit.controls..",
+                            "org.javai.punit.reporting.."
+                    )
+                    .because("utilities must be self-contained and not depend on framework internals");
+
+            rule.check(classes);
+        }
+    }
+
+    @Nested
     @DisplayName("Example Test Rules")
     class ExampleTestRules {
 

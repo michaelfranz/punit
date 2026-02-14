@@ -1,14 +1,11 @@
 package org.javai.punit.model;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.javai.punit.util.HashUtils;
 
 /**
  * Immutable record of covariate values captured during baseline creation
@@ -108,7 +105,7 @@ public final class CovariateProfile {
             sb.append(key).append("=").append(value.toCanonicalString()).append("\n");
         }
 
-        return truncateHash(sha256(sb.toString()));
+        return HashUtils.truncateHash(HashUtils.sha256(sb.toString()), 8);
     }
 
     /**
@@ -123,8 +120,8 @@ public final class CovariateProfile {
         var hashes = new ArrayList<String>();
         for (String key : orderedKeys) {
             var value = values.get(key);
-            var hash = sha256(key + "=" + value.toCanonicalString());
-            hashes.add(hash.substring(0, Math.min(4, hash.length())));
+            var hash = HashUtils.sha256(key + "=" + value.toCanonicalString());
+            hashes.add(HashUtils.truncateHash(hash, 4));
         }
         return hashes;
     }
@@ -144,8 +141,8 @@ public final class CovariateProfile {
     public List<String> computeKeyHashes() {
         var hashes = new ArrayList<String>();
         for (String key : orderedKeys) {
-            var hash = sha256("covariate:" + key);
-            hashes.add(hash.substring(0, Math.min(4, hash.length())));
+            var hash = HashUtils.sha256("covariate:" + key);
+            hashes.add(HashUtils.truncateHash(hash, 4));
         }
         return hashes;
     }
@@ -158,22 +155,8 @@ public final class CovariateProfile {
      * @return 4-character hex hash
      */
     public String computeSingleValueHash(String key, CovariateValue value) {
-        var hash = sha256(key + "=" + value.toCanonicalString());
-        return hash.substring(0, Math.min(4, hash.length()));
-    }
-
-    private static String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 algorithm not available", e);
-        }
-    }
-
-    private static String truncateHash(String hash) {
-        return hash.substring(0, Math.min(8, hash.length()));
+        var hash = HashUtils.sha256(key + "=" + value.toCanonicalString());
+        return HashUtils.truncateHash(hash, 4);
     }
 
     /**

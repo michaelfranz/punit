@@ -223,6 +223,22 @@ class OperationalApproachResolverTest {
                     .isInstanceOf(ProbabilisticTestConfigurationException.class)
                     .hasMessageContaining("Over-Specified");
         }
+
+        @Test
+        @DisplayName("rejects when Sample-Size-First and Confidence-First are both active (conflicting approaches)")
+        void rejectsConflict_sampleSizeFirstAndConfidenceFirst() {
+            ProbabilisticTest annotation = createAnnotation(
+                    "my-spec:v1", 100, Double.NaN, 0.95,  // thresholdConfidence (Sample-Size-First)
+                    0.99, 0.05, 0.80                       // confidence-first params
+            );
+
+            // No minPassRate, so over-specification doesn't fire; conflicting approaches does
+            assertThatThrownBy(() -> resolver.resolve(annotation, true))
+                    .isInstanceOf(ProbabilisticTestConfigurationException.class)
+                    .hasMessageContaining("Conflicting Approaches")
+                    .hasMessageContaining("Sample-Size-First")
+                    .hasMessageContaining("Confidence-First");
+        }
     }
 
     @Nested

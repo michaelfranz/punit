@@ -1,15 +1,12 @@
 package org.javai.punit.model;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.javai.punit.api.CovariateCategory;
+import org.javai.punit.util.HashUtils;
 
 /**
  * The set of covariates declared by a use case.
@@ -112,7 +109,7 @@ public record CovariateDeclaration(
             sb.append(key).append("\n");
         }
 
-        return truncateHash(sha256(sb.toString()));
+        return HashUtils.truncateHash(HashUtils.sha256(sb.toString()), 8);
     }
 
     /**
@@ -216,17 +213,4 @@ public record CovariateDeclaration(
                 "Covariate '" + key + "' is not declared. Declared covariates: " + allKeys());
     }
 
-    private static String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 algorithm not available", e);
-        }
-    }
-
-    private static String truncateHash(String hash) {
-        return hash.substring(0, Math.min(8, hash.length()));
-    }
 }

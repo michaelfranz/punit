@@ -9,16 +9,16 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for {@link ConsoleExplanationRenderer}.
+ * Tests for {@link TextExplanationRenderer}.
  */
-class ConsoleExplanationRendererTest {
+class TextExplanationRendererTest {
 
-    private ConsoleExplanationRenderer renderer;
+    private TextExplanationRenderer renderer;
 
     @BeforeEach
     void setUp() {
         // Use Unicode for consistent test output
-        renderer = new ConsoleExplanationRenderer(true, TransparentStatsConfig.DetailLevel.VERBOSE);
+        renderer = new TextExplanationRenderer(true, TransparentStatsConfig.DetailLevel.VERBOSE);
     }
 
     @Nested
@@ -29,9 +29,9 @@ class ConsoleExplanationRendererTest {
         @DisplayName("includes test name in header")
         void includesTestNameInHeader() {
             StatisticalExplanation explanation = createExplanation("shouldReturnValidJson", true);
-            
+
             String output = renderer.render(explanation);
-            
+
             assertThat(output).contains("STATISTICAL ANALYSIS FOR: shouldReturnValidJson");
         }
 
@@ -39,9 +39,9 @@ class ConsoleExplanationRendererTest {
         @DisplayName("includes hypothesis section")
         void includesHypothesisSection() {
             StatisticalExplanation explanation = createExplanation("test", true);
-            
+
             String output = renderer.render(explanation);
-            
+
             assertThat(output).contains("HYPOTHESIS TEST");
             assertThat(output).contains("H₀ (null):");
             assertThat(output).contains("H₁ (alternative):");
@@ -52,9 +52,9 @@ class ConsoleExplanationRendererTest {
         @DisplayName("includes observed data section")
         void includesObservedDataSection() {
             StatisticalExplanation explanation = createExplanation("test", true);
-            
+
             String output = renderer.render(explanation);
-            
+
             assertThat(output).contains("OBSERVED DATA");
             assertThat(output).contains("Sample size (n):");
             assertThat(output).contains("Successes (k):");
@@ -65,9 +65,9 @@ class ConsoleExplanationRendererTest {
         @DisplayName("includes baseline reference section")
         void includesBaselineReferenceSection() {
             StatisticalExplanation explanation = createExplanation("test", true);
-            
+
             String output = renderer.render(explanation);
-            
+
             assertThat(output).contains("BASELINE REFERENCE");
             assertThat(output).contains("Source:");
         }
@@ -76,9 +76,9 @@ class ConsoleExplanationRendererTest {
         @DisplayName("includes statistical inference section")
         void includesStatisticalInferenceSection() {
             StatisticalExplanation explanation = createExplanation("test", true);
-            
+
             String output = renderer.render(explanation);
-            
+
             assertThat(output).contains("STATISTICAL INFERENCE");
             assertThat(output).contains("Standard error:");
             assertThat(output).contains("Confidence interval:");
@@ -88,9 +88,9 @@ class ConsoleExplanationRendererTest {
         @DisplayName("includes verdict section with PASS")
         void includesVerdictSectionPass() {
             StatisticalExplanation explanation = createExplanation("test", true);
-            
+
             String output = renderer.render(explanation);
-            
+
             assertThat(output).contains("VERDICT");
             assertThat(output).contains("Result:                PASS");
             assertThat(output).contains("Interpretation:");
@@ -100,9 +100,9 @@ class ConsoleExplanationRendererTest {
         @DisplayName("includes verdict section with FAIL")
         void includesVerdictSectionFail() {
             StatisticalExplanation explanation = createExplanation("test", false);
-            
+
             String output = renderer.render(explanation);
-            
+
             assertThat(output).contains("Result:                FAIL");
         }
 
@@ -110,9 +110,9 @@ class ConsoleExplanationRendererTest {
         @DisplayName("uses box drawing characters")
         void usesBoxDrawingCharacters() {
             StatisticalExplanation explanation = createExplanation("test", true);
-            
+
             String output = renderer.render(explanation);
-            
+
             // Uses single-line horizontal character for section dividers
             assertThat(output).contains("─");
         }
@@ -120,12 +120,12 @@ class ConsoleExplanationRendererTest {
         @Test
         @DisplayName("includes caveats when present")
         void includesCaveats() {
-            StatisticalExplanation.VerdictInterpretation verdict = 
+            StatisticalExplanation.VerdictInterpretation verdict =
                     new StatisticalExplanation.VerdictInterpretation(
                             true, "PASS", "Test passed.",
                             List.of("Sample size is small.", "Consider increasing samples.")
                     );
-            
+
             StatisticalExplanation explanation = new StatisticalExplanation(
                     "test",
                     new StatisticalExplanation.HypothesisStatement(
@@ -141,9 +141,9 @@ class ConsoleExplanationRendererTest {
                     verdict,
                     new StatisticalExplanation.Provenance("UNSPECIFIED", "")
             );
-            
+
             String output = renderer.render(explanation);
-            
+
             assertThat(output).contains("Caveat:");
             assertThat(output).contains("Sample size is small");
         }
@@ -153,8 +153,8 @@ class ConsoleExplanationRendererTest {
     @DisplayName("SUMMARY detail level")
     class SummaryDetailLevelTests {
 
-        private final ConsoleExplanationRenderer summaryRenderer =
-                new ConsoleExplanationRenderer(true, TransparentStatsConfig.DetailLevel.SUMMARY);
+        private final TextExplanationRenderer summaryRenderer =
+                new TextExplanationRenderer(true, TransparentStatsConfig.DetailLevel.SUMMARY);
 
         @Test
         @DisplayName("omits hypothesis section")
@@ -200,16 +200,166 @@ class ConsoleExplanationRendererTest {
         @Test
         @DisplayName("uses ASCII symbols when Unicode is disabled")
         void usesAsciiSymbols() {
-            ConsoleExplanationRenderer asciiRenderer = 
-                    new ConsoleExplanationRenderer(false, TransparentStatsConfig.DetailLevel.VERBOSE);
+            TextExplanationRenderer asciiRenderer =
+                    new TextExplanationRenderer(false, TransparentStatsConfig.DetailLevel.VERBOSE);
             StatisticalExplanation explanation = createExplanation("test", true);
-            
+
             String output = asciiRenderer.render(explanation);
-            
+
             // Should use ASCII fallback for box drawing
             assertThat(output).contains("=");
             // Should still have the section headers
             assertThat(output).contains("STATISTICAL ANALYSIS");
+        }
+    }
+
+    @Nested
+    @DisplayName("constructors")
+    class ConstructorTests {
+
+        @Test
+        @DisplayName("default constructor creates a working renderer")
+        void defaultConstructor() {
+            TextExplanationRenderer defaultRenderer = new TextExplanationRenderer();
+            StatisticalExplanation explanation = createExplanation("test", true);
+
+            String output = defaultRenderer.render(explanation);
+
+            assertThat(output).contains("STATISTICAL ANALYSIS FOR: test");
+        }
+
+        @Test
+        @DisplayName("config constructor creates a working renderer")
+        void configConstructor() {
+            TransparentStatsConfig config = new TransparentStatsConfig(
+                    true, TransparentStatsConfig.DetailLevel.SUMMARY,
+                    TransparentStatsConfig.OutputFormat.CONSOLE);
+            TextExplanationRenderer configRenderer = new TextExplanationRenderer(config);
+            StatisticalExplanation explanation = createExplanation("test", true);
+
+            String output = configRenderer.render(explanation);
+
+            assertThat(output).contains("STATISTICAL ANALYSIS FOR: test");
+            // SUMMARY should omit hypothesis
+            assertThat(output).doesNotContain("HYPOTHESIS TEST");
+        }
+    }
+
+    @Nested
+    @DisplayName("render(explanation, config)")
+    class RenderWithConfigTests {
+
+        @Test
+        @DisplayName("overrides detail level when config differs from renderer")
+        void overridesDetailLevel() {
+            // Renderer is VERBOSE, but config says SUMMARY
+            TransparentStatsConfig summaryConfig = new TransparentStatsConfig(
+                    true, TransparentStatsConfig.DetailLevel.SUMMARY,
+                    TransparentStatsConfig.OutputFormat.CONSOLE);
+            StatisticalExplanation explanation = createExplanation("test", true);
+
+            String output = renderer.render(explanation, summaryConfig);
+
+            // Should behave as SUMMARY despite renderer being VERBOSE
+            assertThat(output).doesNotContain("HYPOTHESIS TEST");
+            assertThat(output).contains("VERDICT");
+        }
+
+        @Test
+        @DisplayName("uses existing renderer when config matches")
+        void usesExistingRendererWhenConfigMatches() {
+            TransparentStatsConfig verboseConfig = new TransparentStatsConfig(
+                    true, TransparentStatsConfig.DetailLevel.VERBOSE,
+                    TransparentStatsConfig.OutputFormat.CONSOLE);
+            StatisticalExplanation explanation = createExplanation("test", true);
+
+            String output = renderer.render(explanation, verboseConfig);
+
+            assertThat(output).contains("HYPOTHESIS TEST");
+            assertThat(output).contains("STATISTICAL INFERENCE");
+        }
+    }
+
+    @Nested
+    @DisplayName("non-spec-driven baseline")
+    class NonSpecDrivenBaselineTests {
+
+        @Test
+        @DisplayName("renders inline threshold when no baseline data")
+        void rendersInlineThreshold() {
+            StatisticalExplanation explanation = new StatisticalExplanation(
+                    "inlineTest",
+                    new StatisticalExplanation.HypothesisStatement(
+                            "H0: p <= 0.90", "H1: p > 0.90", "One-sided test"
+                    ),
+                    StatisticalExplanation.ObservedData.of(50, 48),
+                    new StatisticalExplanation.BaselineReference(
+                            "inline", null, 0, 0, 0.0,
+                            "explicit minPassRate", 0.90
+                    ),
+                    new StatisticalExplanation.StatisticalInference(
+                            0.0424, 0.880, 0.990, 0.95, null, null
+                    ),
+                    new StatisticalExplanation.VerdictInterpretation(
+                            true, "PASS", "Passed.", List.of()
+                    ),
+                    new StatisticalExplanation.Provenance("UNSPECIFIED", "")
+            );
+
+            String output = renderer.render(explanation);
+
+            assertThat(output).contains("BASELINE REFERENCE");
+            assertThat(output).contains("Source:");
+            assertThat(output).contains("Threshold:");
+            assertThat(output).contains("explicit minPassRate");
+            // Should NOT contain empirical basis section
+            assertThat(output).doesNotContain("Empirical basis:");
+        }
+    }
+
+    @Nested
+    @DisplayName("provenance section")
+    class ProvenanceSectionTests {
+
+        @Test
+        @DisplayName("renders provenance with threshold origin")
+        void rendersProvenanceWithThresholdOrigin() {
+            StatisticalExplanation explanation = new StatisticalExplanation(
+                    "provenanceTest",
+                    new StatisticalExplanation.HypothesisStatement(
+                            "H0: p <= 0.85", "H1: p > 0.85", "One-sided test"
+                    ),
+                    StatisticalExplanation.ObservedData.of(100, 90),
+                    new StatisticalExplanation.BaselineReference(
+                            "Test.yaml", Instant.now(), 1000, 900, 0.90,
+                            "Wilson lower bound", 0.85
+                    ),
+                    new StatisticalExplanation.StatisticalInference(
+                            0.03, 0.84, 0.96, 0.95, null, null
+                    ),
+                    new StatisticalExplanation.VerdictInterpretation(
+                            true, "PASS", "Passed.", List.of()
+                    ),
+                    new StatisticalExplanation.Provenance("SLA_CONTRACT", "SLA-2024-001")
+            );
+
+            String output = renderer.render(explanation);
+
+            assertThat(output).contains("THRESHOLD PROVENANCE");
+            assertThat(output).contains("Threshold origin:");
+            assertThat(output).contains("SLA_CONTRACT");
+            assertThat(output).contains("Contract:");
+            assertThat(output).contains("SLA-2024-001");
+        }
+
+        @Test
+        @DisplayName("omits provenance section when not specified")
+        void omitsProvenanceWhenNotSpecified() {
+            StatisticalExplanation explanation = createExplanation("test", true);
+
+            String output = renderer.render(explanation);
+
+            assertThat(output).doesNotContain("THRESHOLD PROVENANCE");
         }
     }
 
@@ -235,7 +385,7 @@ class ConsoleExplanationRendererTest {
                 new StatisticalExplanation.VerdictInterpretation(
                         passed,
                         passed ? "PASS" : "FAIL",
-                        passed 
+                        passed
                                 ? "The observed success rate of 87% meets the threshold."
                                 : "The observed success rate of 87% falls below the threshold.",
                         List.of()
@@ -244,4 +394,3 @@ class ConsoleExplanationRendererTest {
         );
     }
 }
-

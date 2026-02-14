@@ -6,7 +6,7 @@ package org.javai.punit.statistics.transparent;
  * <p>Implementations of this interface transform {@link StatisticalExplanation}
  * objects into formatted output suitable for different contexts:
  * <ul>
- *   <li>{@link ConsoleExplanationRenderer}: Human-readable with box drawing characters</li>
+ *   <li>{@link TextExplanationRenderer}: Human-readable with box drawing characters</li>
  *   <li>Future: MarkdownExplanationRenderer for embedding in reports</li>
  *   <li>Future: JsonExplanationRenderer for machine-readable tooling integration</li>
  * </ul>

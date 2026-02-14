@@ -231,6 +231,108 @@ class BinomialProportionEstimatorTest {
     }
     
     @Nested
+    @DisplayName("Z-Test Statistic: z = (p̂ - π₀) / √(π₀(1-π₀)/n)")
+    class ZTestStatistic {
+
+        @Test
+        @DisplayName("computes z-statistic for observed rate below hypothesis")
+        void observedBelowHypothesis() {
+            // p̂ = 0.80, π₀ = 0.95, n = 100
+            // SE = √(0.95 × 0.05 / 100) = √0.000475 ≈ 0.02179
+            // z = (0.80 - 0.95) / 0.02179 ≈ -6.882
+            double z = estimator.zTestStatistic(0.80, 0.95, 100);
+            assertThat(z).isCloseTo(-6.882, within(0.01));
+        }
+
+        @Test
+        @DisplayName("computes z-statistic for observed rate above hypothesis")
+        void observedAboveHypothesis() {
+            // p̂ = 0.98, π₀ = 0.90, n = 200
+            // SE = √(0.90 × 0.10 / 200) ≈ 0.02121
+            // z = (0.98 - 0.90) / 0.02121 ≈ 3.771
+            double z = estimator.zTestStatistic(0.98, 0.90, 200);
+            assertThat(z).isCloseTo(3.771, within(0.01));
+        }
+
+        @Test
+        @DisplayName("returns zero when observed equals hypothesized")
+        void observedEqualsHypothesized() {
+            double z = estimator.zTestStatistic(0.95, 0.95, 100);
+            assertThat(z).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("returns zero for non-positive sample size")
+        void nonPositiveSampleSize() {
+            assertThat(estimator.zTestStatistic(0.90, 0.95, 0)).isEqualTo(0.0);
+            assertThat(estimator.zTestStatistic(0.90, 0.95, -1)).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("returns zero when hypothesized rate is 0 or 1 (SE collapses)")
+        void hypothesizedAtBoundary() {
+            assertThat(estimator.zTestStatistic(0.50, 0.0, 100)).isEqualTo(0.0);
+            assertThat(estimator.zTestStatistic(0.50, 1.0, 100)).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("magnitude increases with sample size for fixed shortfall")
+        void magnitudeIncreasesWithSampleSize() {
+            double zSmall = estimator.zTestStatistic(0.90, 0.95, 50);
+            double zLarge = estimator.zTestStatistic(0.90, 0.95, 500);
+            assertThat(Math.abs(zLarge)).isGreaterThan(Math.abs(zSmall));
+        }
+    }
+
+    @Nested
+    @DisplayName("One-Sided P-Value: P(Z > z)")
+    class OneSidedPValue {
+
+        @Test
+        @DisplayName("p-value is 0.5 when z = 0")
+        void pValueAtZero() {
+            double p = estimator.oneSidedPValue(0.0);
+            assertThat(p).isCloseTo(0.5, within(0.0001));
+        }
+
+        @Test
+        @DisplayName("p-value is small for large positive z")
+        void smallPValueForLargePositiveZ() {
+            // z = 1.645 → upper tail ≈ 0.05
+            double p = estimator.oneSidedPValue(1.645);
+            assertThat(p).isCloseTo(0.05, within(0.001));
+        }
+
+        @Test
+        @DisplayName("p-value approaches 1 for large negative z")
+        void largePValueForNegativeZ() {
+            // z = -3.0 → upper tail ≈ 0.9987
+            double p = estimator.oneSidedPValue(-3.0);
+            assertThat(p).isCloseTo(0.9987, within(0.001));
+        }
+
+        @Test
+        @DisplayName("p-value decreases as z increases")
+        void pValueDecreasesWithZ() {
+            double p1 = estimator.oneSidedPValue(1.0);
+            double p2 = estimator.oneSidedPValue(2.0);
+            double p3 = estimator.oneSidedPValue(3.0);
+            assertThat(p1).isGreaterThan(p2);
+            assertThat(p2).isGreaterThan(p3);
+        }
+
+        @Test
+        @DisplayName("p-value is consistent with z-test statistic")
+        void consistentWithZTestStatistic() {
+            // If observed significantly below threshold, p-value should be large (upper tail of negative z)
+            double z = estimator.zTestStatistic(0.80, 0.95, 100);
+            double p = estimator.oneSidedPValue(z);
+            // z is strongly negative → P(Z > z) ≈ 1
+            assertThat(p).isGreaterThan(0.99);
+        }
+    }
+
+    @Nested
     @DisplayName("Input Validation")
     class InputValidation {
         

@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.javai.punit.model.CovariateProfile;
+import org.javai.punit.util.HashUtils;
 
 /**
  * Generates and parses baseline filenames.
@@ -62,10 +63,10 @@ public final class BaselineFileNamer {
         sb.append(sanitize(useCaseName));
         sb.append(".").append(sanitize(methodName));
         sb.append("-").append(TIMESTAMP_FORMAT.format(timestamp));
-        sb.append("-").append(truncateHash(footprintHash));
+        sb.append("-").append(HashUtils.truncateHash(footprintHash, HASH_LENGTH));
 
         for (String hash : covariateProfile.computeValueHashes()) {
-            sb.append("-").append(truncateHash(hash));
+            sb.append("-").append(HashUtils.truncateHash(hash, HASH_LENGTH));
         }
 
         sb.append(".yaml");
@@ -100,11 +101,11 @@ public final class BaselineFileNamer {
 
         var sb = new StringBuilder();
         sb.append(sanitize(useCaseName));
-        sb.append("-").append(truncateHash(footprintHash));
+        sb.append("-").append(HashUtils.truncateHash(footprintHash, HASH_LENGTH));
 
         // Use value hashes so different covariate circumstances produce different filenames
         for (String hash : covariateProfile.computeValueHashes()) {
-            sb.append("-").append(truncateHash(hash));
+            sb.append("-").append(HashUtils.truncateHash(hash, HASH_LENGTH));
         }
 
         sb.append(".yaml");
@@ -156,10 +157,6 @@ public final class BaselineFileNamer {
 
     private String sanitize(String name) {
         return UNSAFE_CHARS.matcher(name).replaceAll("_");
-    }
-
-    private String truncateHash(String hash) {
-        return hash.substring(0, Math.min(HASH_LENGTH, hash.length()));
     }
 
     /**

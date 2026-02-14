@@ -104,19 +104,6 @@ class EarlyTerminationEvaluatorTest {
     }
 
     @Test
-    void buildImpossibilityExplanationIncludesDetails() {
-        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(100, 0.95);
-        
-        String explanation = evaluator.buildImpossibilityExplanation(0, 6);
-        
-        assertThat(explanation)
-                .contains("6 samples")
-                .contains("0 successes")
-                .contains("94")  // remaining
-                .contains("95"); // required
-    }
-
-    @Test
     void gettersReturnCorrectValues() {
         EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(100, 0.95);
         
@@ -186,32 +173,6 @@ class EarlyTerminationEvaluatorTest {
         
         assertThat(result).isPresent();
         assertThat(result.get()).isEqualTo(TerminationReason.SUCCESS_GUARANTEED);
-    }
-
-    @Test
-    void buildSuccessGuaranteedExplanationIncludesDetails() {
-        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(10, 0.8);
-        
-        String explanation = evaluator.buildSuccessGuaranteedExplanation(8, 8);
-        
-        assertThat(explanation)
-                .contains("8 samples")
-                .contains("8 successes")
-                .contains("1.0000")  // pass rate
-                .contains("2 remaining"); // skipped samples
-    }
-
-    @Test
-    void buildExplanationDispatchesToCorrectMethod() {
-        EarlyTerminationEvaluator evaluator = new EarlyTerminationEvaluator(10, 0.8);
-        
-        String impossibilityExplanation = evaluator.buildExplanation(
-                TerminationReason.IMPOSSIBILITY, 0, 3);
-        assertThat(impossibilityExplanation).contains("maximum possible successes");
-        
-        String successExplanation = evaluator.buildExplanation(
-                TerminationReason.SUCCESS_GUARANTEED, 8, 8);
-        assertThat(successExplanation).contains("already met");
     }
 
     @Test

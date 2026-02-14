@@ -239,7 +239,11 @@ public class ProbabilisticTestExtension implements
 		// Validate factor source consistency if applicable
 		if (strategy instanceof BernoulliTrialsStrategy bernoulliStrategy) {
 			bernoulliStrategy.validateFactorConsistency(testMethod, annotation,
-					strategyConfig.samples(), configResolver);
+					strategyConfig.samples(), configResolver)
+				.ifPresent(result -> {
+					var content = result.toWarningContent();
+					reporter.reportWarn(content.title(), content.body());
+				});
 		}
 
 		// Delegate sample stream generation to strategy
@@ -785,7 +789,7 @@ public class ProbabilisticTestExtension implements
 					.orElse(context.getDisplayName());
 
 			throw new ExtensionConfigurationException(
-					VerificationFeasibilityEvaluator.buildInfeasibilityMessage(
+					InfeasibilityMessageRenderer.render(
 							testName, result, config.hasTransparentStats()));
 		}
 	}

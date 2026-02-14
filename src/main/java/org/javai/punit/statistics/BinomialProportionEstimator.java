@@ -147,10 +147,10 @@ public class BinomialProportionEstimator {
     
     /**
      * Computes the z-score for a given confidence level (two-sided).
-     * 
+     *
      * <p>This is the quantile of the standard normal distribution:
      * z = Φ⁻¹(1-α/2) where α = 1 - confidenceLevel.
-     * 
+     *
      * @param confidenceLevel Confidence level (1-α)
      * @return z-score (quantile of standard normal)
      */
@@ -158,6 +158,37 @@ public class BinomialProportionEstimator {
         validateConfidenceLevel(confidenceLevel);
         double alpha = 1.0 - confidenceLevel;
         return STANDARD_NORMAL.inverseCumulativeProbability(1.0 - alpha / 2.0);
+    }
+
+    /**
+     * Computes the z-test statistic for a one-sided binomial proportion test.
+     *
+     * <p>Tests H₀: p ≥ π₀ vs H₁: p < π₀ using the test statistic:
+     * <pre>
+     *   z = (p̂ - π₀) / √(π₀(1-π₀)/n)
+     * </pre>
+     *
+     * @param observedRate the observed proportion p̂
+     * @param hypothesizedRate the hypothesized proportion π₀
+     * @param sampleSize the number of trials n
+     * @return the z-test statistic, or 0 if the standard error is zero
+     */
+    public double zTestStatistic(double observedRate, double hypothesizedRate, int sampleSize) {
+        if (sampleSize <= 0) {
+            return 0.0;
+        }
+        double se = Math.sqrt(hypothesizedRate * (1 - hypothesizedRate) / sampleSize);
+        return se > 0 ? (observedRate - hypothesizedRate) / se : 0.0;
+    }
+
+    /**
+     * Computes the one-sided p-value P(Z &gt; z) for a standard normal variate.
+     *
+     * @param z the z-score
+     * @return the upper-tail probability
+     */
+    public double oneSidedPValue(double z) {
+        return 1.0 - STANDARD_NORMAL.cumulativeProbability(z);
     }
     
     private void validateInputs(int successes, int trials) {

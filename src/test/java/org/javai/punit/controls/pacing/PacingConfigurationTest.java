@@ -85,7 +85,7 @@ class PacingConfigurationTest {
     }
 
     @Nested
-    @DisplayName("formattedDuration()")
+    @DisplayName("PacingReporter.formattedDuration()")
     class FormattedDurationTests {
 
         @Test
@@ -93,7 +93,7 @@ class PacingConfigurationTest {
         void zeroDuration() {
             PacingConfiguration config = new PacingConfiguration(
                     0, 0, 0, 0, 0, 0, 1, 0, Double.MAX_VALUE);
-            assertThat(config.formattedDuration()).isEqualTo("< 1s");
+            assertThat(PacingReporter.formattedDuration(config)).isEqualTo("< 1s");
         }
 
         @Test
@@ -101,7 +101,7 @@ class PacingConfigurationTest {
         void secondsOnly() {
             PacingConfiguration config = new PacingConfiguration(
                     0, 0, 0, 0, 0, 0, 1, 45000, 1.0);
-            assertThat(config.formattedDuration()).isEqualTo("45s");
+            assertThat(PacingReporter.formattedDuration(config)).isEqualTo("45s");
         }
 
         @Test
@@ -109,7 +109,7 @@ class PacingConfigurationTest {
         void minutesAndSeconds() {
             PacingConfiguration config = new PacingConfiguration(
                     0, 0, 0, 0, 0, 0, 1, 200000, 1.0);
-            assertThat(config.formattedDuration()).isEqualTo("3m 20s");
+            assertThat(PacingReporter.formattedDuration(config)).isEqualTo("3m 20s");
         }
 
         @Test
@@ -117,19 +117,19 @@ class PacingConfigurationTest {
         void hoursMinutesSeconds() {
             PacingConfiguration config = new PacingConfiguration(
                     0, 0, 0, 0, 0, 0, 1, 3725000, 1.0);
-            assertThat(config.formattedDuration()).isEqualTo("1h 2m 5s");
+            assertThat(PacingReporter.formattedDuration(config)).isEqualTo("1h 2m 5s");
         }
     }
 
     @Nested
-    @DisplayName("formattedThroughput()")
+    @DisplayName("PacingReporter.formattedThroughput()")
     class FormattedThroughputTests {
 
         @Test
         @DisplayName("Unlimited RPS formats as 'unlimited'")
         void unlimited() {
             PacingConfiguration config = PacingConfiguration.noPacing();
-            assertThat(config.formattedThroughput()).isEqualTo("unlimited");
+            assertThat(PacingReporter.formattedThroughput(config)).isEqualTo("unlimited");
         }
 
         @Test
@@ -137,7 +137,7 @@ class PacingConfigurationTest {
         void oneRps() {
             PacingConfiguration config = new PacingConfiguration(
                     0, 60, 0, 0, 0, 1000, 1, 100000, 1.0);
-            assertThat(config.formattedThroughput()).isEqualTo("60 samples/min");
+            assertThat(PacingReporter.formattedThroughput(config)).isEqualTo("60 samples/min");
         }
 
         @Test
@@ -145,7 +145,7 @@ class PacingConfigurationTest {
         void halfRps() {
             PacingConfiguration config = new PacingConfiguration(
                     0, 30, 0, 0, 0, 2000, 1, 200000, 0.5);
-            assertThat(config.formattedThroughput()).isEqualTo("30 samples/min");
+            assertThat(PacingReporter.formattedThroughput(config)).isEqualTo("30 samples/min");
         }
     }
 
@@ -167,16 +167,15 @@ class PacingConfigurationTest {
     }
 
     @Nested
-    @DisplayName("formatTime()")
+    @DisplayName("PacingReporter.formatTime()")
     class FormatTimeTests {
 
         @Test
         @DisplayName("Formats instant as HH:mm:ss")
         void formatsTime() {
-            PacingConfiguration config = PacingConfiguration.noPacing();
             Instant time = Instant.parse("2024-01-15T14:23:45Z");
 
-            String formatted = config.formatTime(time);
+            String formatted = PacingReporter.formatTime(time);
 
             // The exact output depends on system timezone, but it should be in HH:mm:ss format
             assertThat(formatted).matches("\\d{2}:\\d{2}:\\d{2}");
@@ -184,14 +183,14 @@ class PacingConfigurationTest {
     }
 
     @Nested
-    @DisplayName("delaySource()")
+    @DisplayName("PacingReporter.delaySource()")
     class DelaySourceTests {
 
         @Test
         @DisplayName("No delay returns 'none'")
         void noDelay_returnsNone() {
             PacingConfiguration config = PacingConfiguration.noPacing();
-            assertThat(config.delaySource()).isEqualTo("none");
+            assertThat(PacingReporter.delaySource(config)).isEqualTo("none");
         }
 
         @Test
@@ -199,7 +198,7 @@ class PacingConfigurationTest {
         void explicitMinMs() {
             PacingConfiguration config = new PacingConfiguration(
                     0, 0, 0, 0, 500, 500, 1, 50000, 2.0);
-            assertThat(config.delaySource()).isEqualTo("explicit minMsPerSample");
+            assertThat(PacingReporter.delaySource(config)).isEqualTo("explicit minMsPerSample");
         }
 
         @Test
@@ -207,7 +206,7 @@ class PacingConfigurationTest {
         void derivedFromRpm() {
             PacingConfiguration config = new PacingConfiguration(
                     0, 60, 0, 0, 0, 1000, 1, 100000, 1.0);
-            assertThat(config.delaySource()).contains("RPM");
+            assertThat(PacingReporter.delaySource(config)).contains("RPM");
         }
 
         @Test
@@ -215,8 +214,7 @@ class PacingConfigurationTest {
         void derivedFromRps() {
             PacingConfiguration config = new PacingConfiguration(
                     2.0, 0, 0, 0, 0, 500, 1, 50000, 2.0);
-            assertThat(config.delaySource()).contains("RPS");
+            assertThat(PacingReporter.delaySource(config)).contains("RPS");
         }
     }
 }
-

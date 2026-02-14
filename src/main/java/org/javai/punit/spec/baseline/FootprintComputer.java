@@ -1,12 +1,9 @@
 package org.javai.punit.spec.baseline;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Map;
 import java.util.Objects;
 import org.javai.punit.model.CovariateDeclaration;
+import org.javai.punit.util.HashUtils;
 
 /**
  * Computes the invocation footprint for baseline matching.
@@ -55,7 +52,7 @@ public final class FootprintComputer {
         covariateDeclaration.allKeys().forEach(key ->
             sb.append("covariate:").append(key).append("\n"));
 
-        return truncateHash(sha256(sb.toString()));
+        return HashUtils.truncateHash(HashUtils.sha256(sb.toString()), HASH_LENGTH);
     }
 
     /**
@@ -79,18 +76,5 @@ public final class FootprintComputer {
         return computeFootprint(useCaseId, Map.of(), CovariateDeclaration.EMPTY);
     }
 
-    private static String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 algorithm not available", e);
-        }
-    }
-
-    private static String truncateHash(String hash) {
-        return hash.substring(0, Math.min(HASH_LENGTH, hash.length()));
-    }
 }
 

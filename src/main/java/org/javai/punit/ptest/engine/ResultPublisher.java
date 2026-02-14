@@ -19,7 +19,7 @@ import org.javai.punit.spec.model.ExecutionSpecification;
 import org.javai.punit.statistics.ComplianceEvidenceEvaluator;
 import org.javai.punit.statistics.VerificationFeasibilityEvaluator;
 import org.javai.punit.statistics.transparent.BaselineData;
-import org.javai.punit.statistics.transparent.ConsoleExplanationRenderer;
+import org.javai.punit.statistics.transparent.TextExplanationRenderer;
 import org.javai.punit.statistics.transparent.StatisticalExplanation;
 import org.javai.punit.statistics.transparent.StatisticalExplanationBuilder;
 import org.javai.punit.statistics.transparent.StatisticalExplanationBuilder.CovariateMisalignment;
@@ -435,7 +435,7 @@ class ResultPublisher {
         }
 
         // Render and print
-        ConsoleExplanationRenderer renderer = new ConsoleExplanationRenderer(ctx.transparentStats());
+        TextExplanationRenderer renderer = new TextExplanationRenderer(ctx.transparentStats());
         var rendered = renderer.renderForReporter(explanation);
         reporter.reportInfo(rendered.title(), rendered.body());
 

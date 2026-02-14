@@ -23,7 +23,6 @@ import org.javai.punit.controls.pacing.PacingConfiguration;
 import org.javai.punit.controls.pacing.PacingResolver;
 import org.javai.punit.experiment.engine.FactorSourceAdapter;
 import org.javai.punit.model.TerminationReason;
-import org.javai.punit.reporting.PUnitReporter;
 import org.javai.punit.ptest.engine.ConfigurationResolver;
 import org.javai.punit.ptest.engine.FactorConsistencyValidator;
 import org.javai.punit.ptest.engine.ProbabilisticTestConfigurationException;
@@ -284,10 +283,12 @@ public class BernoulliTrialsStrategy implements ProbabilisticTestStrategy {
 
         if (earlyTermination.isPresent()) {
             TerminationReason reason = earlyTermination.get();
-            String details = evaluator.buildExplanation(
+            String details = EarlyTerminationMessages.buildExplanation(
                     reason,
                     aggregator.getSuccesses(),
-                    aggregator.getSamplesExecuted());
+                    aggregator.getSamplesExecuted(),
+                    evaluator.getTotalSamples(),
+                    evaluator.getRequiredSuccesses());
 
             aggregator.setTerminated(reason, details);
             terminated.set(true);
@@ -393,7 +394,7 @@ public class BernoulliTrialsStrategy implements ProbabilisticTestStrategy {
     /**
      * Validates factor source consistency with baseline spec.
      */
-    public void validateFactorConsistency(
+    public Optional<FactorConsistencyValidator.ValidationResult> validateFactorConsistency(
             Method testMethod,
             ProbabilisticTest annotation,
             int testSamples,
@@ -401,7 +402,7 @@ public class BernoulliTrialsStrategy implements ProbabilisticTestStrategy {
 
         FactorSource factorSourceAnnotation = testMethod.getAnnotation(FactorSource.class);
         if (factorSourceAnnotation == null) {
-            return;
+            return Optional.empty();
         }
 
         HashableFactorSource testFactorSource;
@@ -411,26 +412,23 @@ public class BernoulliTrialsStrategy implements ProbabilisticTestStrategy {
                     factorSourceAnnotation, testMethod.getDeclaringClass(), useCaseClass);
         } catch (Exception e) {
             logger.warn("Could not resolve factor source for consistency check: {}", e.getMessage());
-            return;
+            return Optional.empty();
         }
 
         Optional<String> specIdOpt = configResolver.resolveSpecIdFromAnnotation(annotation);
         if (specIdOpt.isEmpty()) {
-            return;
+            return Optional.empty();
         }
 
         Optional<ExecutionSpecification> optionalSpec = configResolver.loadSpec(specIdOpt.get());
         if (optionalSpec.isEmpty()) {
-            return;
+            return Optional.empty();
         }
 
         FactorConsistencyValidator.ValidationResult result = FactorConsistencyValidator.validateWithSampleCount(
                 testFactorSource, optionalSpec.get(), testSamples);
 
-        if (result.shouldWarn()) {
-            var content = result.toWarningContent();
-            new PUnitReporter().reportWarn(content.title(), content.body());
-        }
+        return result.shouldWarn() ? Optional.of(result) : Optional.empty();
     }
 
     private boolean hasTokenChargeRecorderParameter(Method method) {

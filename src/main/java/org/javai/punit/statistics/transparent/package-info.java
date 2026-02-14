@@ -15,8 +15,8 @@
  *       Builds explanations from test execution context</li>
  *   <li>{@link org.javai.punit.statistics.transparent.ExplanationRenderer} - 
  *       Interface for rendering explanations in various formats</li>
- *   <li>{@link org.javai.punit.statistics.transparent.ConsoleExplanationRenderer} - 
- *       Human-readable console output with box drawing</li>
+ *   <li>{@link org.javai.punit.statistics.transparent.TextExplanationRenderer} -
+ *       Human-readable text output with box drawing</li>
  * </ul>
  *
  * <h2>Enabling Transparent Mode</h2>

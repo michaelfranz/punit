@@ -83,6 +83,12 @@ public class ShoppingBasketMeasure {
      * <p>With 1000 samples and 10 instructions, each instruction is tested exactly
      * 100 times, providing reliable statistics for each input type.
      *
+     * <p>Whether creating and maintaining a measure experiment in a dedicated class artifact is a good idea is
+     * a personal choice. Measure experiments pair naturally with probabilistic tests, and the ceremony of setting
+     * up a measure experiment is essentially the same as its corresponding probabilistic test. See
+     * {@link org.javai.punit.examples.probabilistictests.ShoppingBasketReliabilityTest} for an example of placing
+     * the measure experiment and the test in the same class.
+     *
      * @param useCase the use case instance (injected by PUnit)
      * @param instruction the instruction (cycles through 10 variations)
      * @param captor records outcomes for aggregation

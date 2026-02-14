@@ -3,7 +3,6 @@ package org.javai.punit.controls.budget;
 import java.util.Optional;
 import org.javai.punit.api.BudgetExhaustedBehavior;
 import org.javai.punit.model.TerminationReason;
-import org.javai.punit.reporting.RateFormat;
 
 /**
  * Coordinates budget checking across suite, class, and method scopes.
@@ -23,6 +22,8 @@ import org.javai.punit.reporting.RateFormat;
  * <p>Public to allow access from strategy implementations.
  */
 public class BudgetOrchestrator {
+
+    private final BudgetMessageFormatter messageFormatter = new BudgetMessageFormatter();
 
     /**
      * Result of a budget check operation.
@@ -221,36 +222,7 @@ public class BudgetOrchestrator {
             SharedBudgetMonitor classBudget,
             SharedBudgetMonitor suiteBudget) {
 
-        switch (reason) {
-            case SUITE_TIME_BUDGET_EXHAUSTED:
-                return suiteBudget != null
-                        ? String.format("Suite time budget exhausted: %dms elapsed >= %dms budget",
-                                suiteBudget.getElapsedMs(), suiteBudget.getTimeBudgetMs())
-                        : reason.getDescription();
-            case SUITE_TOKEN_BUDGET_EXHAUSTED:
-                return suiteBudget != null
-                        ? String.format("Suite token budget exhausted: %d tokens >= %d budget",
-                                suiteBudget.getTokensConsumed(), suiteBudget.getTokenBudget())
-                        : reason.getDescription();
-            case CLASS_TIME_BUDGET_EXHAUSTED:
-                return classBudget != null
-                        ? String.format("Class time budget exhausted: %dms elapsed >= %dms budget",
-                                classBudget.getElapsedMs(), classBudget.getTimeBudgetMs())
-                        : reason.getDescription();
-            case CLASS_TOKEN_BUDGET_EXHAUSTED:
-                return classBudget != null
-                        ? String.format("Class token budget exhausted: %d tokens >= %d budget",
-                                classBudget.getTokensConsumed(), classBudget.getTokenBudget())
-                        : reason.getDescription();
-            case METHOD_TIME_BUDGET_EXHAUSTED:
-                return String.format("Method time budget exhausted: %dms elapsed >= %dms budget",
-                        methodBudget.getElapsedMs(), methodBudget.getTimeBudgetMs());
-            case METHOD_TOKEN_BUDGET_EXHAUSTED:
-                return String.format("Method token budget exhausted: %d tokens >= %d budget",
-                        methodBudget.getTokensConsumed(), methodBudget.getTokenBudget());
-            default:
-                return reason.getDescription();
-        }
+        return messageFormatter.buildExhaustionMessage(reason, methodBudget, classBudget, suiteBudget);
     }
 
     /**
@@ -279,27 +251,11 @@ public class BudgetOrchestrator {
             double minPassRate,
             long elapsedMs) {
 
-        StringBuilder sb = new StringBuilder();
-
-        String failureReason = terminationReason != null 
-                ? terminationReason.getDescription() 
-                : "Budget exhausted";
-        sb.append(String.format("PUnit FAILED: %s.%n", failureReason));
-
-        if (terminationDetails != null && !terminationDetails.isEmpty()) {
-            sb.append(String.format("  %s%n", terminationDetails));
-        }
-
-        sb.append(String.format("%n  Samples executed: %d of %d%n",
-                samplesExecuted, plannedSamples));
-        sb.append(String.format("  Pass rate at termination: %s (%d/%d)%n",
-                RateFormat.format(observedPassRate),
-                successes,
-                samplesExecuted));
-        sb.append(String.format("  Required pass rate: %s%n", RateFormat.format(minPassRate)));
-        sb.append(String.format("  Elapsed: %dms%n", elapsedMs));
-
-        return sb.toString();
+        return messageFormatter.buildExhaustionFailureMessage(
+                terminationReason, terminationDetails,
+                samplesExecuted, plannedSamples,
+                observedPassRate, successes,
+                minPassRate, elapsedMs);
     }
 }
 
