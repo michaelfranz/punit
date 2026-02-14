@@ -89,7 +89,9 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("punit-experiment")
+    }
     testLogging {
         events("passed", "skipped", "failed")
         showStandardStreams = true
@@ -149,7 +151,9 @@ fun Test.configureAsExperimentTask() {
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
 
-    useJUnitPlatform()
+    useJUnitPlatform {
+        includeTags("punit-experiment")
+    }
 
     testLogging {
         events("passed", "skipped", "failed", "standardOut", "standardError")

@@ -6,6 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.javai.punit.experiment.engine.ExperimentExtension;
 import org.javai.punit.experiment.optimize.FactorMutator;
+import org.junit.jupiter.api.Tag;
 import org.javai.punit.experiment.optimize.OptimizationIterationAggregate;
 import org.javai.punit.experiment.optimize.OptimizationObjective;
 import org.javai.punit.experiment.optimize.Scorer;
@@ -95,6 +96,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @Retention(RetentionPolicy.RUNTIME)
 @TestTemplate
 @ExtendWith(ExperimentExtension.class)
+@Tag("punit-experiment")
 public @interface OptimizeExperiment {
 
     /**
