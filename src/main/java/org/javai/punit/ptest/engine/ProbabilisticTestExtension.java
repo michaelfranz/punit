@@ -599,16 +599,37 @@ public class ProbabilisticTestExtension implements
 	 * Resolves baseline selection lazily during the first sample invocation.
 	 * Also validates the test configuration after baseline selection and derives
 	 * minPassRate from baseline if not explicitly specified.
+	 *
+	 * <p>If any step throws (validation failure, infeasibility gate, etc.), the
+	 * error is unrecoverable — the configuration won't change between invocations.
+	 * To avoid repeating the same failure N times, we mark resolution complete and
+	 * signal termination so remaining invocations are skipped.
 	 */
 	private void ensureBaselineSelected(ExtensionContext context) {
 		ExtensionContext.Store store = getMethodStore(context);
-		
+
 		// Check if we've already processed baseline selection (with or without a baseline)
 		Boolean alreadyResolved = store.get(BASELINE_RESOLVED_KEY, Boolean.class);
 		if (Boolean.TRUE.equals(alreadyResolved)) {
 			return;
 		}
 
+		try {
+			resolveBaseline(context, store);
+		} catch (RuntimeException ex) {
+			// Configuration errors are unrecoverable: mark resolved to prevent
+			// re-entry, and signal termination so the stream stops producing
+			// invocations and in-flight samples are skipped.
+			store.put(BASELINE_RESOLVED_KEY, Boolean.TRUE);
+			AtomicBoolean terminated = store.get(TERMINATED_KEY, AtomicBoolean.class);
+			if (terminated != null) {
+				terminated.set(true);
+			}
+			throw ex;
+		}
+	}
+
+	private void resolveBaseline(ExtensionContext context, ExtensionContext.Store store) {
 		BaselineSelectionOrchestrator.PendingSelection pending =
 				store.get(PENDING_SELECTION_KEY, BaselineSelectionOrchestrator.PendingSelection.class);
 		if (pending == null) {

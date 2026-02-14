@@ -20,6 +20,7 @@ import org.javai.punit.testsubjects.ProbabilisticTestSubjects.SmokeUndersizedTes
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.SuccessGuaranteedEarlyTerminationTest;
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.TerminateOnFirstFailureTest;
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.VerificationSizedTest;
+import org.javai.punit.testsubjects.ProbabilisticTestSubjects.UndefinedThresholdTest;
 import org.javai.punit.testsubjects.ProbabilisticTestSubjects.VerificationUndersizedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
@@ -429,6 +430,31 @@ class ProbabilisticTestIntegrationTest {
     }
 
     @Test
+    void infeasibilityGateFailsExactlyOnce() {
+        // An unrecoverable configuration error should fail fast — the infeasibility
+        // message should appear exactly once, not once per sample invocation.
+        var events = EngineTestKit.engine(JUNIT_ENGINE_ID)
+                .selectors(DiscoverySelectors.selectClass(VerificationUndersizedTest.class))
+                .execute()
+                .allEvents()
+                .list();
+
+        var infeasibilityFailures = events.stream()
+                .filter(e -> e.getPayload(org.junit.platform.engine.TestExecutionResult.class)
+                        .map(r -> r.getStatus() == org.junit.platform.engine.TestExecutionResult.Status.FAILED)
+                        .orElse(false))
+                .filter(e -> e.getPayload(org.junit.platform.engine.TestExecutionResult.class)
+                        .flatMap(r -> r.getThrowable())
+                        .map(t -> t.getMessage() != null && t.getMessage().contains("INFEASIBLE"))
+                        .orElse(false))
+                .toList();
+
+        assertThat(infeasibilityFailures)
+                .as("Infeasibility error should be reported exactly once, not once per sample")
+                .hasSize(1);
+    }
+
+    @Test
     void verificationSizedExecutesNormally() {
         // VERIFICATION + N=55, p₀=0.90, confidence=0.95 → N_min=25 → feasible
         // Should execute samples normally and pass (always passes)
@@ -495,5 +521,32 @@ class ProbabilisticTestIntegrationTest {
                     .as("Sample failures should not have suppressed exceptions")
                     .isEmpty();
         });
+    }
+
+    // ========== Fail-Fast for Configuration Errors ==========
+
+    @Test
+    void validationFailureFailsExactlyOnce() {
+        // UNDEFINED: samples=10 with no threshold and no baseline.
+        // The validation error is unrecoverable and should be reported once.
+        var events = EngineTestKit.engine(JUNIT_ENGINE_ID)
+                .selectors(DiscoverySelectors.selectClass(UndefinedThresholdTest.class))
+                .execute()
+                .allEvents()
+                .list();
+
+        var configFailures = events.stream()
+                .filter(e -> e.getPayload(org.junit.platform.engine.TestExecutionResult.class)
+                        .map(r -> r.getStatus() == org.junit.platform.engine.TestExecutionResult.Status.FAILED)
+                        .orElse(false))
+                .filter(e -> e.getPayload(org.junit.platform.engine.TestExecutionResult.class)
+                        .flatMap(r -> r.getThrowable())
+                        .map(t -> t.getMessage() != null && t.getMessage().contains("UNDEFINED"))
+                        .orElse(false))
+                .toList();
+
+        assertThat(configFailures)
+                .as("Validation error should be reported exactly once, not once per sample")
+                .hasSize(1);
     }
 }

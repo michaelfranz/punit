@@ -428,5 +428,20 @@ public class ProbabilisticTestSubjects {
             assertThat(true).isTrue();
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // VALIDATION FAILURE TEST SUBJECTS (fail-fast)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * UNDEFINED: samples specified but no threshold and no baseline.
+     * Should fail fast with a single ExtensionConfigurationException, not N times.
+     */
+    public static class UndefinedThresholdTest {
+        @ProbabilisticTest(samples = 10)
+        void shouldNotExecute() {
+            assertThat(true).isTrue();
+        }
+    }
 }
 

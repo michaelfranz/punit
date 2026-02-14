@@ -3,7 +3,9 @@ package org.javai.punit.examples.usecases;
 import java.time.Duration;
 import java.util.List;
 import org.javai.punit.api.FactorArguments;
+import org.javai.punit.api.FactorGetter;
 import org.javai.punit.api.FactorProvider;
+import org.javai.punit.api.FactorSetter;
 import org.javai.punit.api.UseCase;
 import org.javai.outcome.Outcome;
 import org.javai.punit.contract.ServiceContract;
@@ -81,10 +83,12 @@ public class PaymentGatewayUseCase {
         this.gateway = gateway;
     }
 
+    @FactorGetter
     public String getRegion() {
         return region;
     }
 
+    @FactorSetter("region")
     public void setRegion(String region) {
         this.region = region;
     }
@@ -126,42 +130,5 @@ public class PaymentGatewayUseCase {
      */
     private PaymentResult executeCharge(PaymentInput input) {
         return gateway.charge(input.cardToken(), input.amountCents());
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // FACTOR SOURCES
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /**
-     * Standard payment amounts for testing.
-     *
-     * <p>Covers a range of typical transaction values.
-     *
-     * @return factor arguments with various payment amounts
-     */
-    @FactorProvider
-    public static List<FactorArguments> standardAmounts() {
-        return FactorArguments.configurations()
-                .names("cardToken", "amountCents")
-                .values("tok_visa_4242", 1999L)       // $19.99
-                .values("tok_visa_4242", 4999L)       // $49.99
-                .values("tok_visa_4242", 9999L)       // $99.99
-                .values("tok_mastercard_5555", 2499L) // $24.99
-                .values("tok_mastercard_5555", 14999L)// $149.99
-                .values("tok_amex_3782", 29999L)      // $299.99
-                .stream().toList();
-    }
-
-    /**
-     * Single payment for focused testing.
-     *
-     * @return a single factor argument
-     */
-    @FactorProvider
-    public static List<FactorArguments> singlePayment() {
-        return FactorArguments.configurations()
-                .names("cardToken", "amountCents")
-                .values("tok_visa_4242", 1999L)
-                .stream().toList();
     }
 }
