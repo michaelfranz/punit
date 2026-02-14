@@ -782,10 +782,10 @@ After all production and test code changes are complete, update the documentatio
 
 ### Files
 
-| File                     | Sections Affected                                                                                                                                                                                                                                   |
-|--------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `docs/USER-GUIDE.md`    | §Understanding Test Results (verdict example), §Transparent Statistics Mode (statistical analysis example), §Baseline Expiration (expiration warning example), §Covariate-Aware Baseline Selection (covariate warning example), §Budget Control (budget exhaustion examples), §Threshold Provenance (SLA verdict example) |
-| `docs/VERDICT-CATALOG.md` | All example outputs (if present)                                                                                                                                                                                                                  |
+| File                      | Sections Affected                                                                                                                                                                                                                                                                                                                         |
+|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `docs/USER-GUIDE.md`      | §Understanding Test Results (verdict example, lines ~962–968), §Transparent Statistics Mode (statistical analysis example), §Baseline Expiration (expiration warning example), §Covariate-Aware Baseline Selection (covariate warning example), §Budget Control (budget exhaustion examples), §Threshold Provenance (SLA verdict example) |
+| `docs/VERDICT-CATALOG.md` | All example outputs (if present)                                                                                                                                                                                                                                                                                                          |
 
 ### Approach
 
