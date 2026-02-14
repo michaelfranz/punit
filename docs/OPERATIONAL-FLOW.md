@@ -443,7 +443,7 @@ The goal is to find the best configuration and understand raw system behavior.
 At the end of Phase A, you have an optimized configuration and a baseline that reflects the system's true reliability—warts and all.
 
 ### Phase B: Hardening
-use case
+
 The goal is to improve user-facing reliability and establish regression protection.
 
 | Step | Activity                      | Purpose                                                   |
