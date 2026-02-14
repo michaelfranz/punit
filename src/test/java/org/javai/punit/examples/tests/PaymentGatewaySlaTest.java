@@ -1,6 +1,7 @@
 package org.javai.punit.examples.tests;
 
 import org.javai.punit.api.ProbabilisticTest;
+import org.javai.punit.api.TestIntent;
 import org.javai.punit.api.ThresholdOrigin;
 import org.javai.punit.api.UseCaseProvider;
 import org.javai.punit.examples.usecases.PaymentGatewayUseCase;
@@ -9,25 +10,25 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Smoke tests for payment gateway reliability.
+ * Probabilistic tests for payment gateway reliability, demonstrating how
+ * {@link TestIntent} interacts with sample sizing and threshold targets.
  *
- * <p>These are <b>conformance smoke tests</b>: quick sanity checks that catch
- * catastrophic failures against a prescribed threshold. They are not sized for
- * compliance verification — at 50–200 samples against a 99.99% target, even
- * perfect results cannot provide compliance-grade statistical evidence.
- * PUnit flags this explicitly in the verdict.
- *
- * <p>Compliance testing does not even make sense here. The payment gateway is
- * a third-party service we do not control. We cannot make it comply with
- * anything — we can only observe its behaviour. What these smoke tests give
- * us is early warning: if the gateway starts failing catastrophically, we
- * detect it quickly. If we need to hold the vendor accountable against their
- * SLA, the evidence comes from production monitoring at scale, not from a
- * test suite running a few hundred samples.
+ * <p>The tests in this class illustrate the two intent modes:
+ * <ul>
+ *   <li><b>VERIFICATION</b> — the sample size is sufficient for the target
+ *       pass rate, so PUnit can provide statistical evidence that the SUT
+ *       meets the threshold. This is the default intent and requires a
+ *       feasible sample size; PUnit will reject the test configuration if
+ *       the sample is too small.</li>
+ *   <li><b>SMOKE</b> — the sample size is intentionally undersized relative
+ *       to the target. The test acts as a sentinel: it catches catastrophic
+ *       regressions quickly but does not claim statistical verification.
+ *       PUnit notes the sizing gap in the verdict.</li>
+ * </ul>
  *
  * <p>The {@code thresholdOrigin} and {@code contractRef} annotations record
- * where the threshold came from (provenance metadata for audit traceability),
- * but do not change the character of the test.
+ * provenance — where the threshold came from — for audit traceability.
+ * They do not affect test execution or verdict logic.
  *
  * @see PaymentGatewayUseCase
  */
@@ -43,21 +44,18 @@ public class PaymentGatewaySlaTest {
     }
 
     /**
-     * Smoke test with transparent stats output.
-     *
-     * <p>The transparent stats verdict will include a caveat noting that
-     * the sample is not sized for compliance verification.
+     * Test against an internal SLO (99% more relaxed than the 99.99% SLA).
      */
     @ProbabilisticTest(
             useCase = PaymentGatewayUseCase.class,
-            samples = 200,
-            minPassRate = 0.9999,
-            thresholdOrigin = ThresholdOrigin.SLA,
-            contractRef = "Payment Provider SLA v2.3, Section 4.1",
-            transparentStats = true
+            samples = 268, // minimal sample size required to verify SLO
+            minPassRate = 0.99, // medium reliability service
+            intent = TestIntent.VERIFICATION, // intent is verification by default (can be omitted)
+            thresholdOrigin = ThresholdOrigin.SLO,
+            contractRef = "Internal Payment SLO - Q4 2024"
     )
-    void smokeTestWithTransparentStats(PaymentGatewayUseCase useCase) {
-        useCase.chargeCard("tok_visa_4242", 1999L).assertAll();
+    void testInternalSlo(PaymentGatewayUseCase useCase) {
+        useCase.chargeCard("tok_mastercard_5555", 2499L).assertAll();
     }
 
     /**
@@ -65,40 +63,33 @@ public class PaymentGatewaySlaTest {
      */
     @ProbabilisticTest(
             useCase = PaymentGatewayUseCase.class,
-            samples = 50,
-            minPassRate = 0.9999,
+            samples = 50, // sample size is clearly not suited to validation
+            minPassRate = 0.9999, // high-reliability service
+            intent = TestIntent.SMOKE, // intent therefore explicitly set to smoke
             thresholdOrigin = ThresholdOrigin.SLA,
             contractRef = "Payment Provider SLA v2.3, Section 4.1"
     )
-    void smokeTestQuick(PaymentGatewayUseCase useCase) {
+    void smokeTestSla(PaymentGatewayUseCase useCase) {
         useCase.chargeCard("tok_visa_4242", 1999L).assertAll();
     }
 
     /**
-     * Smoke test against an internal SLO (99.9%, more relaxed than the 99.99% SLA).
+     * Smoke test with transparent stats output.
+     *
+     * <p>The transparent stats verdict will include a caveat noting that
+     * the sample is not sized for compliance verification.
      */
     @ProbabilisticTest(
             useCase = PaymentGatewayUseCase.class,
-            samples = 100,
-            minPassRate = 0.999,
-            thresholdOrigin = ThresholdOrigin.SLO,
-            contractRef = "Internal Payment SLO - Q4 2024"
+            samples = 50,
+            minPassRate = 0.9999,
+            intent = TestIntent.SMOKE,
+            thresholdOrigin = ThresholdOrigin.SLA,
+            contractRef = "Payment Provider SLA v2.3, Section 4.1",
+            transparentStats = true // more detailed report
     )
-    void smokeTestAgainstSlo(PaymentGatewayUseCase useCase) {
-        useCase.chargeCard("tok_mastercard_5555", 2499L).assertAll();
+    void smokeTestWithTransparentStats(PaymentGatewayUseCase useCase) {
+        useCase.chargeCard("tok_visa_4242", 1999L).assertAll();
     }
 
-    /**
-     * Smoke test with a high-value transaction.
-     */
-    @ProbabilisticTest(
-            useCase = PaymentGatewayUseCase.class,
-            samples = 100,
-            minPassRate = 0.9999,
-            thresholdOrigin = ThresholdOrigin.SLA,
-            contractRef = "Payment Provider SLA v2.3, Section 4.1"
-    )
-    void smokeTestHighValue(PaymentGatewayUseCase useCase) {
-        useCase.chargeCard("tok_amex_3782", 29999L).assertAll();
-    }
 }
