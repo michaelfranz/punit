@@ -516,7 +516,7 @@ When testing high thresholds (99.9%+), sample size matters significantly:
 
 To detect that a system is at 99.97% when the SLA requires 99.99%, you need enough samples to distinguish a 0.02% difference. With 1,000 samples, this gap is statistically invisible.
 
-*Source: `org.javai.punit.examples.tests.PaymentGatewaySlaTest`*
+*Source: `org.javai.punit.examples.probabilistictests.PaymentGatewaySlaTest`*
 
 ---
 
@@ -942,7 +942,7 @@ void thresholdFirst(ShoppingBasketUseCase useCase, @Factor("instruction") String
 }
 ```
 
-*Source: `org.javai.punit.examples.tests.ShoppingBasketThresholdApproachesTest`*
+*Source: `org.javai.punit.examples.probabilistictests.ShoppingBasketThresholdApproachesTest`*
 
 ### Understanding Test Results
 
@@ -1135,7 +1135,7 @@ static Stream<String> standardInstructions() {
 
 PUnit loads the matching spec and derives the threshold from the baseline's empirical success rate plus a statistical margin.
 
-*Source: `org.javai.punit.examples.tests.ShoppingBasketTest`*
+*Source: `org.javai.punit.examples.probabilistictests.ShoppingBasketTest`*
 
 ### Baseline Expiration
 
@@ -1213,7 +1213,7 @@ PUnit PASSED: testInstructionTranslation
 public class ShoppingBasketUseCase { }
 ```
 
-*Source: `org.javai.punit.examples.tests.ShoppingBasketCovariateTest`*
+*Source: `org.javai.punit.examples.probabilistictests.ShoppingBasketCovariateTest`*
 
 #### Automatic Complement Labels
 
@@ -1314,7 +1314,7 @@ void evaluateWhatWeHave(TokenChargeRecorder recorder) {
 }
 ```
 
-*Source: `org.javai.punit.examples.tests.ShoppingBasketBudgetTest`*
+*Source: `org.javai.punit.examples.probabilistictests.ShoppingBasketBudgetTest`*
 
 ### Pacing Constraints
 
@@ -1345,7 +1345,7 @@ void rateLimitedApiTest() {
 
 When multiple constraints are specified, the **most restrictive** wins.
 
-*Source: `org.javai.punit.examples.tests.ShoppingBasketPacingTest`*
+*Source: `org.javai.punit.examples.probabilistictests.ShoppingBasketPacingTest`*
 
 ### Exception Handling
 
@@ -1366,7 +1366,7 @@ void exceptionsCountAsFailures() {
 | `FAIL_SAMPLE` | Exception counts as failed sample; continue testing |
 | `ABORT_TEST`  | Exception immediately fails the test                |
 
-*Source: `org.javai.punit.examples.tests.ShoppingBasketExceptionTest`*
+*Source: `org.javai.punit.examples.probabilistictests.ShoppingBasketExceptionTest`*
 
 ---
 
