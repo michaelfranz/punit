@@ -31,19 +31,17 @@ The two are connected: experiments generate the empirical data that powers **spe
 
 ## Installation
 
-PUnit is available via [JitPack](https://jitpack.io). Add it to your project:
+PUnit is available on [Maven Central](https://central.sonatype.com/artifact/org.javai/punit). Add it to your project:
 
 ### Gradle (Kotlin DSL)
 
 ```kotlin
 repositories {
-    mavenLocal()  // Required for outcome library
     mavenCentral()
-    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
-    testImplementation("com.github.javai-org:punit:0.1.0")
+    testImplementation("org.javai:punit:0.1.0")
 }
 ```
 
@@ -52,32 +50,22 @@ dependencies {
 ```groovy
 repositories {
     mavenCentral()
-    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    testImplementation 'com.github.javai-org:punit:0.1.0'
+    testImplementation 'org.javai:punit:0.1.0'
 }
 ```
 
 ### Maven
 
 ```xml
-<repositories>
-    <repository>
-        <id>jitpack.io</id>
-        <url>https://jitpack.io</url>
-    </repository>
-</repositories>
-
-<dependencies>
-    <dependency>
-        <groupId>com.github.javai-org</groupId>
-        <artifactId>punit</artifactId>
-        <version>0.1.0</version>
-        <scope>test</scope>
-    </dependency>
-</dependencies>
+<dependency>
+    <groupId>org.javai</groupId>
+    <artifactId>punit</artifactId>
+    <version>0.1.0</version>
+    <scope>test</scope>
+</dependency>
 ```
 
 ---

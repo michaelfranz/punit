@@ -100,9 +100,7 @@ Don't let the simplicity of this snippet fool you. Behind this clean API lies ri
 **Gradle (Kotlin DSL):**
 ```kotlin
 repositories {
-   mavenLocal()  // Required for outcome library
-   mavenCentral()
-   maven { url = uri("https://jitpack.io") }
+    mavenCentral()
 }
 
 dependencies {
@@ -113,7 +111,6 @@ dependencies {
 **Gradle (Groovy DSL):**
 ```groovy
 repositories {
-    mavenLocal()
     mavenCentral()
 }
 

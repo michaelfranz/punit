@@ -1,6 +1,7 @@
 plugins {
     id("java-library")
-    id("maven-publish")
+    id("signing")
+    id("com.vanniktech.maven.publish") version "0.36.0"
     id("jacoco")
     idea
     kotlin("jvm") version "2.3.10"
@@ -14,16 +15,16 @@ idea {
     }
 }
 
+signing {
+    useGpgCmd()
+}
+
 group = "org.javai"
 version = "0.1.0"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
-    
-    // Generate sources and javadoc jars for publishing
-    withSourcesJar()
-    withJavadocJar()
 }
 
 // Compile with -parameters flag to preserve method parameter names at runtime
@@ -34,7 +35,6 @@ tasks.withType<JavaCompile> {
 
 repositories {
     mavenCentral()
-    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
@@ -55,8 +55,8 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.21.0")
 
     // Outcome - result types for contract postconditions
-    // Resolved locally via composite build (settings.gradle.kts), or from JitPack on CI
-    api("com.github.javai-org:outcome:main-SNAPSHOT")
+    // Resolved locally via composite build (settings.gradle.kts), or from Maven Central on CI
+    api("org.javai:outcome:0.1.0")
 
     // Optional JSON matching support for instance conformance
     // Users who want JsonMatcher need to add this dependency to their project
@@ -331,57 +331,45 @@ tasks.jar {
     }
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("mavenJava") {
-            from(components["java"])
-            
-            pom {
-                name.set("PUNIT")
-                description.set("Probabilistic Unit Testing Framework for JUnit 5 - Test non-deterministic systems with statistical pass/fail thresholds")
-                url.set("https://github.com/javai-org/punit")
-                
-                licenses {
-                    license {
-                        name.set("MIT License")
-                        url.set("https://opensource.org/licenses/MIT")
-                    }
-                }
-                
-                developers {
-                    developer {
-                        id.set("javai")
-                        name.set("JAVAI")
-                        organization.set("javai.org")
-                    }
-                }
-                
-                scm {
-                    connection.set("scm:git:git://github.com/javai-org/punit.git")
-                    developerConnection.set("scm:git:ssh://github.com/javai-org/punit.git")
-                    url.set("https://github.com/javai-org/punit")
-                }
+mavenPublishing {
+    publishToMavenCentral()
+    signAllPublications()
+
+    coordinates("org.javai", "punit", version.toString())
+
+    pom {
+        name.set("PUnit")
+        description.set("Probabilistic Unit Testing Framework for JUnit 5 - Test non-deterministic systems with statistical pass/fail thresholds")
+        url.set("https://github.com/javai-org/punit")
+
+        licenses {
+            license {
+                name.set("Attribution Required License (ARL-1.0)")
+                url.set("https://github.com/javai-org/punit/blob/main/LICENSE")
             }
         }
-    }
-    
-    repositories {
-        // Publish to local Maven repository (~/.m2/repository)
-        mavenLocal()
-        
-        // Publish to project's build directory (for CI artifacts)
-        maven {
-            name = "buildDir"
-            url = uri(layout.buildDirectory.dir("repo"))
+
+        developers {
+            developer {
+                id.set("mikemannion")
+                name.set("Michael Franz Mannion")
+                email.set("michaelmannion@me.com")
+            }
+        }
+
+        scm {
+            url.set("https://github.com/javai-org/punit")
+            connection.set("scm:git:git://github.com/javai-org/punit.git")
+            developerConnection.set("scm:git:ssh://github.com/javai-org/punit.git")
         }
     }
 }
 
 // Convenience task to build and publish locally
 tasks.register("publishLocal") {
+    description = "Publishes to the local Maven repository"
     group = "publishing"
-    description = "Builds and publishes to local Maven repository"
-    dependsOn("publishMavenJavaPublicationToMavenLocalRepository")
+    dependsOn(tasks.publishToMavenLocal)
 }
 
 
