@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-15
+
 ### Added
 - Release lifecycle Gradle tasks (`release`, `tagRelease`)
 - Centralised version in `gradle.properties`
-- This changelog
+- `CHANGELOG.md` with validation gate in the release task
+- Test intent system: `VERIFICATION` (evidential) and `SMOKE` (sentinel) modes
+- Feasibility gate using Wilson score lower bound for verification tests
+- Diff-anchor lines in explore experiment output
+- Infeasibility fail-fast for infeasible thresholds
 
 ## [0.1.0] - 2025-12-15
 
@@ -33,5 +39,6 @@ unit testing of non-deterministic systems.
 - Verbose statistical explanation output
 - Gradle plugin (`org.javai.punit`) for test/experiment task configuration
 
-[Unreleased]: https://github.com/javai-org/punit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/javai-org/punit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/javai-org/punit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/javai-org/punit/releases/tag/v0.1.0
