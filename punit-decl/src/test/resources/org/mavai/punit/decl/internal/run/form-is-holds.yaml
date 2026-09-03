@@ -1,0 +1,17 @@
+format: mavai-contract/1
+contract: form-is-holds
+service: form-oracle
+transforms:
+  doc: json
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - path: "$.yes"
+        is: true
+      - path: "$.no"
+        is: false
+inputs:
+  - "judge the document"
+  - "judge it again"

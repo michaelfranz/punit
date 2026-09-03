@@ -1,0 +1,17 @@
+format: mavai-contract/1
+contract: form-is-null-holds
+service: form-oracle
+transforms:
+  doc: json
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - path: "$.nothing"
+        is-null: true
+      - path: "$.absent"
+        is-null: true
+inputs:
+  - "judge the document"
+  - "judge it again"

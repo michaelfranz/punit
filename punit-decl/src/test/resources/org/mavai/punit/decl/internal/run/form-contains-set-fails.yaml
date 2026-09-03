@@ -1,0 +1,16 @@
+format: mavai-contract/1
+contract: form-contains-set-fails
+service: form-oracle
+transforms:
+  doc: json
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - in: doc
+        path: "$.amounts[*]"
+        contains-set: [1]
+inputs:
+  - "judge the document"
+  - "judge it again"

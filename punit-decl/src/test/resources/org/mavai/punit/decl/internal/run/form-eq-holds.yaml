@@ -1,0 +1,15 @@
+format: mavai-contract/1
+contract: form-eq-holds
+service: form-oracle
+transforms:
+  doc: json
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - path: "$.n"
+        eq: "12.50"
+inputs:
+  - "judge the document"
+  - "judge it again"

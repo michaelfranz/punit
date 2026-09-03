@@ -1,0 +1,15 @@
+format: mavai-contract/1
+contract: form-parses-fails
+service: form-oracle
+transforms:
+  doc: json
+  xmlview: xml
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - parses: xmlview
+inputs:
+  - "judge the document"
+  - "judge it again"
