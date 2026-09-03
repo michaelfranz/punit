@@ -1702,15 +1702,16 @@ human enough context to decide whether to act.
 
 ## Part 11: Reports
 
-PUnit emits a structured artefact from every run — verdict XML for a
-probabilistic test, YAML records for MEASURE, EXPLORE and OPTIMIZE
-experiments — and renders none of them. HTML reports for the whole mavai
-family come from one shared renderer, **`mavai`** (the
-[mavai-report](https://github.com/mavai-org/mavai) tool), which reads the
-canonical interchange artefacts whichever framework produced them. A
-report is therefore implemented once, for punit, feotest and baseltest
-alike, and every number on the page is one the framework stated in the
-artefact; the renderer derives nothing.
+PUnit renders no HTML itself. Every run emits a structured artefact —
+verdict XML for a probabilistic test, YAML records for MEASURE, EXPLORE
+and OPTIMIZE experiments — and reports are produced from those artefacts
+by a separate tool: **[`mavai`](https://github.com/mavai-org/mavai)**, a
+single-binary renderer. (It is a separate tool rather than a part of
+PUnit because the same renderer also serves PUnit's sister frameworks,
+feotest and baseltest.) The division buys you a guarantee worth having:
+every number on a report page is one PUnit stated in the artefact — the
+renderer derives nothing — so the page can never disagree with the
+artefact your build archived.
 
 ### Installing the renderer
 
@@ -1777,8 +1778,8 @@ ranking is unchanged) for runs whose scorer is the observed pass rate.
 **Measurement records.** `mavai measure` renders `mavai-baseline-1`
 documents. PUnit's baselines are still written in its own
 `punit-baseline-3` layout, which the renderer does not read, so a punit
-baseline is inspected as YAML for now; the migration to the family
-format is tracked in the project's changelog.
+baseline is inspected as YAML for now; the migration to the renderer's
+`mavai-baseline-1` format is tracked in the project's changelog.
 
 In CI, run the renderer after the tests and publish the page as a build
 artefact. A failed render is a diagnostic, not a verdict: the test
@@ -1791,22 +1792,22 @@ task's own exit status states the run.
 > verdict XML sink, the bundled verdict schemas and the `punitVerify`
 > verifier live.
 
-### Verdict XML (RP07)
+### Verdict XML
 
 Every probabilistic test verdict serialises to an XML file conforming
-to the **RP07 mavai verdict interchange standard**:
+to the published **mavai verdict schema**:
 
 - Namespace: `http://mavai.org/verdict/1.0`
 - Root: `<verdict-record>`
 - Schema: the `verdict-1.x.xsd` revisions bundled in `punit-report`,
-  vendored from the family's published interchange schemas.
+  vendored from the published mavai schema releases.
 
 The schema covers identity, verdict, criterion results, postcondition
 standings, sample counts, latency percentiles, baseline expiration,
-environment metadata, contract reference, and correlation id. The verdict
-XML is the one format that flows between punit, feotest, baseltest and
-the `mavai` renderer — sentinels and dashboards consume it without caring
-which framework produced it.
+environment metadata, contract reference, and correlation id. Because
+the format is versioned and schema-checked, tools downstream of your
+build — the `mavai` renderer, sentinels, dashboards — consume the
+verdict record without knowing anything about your test code.
 
 Configuration: set the output directory via system property
 (`-Dpunit.report.dir=...`) or the `punit { }` Gradle extension.
