@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-07
+
 ### Removed
 
 - **PUnit no longer renders HTML; the family's shared `mavai` tool
@@ -234,23 +236,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   schemas cannot express (ascending passing-latency vector,
   floor-gated percentile statement, convergence consistency).
 
-- **Per-criterion matrix transposed in both comparison HTML reports.**
-  The exploration and optimization comparison reports' "Per-criterion
-  comparison" table now lists variants/iterations as rows and criteria
-  as columns (previously the reverse). Bounds the table's column count
-  to the criteria set instead of letting it grow with every
-  variant/iteration, and aligns row identity with the leaderboard
-  table above it.
-- **Comparison-report renderers de-duplicated.** The Explore and
-  Optimize `HtmlWriter`s shared a near-identical `CriterionResult`
-  record and near-identical per-criterion-matrix, latency-cell,
-  cost-cell, termination-cell, pass-rate-cell, number-formatting, and
-  chart-CSS code. `CriterionResult` and these section renderers now
-  live once in a new `org.mavai.punit.report.ComparisonReportHtml`
-  (alongside the existing shared `ReportHtml`); each report's
-  `HtmlWriter` supplies only what's genuinely report-specific. No
-  behavioural change — output is unchanged.
-
 ### Fixed
 
 - **A declarative service type is found from a consuming project.**
@@ -373,10 +358,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   previously described the convention-default path as "on the classpath"
   — it's a filesystem path relative to the working directory, not a
   classpath resource lookup; corrected in both places.
-
-- Brought the optimize comparison report's description in the user guide
-  (Part 11) in line with the 0.9.3 run-order layout — iterations listed in
-  run order with a **Rank** column, not a score-sorted leaderboard.
 
 ## [0.9.3] - 2026-06-30
 
@@ -1437,7 +1418,8 @@ unit testing of non-deterministic systems.
 - Verbose statistical explanation output
 - Gradle plugin (`org.javai.punit`) for test/experiment task configuration
 
-[Unreleased]: https://github.com/javai-org/punit/compare/v0.7.0-alpha5...HEAD
+[Unreleased]: https://github.com/mavai-org/punit/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/mavai-org/punit/compare/v0.9.3...v0.10.0
 [0.7.0-alpha5]: https://github.com/javai-org/punit/compare/v0.7.0-alpha4...v0.7.0-alpha5
 [0.7.0-alpha4]: https://github.com/javai-org/punit/compare/v0.7.0-alpha3...v0.7.0-alpha4
 [0.7.0-alpha3]: https://github.com/javai-org/punit/compare/v0.7.0-alpha2...v0.7.0-alpha3
