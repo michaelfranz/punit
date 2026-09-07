@@ -1,0 +1,16 @@
+format: mavai-contract/1
+contract: form-equals-set-holds
+service: form-oracle
+transforms:
+  doc: json
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - in: doc
+        path: "$.tags[*]"
+        equals-set: ["b", "a", "b"]
+inputs:
+  - "judge the document"
+  - "judge it again"

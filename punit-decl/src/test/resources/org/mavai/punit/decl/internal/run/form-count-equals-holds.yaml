@@ -1,0 +1,19 @@
+format: mavai-contract/1
+contract: form-count-equals-holds
+service: form-oracle
+transforms:
+  doc: json
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - in: doc
+        path: "$.tags[*]"
+        count-equals: 3
+      - in: doc
+        path: "$.empty[*]"
+        count-equals: 0
+inputs:
+  - "judge the document"
+  - "judge it again"

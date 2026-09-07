@@ -66,6 +66,19 @@ class MavaiBindings {
                 """;
     }
 
+    @Binding("form-oracle")
+    String formOracle(String instruction) {
+        // One fixed document every postcondition form is judged over:
+        // decimals in both spellings, a case-varied padded string, a
+        // null, both booleans, a list with a duplicate, an empty list.
+        return """
+                {"n": 12.5, "s": "500.00", "padded": "  hELLO   world ",
+                 "nothing": null, "yes": true, "no": false,
+                 "tags": ["a", "b", "b"], "empty": [],
+                 "amounts": [1200, 950.5], "status": "approved"}
+                """;
+    }
+
     @Binding("repeater")
     String repeat(String item, int count) {
         return item + " x" + count;
@@ -108,6 +121,11 @@ class MavaiBindings {
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         return factory.newDocumentBuilder()
                 .parse(new org.xml.sax.InputSource(new java.io.StringReader(response)));
+    }
+
+    @Check("has-status")
+    boolean hasStatus(String subject) {
+        return subject.contains("status");
     }
 
     @Check("mentions-category")

@@ -1,0 +1,14 @@
+format: mavai-contract/1
+contract: form-matches-holds
+service: form-oracle
+transforms:
+  doc: json
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - matches: '"status": "approved"'
+inputs:
+  - "judge the document"
+  - "judge it again"

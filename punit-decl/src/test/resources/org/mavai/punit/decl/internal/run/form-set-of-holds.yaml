@@ -1,0 +1,19 @@
+format: mavai-contract/1
+contract: form-set-of-holds
+service: form-oracle
+transforms:
+  doc: json
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - in: doc
+        path: "$.tags[*]"
+        set-of:
+          required: ["a"]
+          optional: ["b", "c"]
+          min-present: 1
+inputs:
+  - "judge the document"
+  - "judge it again"

@@ -1,0 +1,15 @@
+format: mavai-contract/1
+contract: form-lt-fails
+service: form-oracle
+transforms:
+  doc: json
+criteria:
+  - name: the-form-holds
+    threshold: 0.9
+    postconditions:
+      - parses: doc
+      - path: "$.n"
+        lt: 12.5
+inputs:
+  - "judge the document"
+  - "judge it again"
