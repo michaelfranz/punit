@@ -64,7 +64,10 @@ class PUnitPlugin : Plugin<Project> {
         project.dependencies.add("punitSentinel",
             "org.mavai:punit-sentinel:$punitVersion")
 
-        // Create a dedicated configuration for punit-report (HTML report generation)
+        // Create a dedicated configuration for punit-report (verdict XML reading,
+        // used by punitVerify). HTML rendering is not punit's job: the shared
+        // `mavai` renderer draws every report for the family from the emitted
+        // artefacts.
         val reportConfig = project.configurations.create("punitReport") {
             isCanBeConsumed = false
             isCanBeResolved = true
@@ -86,9 +89,6 @@ class PUnitPlugin : Plugin<Project> {
                 "Shorthand for 'experiment' task")
 
             registerCreateSentinelTask(project, extension, sentinelConfig)
-            registerPUnitReportTask(project, reportConfig)
-            registerExplorationReportTask(project, extension, reportConfig)
-            registerOptimizationReportTask(project, extension, reportConfig)
             registerPUnitVerifyTask(project, reportConfig)
             registerMavaiCheckTask(project, extension)
             registerMavaiMaterialiseTask(project)
@@ -107,7 +107,8 @@ class PUnitPlugin : Plugin<Project> {
 
             systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
 
-            // Set default report directory so VerdictXmlSink writes to where punitReport reads
+            // Set default report directory so VerdictXmlSink writes to where
+            // punitVerify reads (and where `mavai verdict build/reports/punit` renders from)
             if (System.getProperty("punit.report.dir") == null) {
                 systemProperty("punit.report.dir",
                     project.layout.buildDirectory.dir("reports/punit/xml").get().asFile.absolutePath)
@@ -461,55 +462,6 @@ class PUnitPlugin : Plugin<Project> {
             }
         } catch (_: Throwable) {
             // Skip classes that can't be loaded
-        }
-    }
-
-    private fun registerPUnitReportTask(
-        project: Project,
-        reportConfig: org.gradle.api.artifacts.Configuration
-    ) {
-        project.tasks.register("punitReport", PUnitReportTask::class.java).configure {
-            description = "Generates an HTML report from PUnit test verdict XML files"
-            group = "verification"
-            xmlDir.set(project.layout.buildDirectory.dir("reports/punit/xml"))
-            htmlDir.set(project.layout.buildDirectory.dir("reports/punit/html"))
-            reportClasspath.from(reportConfig)
-        }
-    }
-
-    private fun registerExplorationReportTask(
-        project: Project,
-        extension: PUnitExperimentExtension,
-        reportConfig: org.gradle.api.artifacts.Configuration
-    ) {
-        project.tasks.register("explorationReport", PUnitExploreReportTask::class.java).configure {
-            description = "Generates an HTML report comparing EXPLORE experiment variants"
-            group = "verification"
-            val rootPath = extension.explorationsDir
-            explorationsRootPath.set(rootPath)
-            // Optional input-file tracking only; a missing root resolves to an
-            // empty tree, so the task still runs and emits a "no explorations" page.
-            explorationFiles.from(rootPath.map { project.fileTree(it) { include("**/*.yaml") } })
-            htmlDir.set(project.layout.buildDirectory.dir("reports/punit-explorations/html"))
-            reportClasspath.from(reportConfig)
-        }
-    }
-
-    private fun registerOptimizationReportTask(
-        project: Project,
-        extension: PUnitExperimentExtension,
-        reportConfig: org.gradle.api.artifacts.Configuration
-    ) {
-        project.tasks.register("optimizationReport", PUnitOptimizeReportTask::class.java).configure {
-            description = "Generates an HTML report summarising OPTIMIZE experiment iterations"
-            group = "verification"
-            val rootPath = extension.optimizationsDir
-            optimizationsRootPath.set(rootPath)
-            // Optional input-file tracking only; a missing root resolves to an
-            // empty tree, so the task still runs and emits a "no optimizations" page.
-            optimizationFiles.from(rootPath.map { project.fileTree(it) { include("**/*.yaml") } })
-            htmlDir.set(project.layout.buildDirectory.dir("reports/punit-optimizations/html"))
-            reportClasspath.from(reportConfig)
         }
     }
 

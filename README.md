@@ -57,7 +57,7 @@ Some systems do not yield the same outcome on every run — LLMs, ML models, ran
 | **Budget control**         | Time and token budgets at method, class, or suite level              |
 | **Pacing constraints**     | Declare API rate limits; framework computes optimal execution pace   |
 | **Latency assertions**     | Per-percentile latency thresholds (p50, p90, p95, p99)               |
-| **HTML report**            | Standalone report with per-test statistical detail                   |
+| **Interchange artefacts**  | Verdict XML and experiment YAML, rendered by the family's shared `mavai` tool |
 | **Sentinel**               | JUnit-free engine for probabilistic testing in deployed environments |
 
 ## Project structure
@@ -68,7 +68,7 @@ PUnit ships as three published artefacts plus a Gradle plugin:
 |------------------------|----------------------------|------------------------------------------------------------------------------------------------------------------|
 | **punit-core**         | `org.mavai:punit-core`     | Foundational library: author-facing API (`ServiceContract`, `Contract`, `Sampling`, criteria), engine, statistics, baselines, runtime entry point. Carries the user-facing `@ProbabilisticTest` and `@Experiment` annotations (meta-annotated with `@Test`). JUnit-free at runtime; sentinel-deployable directly. |
 | **punit-sentinel**     | `org.mavai:punit-sentinel` | Sentinel runner for production/scheduled probabilistic checks without a test harness.                            |
-| **punit-report**       | `org.mavai:punit-report`   | HTML report generator and verdict-XML reader/writer; auto-registers an XML `VerdictSink` via `ServiceLoader`.    |
+| **punit-report**       | `org.mavai:punit-report`   | Verdict-XML reader/writer, bundled verdict schemas and verifier; auto-registers an XML `VerdictSink` via `ServiceLoader`. Renders nothing: HTML comes from the shared `mavai` renderer. |
 | **punit Gradle plugin**| `org.mavai.punit` (plugin) | Auto-configures the `test` task, registers `experiment` / `exp` tasks, supports `-Prun=` filtering.              |
 
 The three library artefacts share the `punit-` prefix; `punit-core` is the foundation, the others extend it.
@@ -170,7 +170,7 @@ Find many examples in the [punitexamples repository](https://github.com/mavai-or
 
 ## Documentation
 
-The **[User Guide](docs/USER-GUIDE.md)** is the comprehensive reference for PUnit. It covers the full experimentation-to-testing workflow, the service contract pattern, latency assertions, budget and pacing control, the statistical core, the Sentinel runtime, and the HTML report.
+The **[User Guide](docs/USER-GUIDE.md)** is the comprehensive reference for PUnit. It covers the full experimentation-to-testing workflow, the service contract pattern, latency assertions, budget and pacing control, the statistical core, the Sentinel runtime, and rendering reports with the shared `mavai` tool.
 
 The **[Statistical Companion](docs/STATISTICAL-COMPANION.md)** covers the mathematical foundations for readers who want to understand the inference machinery.
 

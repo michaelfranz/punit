@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 
 @DisplayName("PUnit Gradle Plugin")
@@ -250,27 +251,29 @@ class PUnitPluginFunctionalTest {
     }
 
     @Nested
-    @DisplayName("PUnit Report Task")
-    inner class PUnitReportTaskTests {
+    @DisplayName("Reporting")
+    inner class Reporting {
 
         @Test
-        @DisplayName("punitReport task is registered with correct description")
-        fun taskIsRegistered() {
+        @DisplayName("the plugin registers no HTML report tasks: rendering belongs to the mavai renderer")
+        fun noReportTasks() {
             buildFile.writeText(buildFileWithPlugin())
 
             val result = runner("tasks", "--all").build()
 
-            assertTrue(result.output.contains("punitReport - Generates an HTML report from PUnit test verdict XML files"))
+            assertFalse(result.output.contains("punitReport - "))
+            assertFalse(result.output.contains("explorationReport"))
+            assertFalse(result.output.contains("optimizationReport"))
         }
 
         @Test
-        @DisplayName("punitReport task appears in verification group")
-        fun taskInVerificationGroup() {
+        @DisplayName("punitVerify task remains in the verification group")
+        fun verifyTaskRemains() {
             buildFile.writeText(buildFileWithPlugin())
 
             val result = runner("tasks", "--group=verification").build()
 
-            assertTrue(result.output.contains("punitReport"))
+            assertTrue(result.output.contains("punitVerify"))
         }
     }
 

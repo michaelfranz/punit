@@ -1124,9 +1124,7 @@ sub-directory is named by the factors the experiment sweeps, joined with
 `+` (`temperature`, `temperature+model`), or `baseline-only` when nothing
 varies, so evolving what is swept opens a fresh directory and never
 strands a superseded artefact beside fresh ones. Render them with the
-shared `mavai explore` report (the in-punit `explorationReport` task
-predates this layout and is slated for removal in favour of the `mavai`
-renderer).
+shared `mavai explore` report ([Part 11](#part-11-reports)).
 
 Output is an exploration grid file: one row per configuration with
 observed pass rate, latency percentiles, postcondition failure
@@ -1639,9 +1637,10 @@ The Sentinel binary returns:
 - Exit 3 on engine-level error.
 
 Use these in container health checks, scheduled jobs, or CI pipeline
-steps. Verdict XML and (optionally) HTML reports are emitted to a
-configured directory in the same shape as the development-time runs;
-[Part 11](#part-11-reports) covers the report format.
+steps. Verdict XML is emitted to a configured directory in the same
+shape as the development-time runs, so the same `mavai verdict` command
+renders it; [Part 11](#part-11-reports) covers the artefacts and the
+renderer.
 
 ### Baseline file location
 
@@ -1703,95 +1702,112 @@ human enough context to decide whether to act.
 
 ## Part 11: Reports
 
-PUnit emits structured reports from every run, suitable for both
-human reading and machine consumption.
+PUnit renders no HTML itself. Every run emits a structured artefact —
+verdict XML for a probabilistic test, YAML records for MEASURE, EXPLORE
+and OPTIMIZE experiments — and reports are produced from those artefacts
+by a separate tool: **[`mavai`](https://github.com/mavai-org/mavai)**, a
+single-binary renderer. (It is a separate tool rather than a part of
+PUnit because the same renderer also serves PUnit's sister frameworks,
+feotest and baseltest.) The division buys you a guarantee worth having:
+every number on a report page is one PUnit stated in the artefact — the
+renderer derives nothing — so the page can never disagree with the
+artefact your build archived.
 
-### HTML report
+### Installing the renderer
 
-For local development and CI artifacts, PUnit can generate an HTML
-report aggregating every verdict from the most recent run:
-
-```bash
-./gradlew test punitReport
-```
-
-Output: `build/reports/punit/html/index.html`. The report shows, per test:
-
-- The verdict (PASS / FAIL / INCONCLUSIVE) and the contract reference.
-- The criteria evaluated and their individual results.
-- The per-postcondition failure histogram with exemplars.
-- The latency profile (percentiles plus the full distribution as a
-  histogram).
-- The covariate alignment between the run and the matched baseline.
-- The transparent-statistics breakdown if it was enabled.
-
-### Experiment comparison reports
-
-Beyond the per-test report above, PUnit renders browser-friendly
-**comparison reports** for EXPLORE and OPTIMIZE experiments — a single
-self-contained HTML page that ranks the candidates so you can see at a
-glance which performed best, without reading the raw YAML. Both share the
-test report's styling and, like it, embed all CSS and make no external
-requests, so they open directly from disk with no server.
-
-Run a comparison report after the experiment that produces its data
-(`./gradlew exp -Prun=YourExperiment`). If no experiments have been run,
-the report states that none were found rather than failing the build.
-
-**Exploration comparison.** Compares the variants of an EXPLORE
-experiment (one factor combination — model, temperature, system prompt, …
-— per variant), overall and per criterion:
+`mavai` is a single static binary, published per platform on the
+[mavai-org/mavai releases](https://github.com/mavai-org/mavai/releases)
+page (Linux x86-64 and arm64, macOS Intel and Apple silicon, Windows
+x86-64). Download the archive for your platform, unpack it, and put the
+executable on your `PATH`. Each release also ships a `fetch-binary.sh`
+helper that downloads one platform's archive, checks it against the
+release's `SHA256SUMS`, and writes the executable where you ask — the
+recommended route for CI:
 
 ```bash
-./gradlew explorationReport
+curl -fsSLO https://github.com/mavai-org/mavai/releases/download/v<version>/fetch-binary.sh
+sh fetch-binary.sh --version <version> --target aarch64-apple-darwin --output build/mavai
+build/mavai --version
 ```
 
-Reads the exploration YAML under `build/punit/explorations/<service>/`
-(the `explorationsDir`) and writes
-`build/reports/punit-explorations/html/index.html`. Per service it shows a
-ranked leaderboard (overall pass rate, then latency, then cost), a
-per-criterion matrix comparing the variants check-by-check, and a
-latency-distribution strip per variant. Variants whose ranking rests on a
-margin within 5% are flagged **too close to call** (a presentational
-marker, not a significance test).
+### Rendering a report
 
-**Optimization comparison.** Summarises one OPTIMIZE experiment's
-iterations, ranked by the scorer:
+Every `mavai` command takes the *directory* holding the artefacts and
+writes a single self-contained HTML page (embedded CSS, no JavaScript, no
+external assets) to stdout, or to a file with `-o`. Diagnostics go to
+stderr, and the exit code is non-zero only when nothing was renderable —
+files that are not the expected artefact are skipped and named, never
+fatal.
 
-```bash
-./gradlew optimizationReport
-```
+The renderer walks one directory level below the root it is given, so
+hand it the **parent** of where punit writes:
 
-Reads the optimization YAML under `build/punit/optimizations/<service>/`
-(the `optimizationsDir`) and writes
-`build/reports/punit-optimizations/html/index.html`. Per run it names the
-service and the optimisation objective (`MAXIMIZE` / `MINIMIZE`), then lists
-the iterations in run order — each row expanding to reveal the factor bundle
-that produced it — carrying the objective-aware score rank in a **Rank**
-column rather than by row order, so the run reads as the sequence it
-actually ran in. The chosen best iteration is highlighted. A per-criterion
-matrix and a score trajectory across the run follow. Iterations within 5% of
-each other on score share a rank and are flagged **too close to call**.
+| PUnit run                            | Artefact                | Command                                                         |
+|--------------------------------------|-------------------------|-----------------------------------------------------------------|
+| `./gradlew test` (probabilistic tests) | verdict XML, flat under `build/reports/punit/xml/` | `mavai verdict build/reports/punit -o build/reports/punit/verdict.html` |
+| `./gradlew exp` (EXPLORE)            | `mavai-explore-1` YAML under `build/punit/explorations/<service>/<swept-keys>/` | `mavai explore build/punit/explorations/<service> -o build/reports/explore.html` |
+| `./gradlew exp` (OPTIMIZE)           | `mavai-optimize-1` YAML under `build/punit/optimizations/<service>/` | `mavai optimize build/punit/optimizations -o build/reports/optimize.html` |
 
-Both tasks reuse the `punit { }` extension's existing output-directory
-properties (`explorationsDir`, `optimizationsDir`); no extra configuration
-is required for the defaults.
+The directories are the `punit { }` extension's defaults
+(`explorationsDir`, `optimizationsDir`) and the verdict-XML default from
+the [configuration table](#appendix-a-configuration); point `mavai` at
+whatever you configured instead. Explorations sit one level deeper than
+the other artefacts ([Part 5](#part-5-exploring) explains the
+swept-keys directory), which is why the explore command names the
+service: its swept-keys sub-directories become the report's groups.
 
-### Verdict XML (RP07)
+**Verdict report.** One page over every verdict record beneath the
+directory, grouped by service contract (the record's use-case identity,
+never the filename): per run, the verdict, each criterion's outcome, and
+the descriptive postcondition standings the record states — counts and
+observed fractions per check, with partial credit flagged where the
+contract declared optional checks. The run-design disclosures of
+[Part 12](#part-12-statistics--what-is-actually-computed) travel in the
+same record.
+
+**Exploration comparison.** Per service, ranks the configurations of an
+EXPLORE experiment (one factor combination — model, temperature, system
+prompt, … — per configuration), overall and criterion by criterion, with
+the postcondition standings beside the pass rate.
+
+**Optimization comparison.** Per run, the iterations of an OPTIMIZE
+experiment ranked by the scorer, the chosen iteration marked, and the
+factor bundle behind each. `--hide-scores` omits the score display (the
+ranking is unchanged) for runs whose scorer is the observed pass rate.
+
+**Measurement records.** `mavai measure` renders `mavai-baseline-1`
+documents. PUnit's baselines are still written in its own
+`punit-baseline-3` layout, which the renderer does not read, so a punit
+baseline is inspected as YAML for now; the migration to the renderer's
+`mavai-baseline-1` format is tracked in the project's changelog.
+
+In CI, run the renderer after the tests and publish the page as a build
+artefact. A failed render is a diagnostic, not a verdict: the test
+task's own exit status states the run.
+
+> **Upgrading from 0.9.x.** The `punitReport`, `explorationReport` and
+> `optimizationReport` Gradle tasks, and the HTML writers behind them in
+> `punit-report`, were removed in 0.10.0. Replace each with the matching
+> `mavai` command above. `punit-report` itself stays: it is where the
+> verdict XML sink, the bundled verdict schemas and the `punitVerify`
+> verifier live.
+
+### Verdict XML
 
 Every probabilistic test verdict serialises to an XML file conforming
-to the **RP07 mavai verdict interchange standard**:
+to the published **mavai verdict schema**:
 
 - Namespace: `http://mavai.org/verdict/1.0`
 - Root: `<verdict-record>`
-- Schema: `verdict-1.0.xsd` (bundled in `punit-report`).
+- Schema: the `verdict-1.x.xsd` revisions bundled in `punit-report`,
+  vendored from the published mavai schema releases.
 
-The schema covers identity, verdict, criterion results, sample
-counts, latency percentiles, baseline expiration, environment
-metadata, contract reference, and correlation id. The verdict XML is
-the one format that flows between punit, feotest, and mavai.org —
-sentinels and dashboards consume it without caring which framework
-produced it.
+The schema covers identity, verdict, criterion results, postcondition
+standings, sample counts, latency percentiles, baseline expiration,
+environment metadata, contract reference, and correlation id. Because
+the format is versioned and schema-checked, tools downstream of your
+build — the `mavai` renderer, sentinels, dashboards — consume the
+verdict record without knowing anything about your test code.
 
 Configuration: set the output directory via system property
 (`-Dpunit.report.dir=...`) or the `punit { }` Gradle extension.
@@ -1933,7 +1949,7 @@ PUnit resolves configuration in this order (highest priority first):
 | Setting                 | System property              | Env var                     | Default                                            |
 |-------------------------|------------------------------|-----------------------------|----------------------------------------------------|
 | Baseline directory      | `punit.baseline.dir`         | `PUNIT_BASELINE_DIR`        | `src/test/resources/punit/baselines/` (filesystem, relative to CWD) |
-| Report directory        | `punit.report.dir`           | `PUNIT_REPORT_DIR`          | `build/reports/punit/xml/` (verdict XML; the HTML report is written beside it under `build/reports/punit/html/`) |
+| Report directory        | `punit.report.dir`           | `PUNIT_REPORT_DIR`          | `build/reports/punit/xml/` (verdict XML; render with `mavai verdict build/reports/punit`) |
 | Transparent stats       | `punit.stats.transparent`    | `PUNIT_STATS_TRANSPARENT`   | `false`                                            |
 | Confidence level        | `punit.confidence`           | `PUNIT_CONFIDENCE`          | `0.95`                                             |
 | Latency enforcement     | `punit.latency.enforcement`  | `PUNIT_LATENCY_ENFORCEMENT` | `advisory`                                         |

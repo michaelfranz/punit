@@ -23,18 +23,19 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 /**
  * The run-design disclosures through the full production pipeline:
- * {@code PUnit.testing(...)} → verdict adapter → XML sink → report
- * generator. Measures a baseline over 200 samples at a 96% criterion
- * rate, runs a downsized empirical test (80 samples, token costs
- * recorded: the full sizing trade), a declared-threshold test
- * (approach disclosure alone), and a risk-driven test (a declared
- * absolute tolerance priced to a computed count), then renders the
- * HTML report from the emitted verdict XML. Each run is its own
- * ordered test method so each verdict lands in its own XML file.
+ * {@code PUnit.testing(...)} → verdict adapter → XML sink. Measures a
+ * baseline over 200 samples at a 96% criterion rate, runs a downsized
+ * empirical test (80 samples, token costs recorded: the full sizing
+ * trade), a declared-threshold test (approach disclosure alone), and a
+ * risk-driven test (a declared absolute tolerance priced to a computed
+ * count), asserting the disclosures in the emitted verdict XML. Each
+ * run is its own ordered test method so each verdict lands in its own
+ * XML file.
  *
  * <p>Doubles as a hands-on demo: run with
  * {@code ./gradlew :punit-report:test --tests RunDesignDisclosurePipelineTest}
- * and open {@code punit-report/build/run-design-demo/html/index.html}.
+ * and render the records with
+ * {@code mavai verdict punit-report/build/run-design-demo -o report.html}.
  */
 @DisplayName("Run-design disclosures through the production pipeline")
 @TestMethodOrder(OrderAnnotation.class)
@@ -162,21 +163,5 @@ class RunDesignDisclosurePipelineTest {
                 .contains("key=\"sizing-declared-power\" value=\"0.8\"")
                 .contains("key=\"sizing-computed-samples\" value=\"" + expected + "\"")
                 .contains("key=\"sizing-detectable-rate\"");
-    }
-
-    @Test
-    @Order(5)
-    @DisplayName("the HTML report renders the run-design block from the emitted XML")
-    void renderReport() throws Exception {
-        new ReportGenerator().generate(DEMO_DIR.resolve("xml"), DEMO_DIR.resolve("html"));
-        String html = java.nio.file.Files.readString(DEMO_DIR.resolve("html/index.html"));
-        assertThat(html)
-                .contains("Run design")
-                .contains("confidence-first (risk-driven)")
-                .contains("Tolerated rate")
-                .contains("would only catch a drop below")
-                .contains("less execution time and tokens");
-        System.out.println("report written to "
-                + DEMO_DIR.resolve("html/index.html").toAbsolutePath());
     }
 }

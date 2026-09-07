@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+
+- **PUnit no longer renders HTML; the family's shared `mavai` tool
+  does.** The `punitReport`, `explorationReport` and
+  `optimizationReport` Gradle tasks are gone, along with the writers
+  behind them in `punit-report` (`ReportGenerator`, `HtmlReportWriter`,
+  `ReportHtml`, `ComparisonReportHtml`, and the `report.explore` and
+  `report.optimize` packages). A framework emits artefacts; turning them
+  into a page is one job, done once for punit, feotest and baseltest by
+  the [mavai renderer](https://github.com/mavai-org/mavai). Replace
+  `./gradlew punitReport` with `mavai verdict build/reports/punit`,
+  `explorationReport` with `mavai explore build/punit/explorations/<service>`, and
+  `optimizationReport` with `mavai optimize build/punit/optimizations`;
+  the User Guide's Part 11 walks through installing the binary and
+  rendering each report. `punit-report` remains the home of the verdict
+  XML sink, the bundled verdict schemas and the `punitVerify` verifier,
+  and no longer depends on snakeyaml. Known gap, recorded rather than
+  papered over: `mavai measure` reads `mavai-baseline-1`, while punit
+  still writes `punit-baseline-3`, so punit baselines are not yet
+  renderable.
+
 ### Added
 
 - **A language-model service states how long it will be waited for.**

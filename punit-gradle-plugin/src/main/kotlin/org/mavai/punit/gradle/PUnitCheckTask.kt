@@ -28,7 +28,7 @@ import java.nio.file.Path
  * root) is resolved when present.
  *
  * Uses classpath isolation via [URLClassLoader] over the test runtime
- * classpath — the same approach as the report tasks — so the consumer's
+ * classpath — the same approach as the verify task — so the consumer's
  * bindings classes and service types resolve exactly as a test run
  * would see them.
  */
